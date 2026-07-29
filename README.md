@@ -12,6 +12,44 @@ PDF de 4 páginas — tudo entregue por e-mail após o pagamento.
 > desenvolvimento e deploy — leia também o `SPEC.md`, que é mais detalhado
 > sobre a visão de produto, tom de voz e regras de negócio.
 
+## ⚠️ Leia primeiro: o código está uma versão atrás do SPEC
+
+O `SPEC.md` foi reescrito (v1, jul/2026) e passou de produto único para
+plataforma. **O que este README descreve abaixo é a v0 antiga, que é o que
+roda hoje na VPS.** A tabela é a distância entre os dois — e sete das linhas
+estão marcadas como **travado** no Apêndice A do SPEC, ou seja, não são
+sugestão:
+
+| SPEC v1 | Código hoje |
+|---|---|
+| Mercado Pago (Payment Brick), seção 10.1 | **Asaas** Checkout hospedado — gateway que não aparece em nenhuma versão do SPEC |
+| Quiz de 26 itens, circumplexo de 2 eixos (2.2) | 8 perguntas, `+2 pontos por bicho` (`lib/familiares.ts`) |
+| Signo com peso **ZERO** na escolha (2.4) | elemento do signo solar **é o critério de desempate** |
+| Gemini 3.5 na voz, 3.1 só na vigilância (8.1) | 3.1-flash-lite na voz; vigilância inexistente |
+| 12 escores de afinidade salvos (0.8) | não são calculados; sem coluna no schema |
+| Dois produtos, R$ 9,80 e R$ 18,90 (0.3) | um preço, `980` hardcoded em dois arquivos |
+| Micro-avisos em 9 pontos do fluxo (7.4) | um link no rodapé (`components/RodapeLegal.tsx`) |
+| Conta, verificação de e-mail, endereço permanente (0.5) | pedido anônimo identificado por uuid |
+| Oráculo com 3 perguntas grátis (0.4) | `/api/oraculo` só grava e-mail + pergunta numa lista de espera |
+| Carta compartilhável **para quem não pagou** (0.3) | toda geração de arte roda depois do pagamento |
+| Tiragem diária, perfil público, roda dos 12 (0.3) | não existem |
+| Leitura mora em endereço permanente, não em arquivo (0.5) | PDF de 4 páginas é o centro da entrega (`lib/pdf.ts`) |
+
+O diagnóstico da seção 2.1 do SPEC — *"não parece que as perguntas definem o
+familiar, e sim o signo"* — está literalmente no código: com 8 itens para 12
+saídas os empates são a regra, e `calcularFamiliar()` resolve empate pelo
+elemento do signo solar. O sintoma relatado é o comportamento projetado.
+
+**Risco aberto:** existe campo de texto livre (`components/FormularioOraculo.tsx`)
+gravando pergunta do usuário sem lista de gatilhos, sem classificador e sem
+protocolo de crise — o que o SPEC 0.4 chama de "inegociável enquanto o campo
+existir". Atenuante: o DNS do domínio nunca foi apontado (ver Pendências), então
+a página provavelmente não é alcançável.
+
+**Sem vendas concluídas:** o banco tem pedidos, todos em
+`aguardando_pagamento`. Nenhum cliente para migrar — o remodelamento tem mão
+livre.
+
 ## Stack
 
 - **Next.js 16** (App Router, Turbopack) + React 19 + TypeScript + Tailwind 4
@@ -26,7 +64,30 @@ PDF de 4 páginas — tudo entregue por e-mail após o pagamento.
   fake" pra dev local (ver `lib/pagamento.ts`)
 - **rembg** (Python, `isnet-general-use`) — usado *uma única vez*, offline, pra
   remover o fundo dos 12 PNGs dos animais. Não roda em produção; as saídas já
-  ficam versionadas em `assets/familiares/`
+  ficam versionadas em `assets/familiares/`. O `.venv/` de 955 MB que sobrou
+  desse processamento foi apagado — se precisar reprocessar um animal novo:
+  `python3 -m venv .venv && .venv/bin/pip install rembg onnxruntime`
+
+## Organização das pastas
+
+```
+app/         rotas (App Router) + API routes
+components/  componentes de UI React
+lib/         toda a lógica: banco, pagamento, IA, arte, PDF, astro
+assets/      fontes (.ttf/.woff2) e PNGs dos 12 familiares + 4 luas
+             → fonte de verdade: app/layout.tsx importa os .woff2 daqui,
+               lib/pdf.ts embute os .ttf daqui, e é daqui que se copia
+               pro sistema operacional (ver seção de fontes abaixo)
+public/       só exemplos/ (3 PNGs da landing) e o favicon
+scripts/      utilitários avulsos (tsx), fora do runtime
+data/         banco SQLite — nunca versionado, nunca sobrescrito por deploy
+storage/      artes/PDFs gerados por pedido — idem
+imagens/      matéria-prima de divulgação, 265 MB, não versionada (ver abaixo)
+```
+
+Não há testes no projeto. Vale notar que o SPEC 0.7 abre justamente pedindo o
+motor de pontuação como "lógica pura, testável no terminal" — é o primeiro
+lugar onde teste passa a fazer diferença.
 
 ## Pasta `imagens/` (produção de conteúdo)
 
@@ -202,9 +263,18 @@ sobrescritos por um deploy — ficam só no servidor, fora do rsync.
 
 ## Limitações conhecidas / próximos passos
 
+O roteiro real está no `SPEC.md` seção 0.7 ("Ordem de construção"), que começa
+por quatro tarefas offline: motor de pontuação do circumplexo com testes, os 26
+itens com vetores de carga, o caso-exemplo nas 12 vozes, e a lista
+determinística de gatilhos da vigilância. Fora isso:
+
 - Sem painel admin — consultas via `sqlite3 data/bruxario.db` direto no SSH
   (decisão do `SPEC.md`: menos superfície de ataque na v1)
-- Oráculo Horário (fase 2, `SPEC.md` seção 12) — só captura e-mail/pergunta
-  em `oraculo_espera` por enquanto, sem produto ativo
 - Sem cancelamento automático de cobranças `aguardando_pagamento` antigas
   (o `SPEC.md` sugere um job diário; ainda não implementado)
+- `app/termos/page.tsx` junta termos e privacidade numa página curta. O SPEC 7.5
+  pede três páginas separadas, e falta o essencial: controlador/CNPJ, canal do
+  encarregado (DPO), base legal por finalidade, transferência internacional,
+  decisão automatizada (art. 20) e direito de arrependimento de 7 dias
+- A decisão **18+ ou construir para menor** (SPEC 7.3) está pendente e trava a
+  redação das páginas legais e o corpus inteiro
