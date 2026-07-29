@@ -1,7 +1,7 @@
 import sharp from 'sharp';
 import path from 'path';
 import fs from 'fs';
-import { FAMILIARES, type FamiliarId, type LuaId } from '../lib/familiares';
+import { FAMILIARES, type FamiliarId, type LuaId } from '../src/lib/familiares';
 
 const CORES = {
   tinta: '#171225',
@@ -9,8 +9,8 @@ const CORES = {
   vela: '#D9A441',
 };
 
-const ASSETS = path.join(process.cwd(), 'assets');
-const SAIDA = path.join(process.cwd(), 'imagens', 'fundidas');
+const ASSETS = path.join(process.cwd(), 'src', 'assets');
+const SAIDA = path.join(process.cwd(), 'conteudo', 'fundidas');
 
 const LARGURA = 1080;
 const ALTURA = 1920;

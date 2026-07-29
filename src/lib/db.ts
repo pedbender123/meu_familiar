@@ -1,11 +1,12 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import { BANCO, DADOS } from './caminhos';
 
-const dataDir = path.join(process.cwd(), 'data');
+const dataDir = DADOS;
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
-const db = new Database(path.join(dataDir, 'bruxario.db'));
+const db = new Database(BANCO);
 db.pragma('journal_mode = WAL');
 
 db.exec(`

@@ -5,6 +5,7 @@ import type { Familiar, LuaId } from './familiares';
 import type { Signo } from './astro';
 import { glifoSvg } from './zodiaco';
 import type { Leitura } from './leitura';
+import { familiarPng, luaPng, pastaDoPedido } from './caminhos';
 
 const CORES = {
   tinta: '#171225',
@@ -13,8 +14,6 @@ const CORES = {
   violeta: '#7B6394',
   musgo: '#4A5D4E',
 };
-
-const ASSETS = path.join(process.cwd(), 'assets');
 
 function escapeXml(texto: string): string {
   return texto
@@ -59,11 +58,11 @@ async function compor(
   const { nome, familiar, lua, signoSol, signoLua, leitura } = params;
 
   // as luas têm uma borda irregular tipo papel rasgado nas bordas — recortamos antes de cobrir
-  const luaMeta = await sharp(path.join(ASSETS, 'luas', `${lua}.png`)).metadata();
+  const luaMeta = await sharp(luaPng(lua)).metadata();
   const luaLargura = luaMeta.width ?? 2048;
   const luaAltura = luaMeta.height ?? 2048;
   const margemLua = Math.round(luaLargura * 0.06);
-  const fundoLua = await sharp(path.join(ASSETS, 'luas', `${lua}.png`))
+  const fundoLua = await sharp(luaPng(lua))
     .extract({
       left: margemLua,
       top: margemLua,
@@ -114,7 +113,7 @@ async function compor(
   const yAnimal = Math.round(gap.respiroTopo * 0.5);
   const xAnimal = Math.round((largura - tamanhoAnimal) / 2);
 
-  const animal = await sharp(path.join(ASSETS, 'familiares', `${familiar.id}.png`))
+  const animal = await sharp(familiarPng(familiar.id))
     .resize(tamanhoAnimal, tamanhoAnimal, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
     .toBuffer();
 
@@ -180,7 +179,7 @@ async function compor(
 }
 
 export async function gerarArtes(pedidoId: string, params: ParametrosArte) {
-  const dir = path.join(process.cwd(), 'storage', 'orders', pedidoId);
+  const dir = pastaDoPedido(pedidoId);
   fs.mkdirSync(dir, { recursive: true });
 
   const story = await compor(1080, 1920, params);

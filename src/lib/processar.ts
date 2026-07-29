@@ -4,13 +4,16 @@ import { calcularSignos } from './astro';
 import { gerarLeitura } from './leitura';
 import { gerarArtes } from './arte';
 import { gerarPdf } from './pdf';
-import { enviarEmailRevelacao } from './email';
 
 /**
  * Roda em background após a confirmação de pagamento: calcula signos, gera a
- * leitura (Gemini), compõe as artes (sharp) e o PDF, marca `entregue` e
- * dispara o e-mail. Nunca deve lançar para o chamador — erros marcam `erro`
- * para o job de reprocessamento pegar depois.
+ * leitura (Gemini), compõe as artes (sharp) e o PDF e marca `entregue`.
+ * Nunca deve lançar para o chamador — erros marcam `erro` para o job de
+ * reprocessamento pegar depois.
+ *
+ * Não há envio de e-mail: a entrega é o próprio link permanente
+ * (/revelacao/[id]), para onde /obrigado/[id] redireciona sozinho quando o
+ * status vira `entregue`.
  */
 export async function processarPedido(pedidoId: string): Promise<void> {
   const pedido = buscarPedido(pedidoId);
@@ -61,8 +64,6 @@ export async function processarPedido(pedidoId: string): Promise<void> {
       leitura_json: JSON.stringify(leitura),
     });
     registrarEvento('pedido_entregue', pedidoId);
-
-    await enviarEmailRevelacao({ nome: pedido.nome, email: pedido.email, pedidoId });
   } catch (erro) {
     console.error(`[processarPedido] erro no pedido ${pedidoId}:`, erro);
     atualizarPedido(pedidoId, { status: 'erro' });

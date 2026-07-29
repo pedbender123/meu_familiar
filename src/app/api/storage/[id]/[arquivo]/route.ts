@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import { buscarPedido } from '@/lib/db';
+import { pastaDoPedido } from '@/lib/caminhos';
 
 const ARQUIVOS_PERMITIDOS: Record<string, string> = {
   'story.png': 'image/png',
@@ -24,7 +25,7 @@ export async function GET(
     return NextResponse.json({ erro: 'não encontrado' }, { status: 404 });
   }
 
-  const caminho = path.join(process.cwd(), 'storage', 'orders', id, arquivo);
+  const caminho = path.join(pastaDoPedido(id), arquivo);
   if (!fs.existsSync(caminho)) {
     return NextResponse.json({ erro: 'não encontrado' }, { status: 404 });
   }

@@ -1,8 +1,8 @@
-import { carregarEnv } from '../lib/carregar-env';
+import { carregarEnv } from '../src/lib/carregar-env';
 carregarEnv();
 
-import { pedidosTravados } from '../lib/db';
-import { processarPedido } from '../lib/processar';
+import { pedidosTravados } from '../src/lib/db';
+import { processarPedido } from '../src/lib/processar';
 
 async function main() {
   const travados = pedidosTravados();

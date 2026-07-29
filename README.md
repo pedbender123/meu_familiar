@@ -4,7 +4,7 @@ Ritual digital: um quiz de 12 passos revela qual dos 12 "familiares" (animais
 arquetípicos) escolheu a pessoa, cruzando as respostas com o signo solar e
 lunar calculados a partir da data/hora de nascimento. A revelação vem com uma
 leitura personalizada (Gemini), artes prontas pra Story/Feed do Instagram e um
-PDF de 4 páginas — tudo entregue por e-mail após o pagamento.
+PDF de 4 páginas — tudo num link permanente, gerado logo após o pagamento.
 
 > **Este projeto foi majoritariamente "vibecodado"** com o [Claude Code](https://claude.com/claude-code)
 > (Anthropic), a partir de um `SPEC.md` escrito pelo dono do produto como fonte
@@ -14,33 +14,50 @@ PDF de 4 páginas — tudo entregue por e-mail após o pagamento.
 
 ## ⚠️ Leia primeiro: o código está uma versão atrás do SPEC
 
-O `SPEC.md` foi reescrito (v1, jul/2026) e passou de produto único para
-plataforma. **O que este README descreve abaixo é a v0 antiga, que é o que
-roda hoje na VPS.** A tabela é a distância entre os dois — e sete das linhas
-estão marcadas como **travado** no Apêndice A do SPEC, ou seja, não são
-sugestão:
+O `SPEC.md` foi reescrito (v1, jul/2026). **O que este README descreve abaixo é
+a v0 antiga, que é o que roda hoje na VPS.**
+
+**O coração do SPEC é a evolução do teste.** O quiz sai de 8 perguntas para o
+máximo de itens que a conclusão do funil aguentar, e passa a se apoiar em
+instrumentos de personalidade reais e embasados (circumplexo interpessoal de
+Leary/Wiggins, itens do IPIP que é de domínio público) — o objetivo é montar um
+perfil que realmente diga algo sobre a pessoa, não um resultado bonito. Todo o
+resto do SPEC (oráculo, dossiê, assinatura, crescimento) é destino documentado;
+o que muda o produto agora é o teste.
+
+A tabela é a distância entre os dois, com o quiz no topo porque é o que
+importa. Sete das linhas estão marcadas como **travado** no Apêndice A do SPEC,
+ou seja, não são sugestão:
 
 | SPEC v1 | Código hoje |
 |---|---|
 | Mercado Pago (Payment Brick), seção 10.1 — **decisão definitiva** | **Asaas** Checkout hospedado (ver histórico abaixo) |
-| Quiz de 26 itens, circumplexo de 2 eixos (2.2) | 8 perguntas, `+2 pontos por bicho` (`lib/familiares.ts`) |
+| Quiz de 26 itens, circumplexo de 2 eixos (2.2) | 8 perguntas, `+2 pontos por bicho` (`src/lib/familiares.ts`) |
 | Signo com peso **ZERO** na escolha (2.4) | elemento do signo solar **é o critério de desempate** |
 | Gemini 3.5 na voz, 3.1 só na vigilância (8.1) | 3.1-flash-lite na voz; vigilância inexistente |
 | 12 escores de afinidade salvos (0.8) | não são calculados; sem coluna no schema |
 | Dois produtos, R$ 9,80 e R$ 18,90 (0.3) | um preço, `980` hardcoded em dois arquivos |
-| Micro-avisos em 9 pontos do fluxo (7.4) | um link no rodapé (`components/RodapeLegal.tsx`) |
+| Micro-avisos em 9 pontos do fluxo (7.4) | um link no rodapé (`src/components/RodapeLegal.tsx`) |
 | Conta, verificação de e-mail, endereço permanente (0.5) | pedido anônimo identificado por uuid |
 | Oráculo com 3 perguntas grátis (0.4) | `/api/oraculo` só grava e-mail + pergunta numa lista de espera |
 | Carta compartilhável **para quem não pagou** (0.3) | toda geração de arte roda depois do pagamento |
 | Tiragem diária, perfil público, roda dos 12 (0.3) | não existem |
-| Leitura mora em endereço permanente, não em arquivo (0.5) | PDF de 4 páginas é o centro da entrega (`lib/pdf.ts`) |
+| Leitura mora em endereço permanente, não em arquivo (0.5) | PDF de 4 páginas ainda é o centro da entrega (`src/lib/pdf.ts`) |
+
+**Entrega por e-mail: removida.** O link permanente já é gerado, então mandar
+e-mail era um segundo caminho pra mesma coisa — com chave de API, domínio
+verificado e mais um jeito de falhar. `src/lib/email.ts` e a dependência
+`resend` saíram; `/obrigado/[id]` redireciona pro link sozinho quando a geração
+termina. Próximo passo natural nessa direção: **QR code do perfil**, que torna
+o link compartilhável no mundo físico (print, adesivo, story) sem depender de
+caixa de entrada nenhuma.
 
 O diagnóstico da seção 2.1 do SPEC — *"não parece que as perguntas definem o
 familiar, e sim o signo"* — está literalmente no código: com 8 itens para 12
 saídas os empates são a regra, e `calcularFamiliar()` resolve empate pelo
 elemento do signo solar. O sintoma relatado é o comportamento projetado.
 
-**Risco aberto:** existe campo de texto livre (`components/FormularioOraculo.tsx`)
+**Risco aberto:** existe campo de texto livre (`src/components/FormularioOraculo.tsx`)
 gravando pergunta do usuário sem lista de gatilhos, sem classificador e sem
 protocolo de crise — o que o SPEC 0.4 chama de "inegociável enquanto o campo
 existir". Atenuante: o DNS do domínio nunca foi apontado (ver Pendências), então
@@ -73,50 +90,65 @@ quando. Não há o que reavaliar aqui.
 - **pdf-lib** (+ `@pdf-lib/fontkit`) — PDF de 4 páginas
 - **astronomy-engine** — signo solar/lunar calculado 100% offline
 - **Gemini** (`@google/genai`, modelo `gemini-3.1-flash-lite`) — texto da leitura
-- **Resend** — e-mail transacional (opcional; sem chave, só loga no console)
 - **Asaas** — pagamento via **Checkout hospedado** (`/v3/checkouts`) — Pix e
   Cartão de Crédito. Sem chave configurada, cai automaticamente num "pagamento
-  fake" pra dev local (ver `lib/pagamento.ts`)
+  fake" pra dev local (ver `src/lib/pagamento.ts`)
 - **rembg** (Python, `isnet-general-use`) — usado *uma única vez*, offline, pra
   remover o fundo dos 12 PNGs dos animais. Não roda em produção; as saídas já
-  ficam versionadas em `assets/familiares/`. O `.venv/` de 955 MB que sobrou
+  ficam versionadas em `src/assets/familiares/`. O `.venv/` de 955 MB que sobrou
   desse processamento foi apagado — se precisar reprocessar um animal novo:
   `python3 -m venv .venv && .venv/bin/pip install rembg onnxruntime`
 
 ## Organização das pastas
 
+A raiz tinha oito pastas soltas misturando código, assets, estado de runtime e
+matéria-prima de divulgação. Agora são **três raízes com regras diferentes**, e
+a regra é o que importa:
+
 ```
-app/         rotas (App Router) + API routes
-components/  componentes de UI React
-lib/         toda a lógica: banco, pagamento, IA, arte, PDF, astro
-assets/      fontes (.ttf/.woff2) e PNGs dos 12 familiares + 4 luas
-             → fonte de verdade: app/layout.tsx importa os .woff2 daqui,
-               lib/pdf.ts embute os .ttf daqui, e é daqui que se copia
-               pro sistema operacional (ver seção de fontes abaixo)
-public/       só exemplos/ (3 PNGs da landing) e o favicon
-scripts/      utilitários avulsos (tsx), fora do runtime
-data/         banco SQLite — nunca versionado, nunca sobrescrito por deploy
-storage/      artes/PDFs gerados por pedido — idem
-imagens/      matéria-prima de divulgação, 265 MB, não versionada (ver abaixo)
+src/           CÓDIGO — tudo que é versionado e executado
+  app/         rotas (App Router) + API routes
+  components/  componentes de UI React
+  lib/         lógica: banco, pagamento, IA, arte, PDF, astro, caminhos
+  assets/      fontes (.ttf/.woff2) e PNGs dos 12 familiares + 4 luas
+               → fonte de verdade única: src/app/layout.tsx importa os
+                 .woff2 daqui, src/lib/pdf.ts embute os .ttf daqui, e é
+                 daqui que se copia pro SO (ver seção de fontes abaixo)
+
+var/           ESTADO DE RUNTIME — escrito pelo app, jamais versionado,
+               jamais sobrescrito por deploy
+  data/        banco SQLite
+  storage/     artes e PDFs gerados, uma pasta por pedido
+
+conteudo/      MATÉRIA-PRIMA de divulgação (265 MB), fora do runtime do app
+
+public/        obrigatoriamente na raiz pelo Next: exemplos/ + favicon
+scripts/       utilitários avulsos (tsx), fora do runtime
 ```
+
+**Nenhum `path.join(process.cwd(), ...)` espalhado.** Todo caminho de
+filesystem mora em [`src/lib/caminhos.ts`](src/lib/caminhos.ts). Antes ele
+estava repetido em seis arquivos, e foi exatamente o que tornou esta
+reorganização mais trabalhosa do que precisava — se as pastas mudarem de novo,
+mexe-se em um arquivo.
 
 Não há testes no projeto. Vale notar que o SPEC 0.7 abre justamente pedindo o
 motor de pontuação como "lógica pura, testável no terminal" — é o primeiro
 lugar onde teste passa a fazer diferença.
 
-## Pasta `imagens/` (produção de conteúdo)
+## Pasta `conteudo/` (produção de conteúdo)
 
 Não versionada (`.gitignore`) e separada do código — é só matéria-prima pra
 criar posts/artes de divulgação, não é usada pelo app em runtime:
 
-- `imagens/brutas/familiares/` e `imagens/brutas/luas/` — cópias das imagens
-  originais (mesmo conteúdo de `assets/familiares` e `assets/luas`, mas com o
-  fundo ainda presente nos animais).
-- `imagens/fundidas/<lua>/<familiar>.png` — as 12×4 = 48 combinações de
+- `conteudo/brutas/familiares/` e `conteudo/brutas/luas/` — cópias das imagens
+  originais (mesmo conteúdo de `src/assets/familiares` e `src/assets/luas`, mas
+  com o fundo ainda presente nos animais).
+- `conteudo/fundidas/<lua>/<familiar>.png` — as 12×4 = 48 combinações de
   animal + fundo de lua já mescladas (1080×1920), com só o nome do animal
   escrito. Gerado por `npm run gerar-fusoes` (script em
   `scripts/gerar-fusoes.ts`, usa `sharp` com os mesmos assets de
-  `lib/arte.ts`).
+  `src/lib/arte.ts`).
 
 ## Rodando localmente
 
@@ -132,7 +164,7 @@ instaladas no sistema operacional — `sharp` e `pdf-lib` renderizam texto via
 
 ```bash
 mkdir -p ~/.fonts   # ou /usr/local/share/fonts/bruxario no servidor
-cp assets/fonts/*.ttf ~/.fonts/
+cp src/assets/fonts/*.ttf ~/.fonts/
 fc-cache -f ~/.fonts
 ```
 
@@ -146,14 +178,13 @@ ASAAS_API_KEY=
 ASAAS_WEBHOOK_TOKEN=
 ASAAS_ENV=sandbox   # sandbox | production
 GEMINI_API_KEY=
-RESEND_API_KEY=
 BASE_URL=http://localhost:3000
 PRICE_CENTAVOS=980
 ```
 
 - **`ASAAS_API_KEY` vazia** → o app usa um provedor de pagamento "fake": o
   checkout confirma na hora, sem ir pra Asaas de verdade. Ótimo pra testar o
-  fluxo completo (quiz → leitura → artes → PDF → e-mail) sem gateway nenhum.
+  fluxo completo (quiz → leitura → artes → PDF → link) sem gateway nenhum.
 - **⚠️ Cuidado com `$` no valor da chave.** As chaves da Asaas começam com
   `$aact_...`. O Next.js expande `$NOME_DE_VARIAVEL` dentro do `.env`
   automaticamente — se não escapar, o `$aact_...` vira string vazia
@@ -168,7 +199,7 @@ PRICE_CENTAVOS=980
 - **`DEBIT_CARD` não existe no endpoint de Checkout** (`/v3/checkouts`) da
   Asaas — só nas cobranças avulsas (`/v3/payments`). Testado e confirmado
   direto contra a API de produção. Por isso `billingTypes` em
-  `lib/pagamento.ts` é só `['PIX', 'CREDIT_CARD']`.
+  `src/lib/pagamento.ts` é só `['PIX', 'CREDIT_CARD']`.
 
 ## Arquitetura do fluxo de compra
 
@@ -182,17 +213,19 @@ PRICE_CENTAVOS=980
                 (Pix/Cartão — nenhum dado de pagamento passa pelo nosso servidor)
 Asaas confirma pagamento
   → POST /api/webhook (header asaas-access-token validado)
-       marca "pago" → dispara lib/processar.ts em background
+       marca "pago" → dispara src/lib/processar.ts em background
 /obrigado/[id]                 tela de carregamento (poll em /api/pedido/[id])
   → quando status = "entregue", redireciona pra:
 /revelacao/[id]                 arte + leitura + constelação + compartilhar
 ```
 
-`lib/processar.ts` é o pipeline completo pós-pagamento: calcula signos
-(`lib/astro.ts`) → gera a leitura (`lib/leitura.ts`, Gemini) → compõe as artes
-(`lib/arte.ts`, sharp) → monta o PDF (`lib/pdf.ts`) → envia e-mail
-(`lib/email.ts`). Roda em background (fire-and-forget) — se o processo cair no
-meio, `pedidosTravados()` em `lib/db.ts` + `scripts/reprocessar.ts`
+`src/lib/processar.ts` é o pipeline completo pós-pagamento: calcula signos
+(`src/lib/astro.ts`) → gera a leitura (`src/lib/leitura.ts`, Gemini) → compõe
+as artes (`src/lib/arte.ts`, sharp) → monta o PDF (`src/lib/pdf.ts`) → marca
+`entregue`. **Não envia e-mail** — a entrega é o próprio link permanente, e
+`/obrigado/[id]` redireciona pra lá sozinho quando o status vira `entregue`.
+Roda em background (fire-and-forget) — se o processo cair no
+meio, `pedidosTravados()` em `src/lib/db.ts` + `scripts/reprocessar.ts`
 (`npm run reprocessar`) reencaminham pedidos presos em `pago`/`gerando`/`erro`.
 
 ### Por que Checkout hospedado, não `/v3/payments`
@@ -221,8 +254,10 @@ padrões que já existiam ali, sem introduzir ferramentas novas:
 - **Código:** `/root/apps/bruxario` (mesmo padrão de `/root/apps/copa_login`
   que já existia no servidor)
 - **Fontes:** copiadas pra `/usr/local/share/fonts/bruxario/` + `fc-cache -f`
-- **Backup:** `scripts/backup.sh` via cron diário (4h), `.tar.gz` de `data/` +
-  `storage/` em `/root/backups/bruxario/`, retenção de 14 dias
+- **Backup:** `scripts/backup.sh` via cron diário (4h), `.tar.gz` de `var/` em
+  `/root/backups/bruxario/`, retenção de 14 dias.
+  ⚠️ o script no servidor ainda aponta pros caminhos antigos `data/` e
+  `storage/` — atualizar pra `var/` no próximo deploy
 - **Firewall (`ufw`):** já vinha configurado no servidor (22/80/443 públicos);
   nada novo foi aberto — o Next.js roda só em `127.0.0.1:3000`, nunca exposto
   direto
@@ -244,8 +279,8 @@ padrões que já existiam ali, sem introduzir ferramentas novas:
 
 2. **Webhook não está cadastrado no painel da Asaas.** Sem isso, pagamentos
    confirmados não avisam o site (o pedido fica preso em "aguardando
-   pagamento" mesmo depois de pago — o cliente só recebe o e-mail se alguém
-   rodar `npm run reprocessar` manualmente).
+   pagamento" mesmo depois de pago — a revelação só é gerada se alguém rodar
+   `npm run reprocessar` manualmente).
    **Ação necessária:** painel da Asaas (produção) → Configurações →
    Webhooks → cadastrar `https://bruxario.com.br/api/webhook`, marcar os
    eventos `PAYMENT_CONFIRMED` e `PAYMENT_RECEIVED`, e usar como "token de
@@ -266,8 +301,8 @@ rsync -az --exclude node_modules --exclude .next --exclude data \
 ssh root@72.61.133.109 "cd /root/apps/bruxario && npm install && npm run build && pm2 restart bruxario"
 ```
 
-`data/` (banco SQLite) e `storage/` (artes/PDFs gerados) **nunca** devem ser
-sobrescritos por um deploy — ficam só no servidor, fora do rsync.
+`var/` (banco SQLite + artes/PDFs gerados) **nunca** deve ser sobrescrito por
+um deploy — fica só no servidor, fora do rsync.
 
 ## Scripts
 
@@ -287,7 +322,7 @@ determinística de gatilhos da vigilância. Fora isso:
   (decisão do `SPEC.md`: menos superfície de ataque na v1)
 - Sem cancelamento automático de cobranças `aguardando_pagamento` antigas
   (o `SPEC.md` sugere um job diário; ainda não implementado)
-- `app/termos/page.tsx` junta termos e privacidade numa página curta. O SPEC 7.5
+- `src/app/termos/page.tsx` junta termos e privacidade numa página curta. O SPEC 7.5
   pede três páginas separadas, e falta o essencial: controlador/CNPJ, canal do
   encarregado (DPO), base legal por finalidade, transferência internacional,
   decisão automatizada (art. 20) e direito de arrependimento de 7 dias

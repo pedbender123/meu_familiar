@@ -1,5 +1,5 @@
 import fs from 'fs';
-import path from 'path';
+import { ENV } from './caminhos';
 
 /**
  * Scripts standalone (fora do `next dev`/`next start`) não ganham o .env de
@@ -9,7 +9,7 @@ import path from 'path';
  * escape o Next as trataria como início de uma variável a expandir).
  */
 export function carregarEnv() {
-  const caminho = path.join(process.cwd(), '.env');
+  const caminho = ENV;
   if (!fs.existsSync(caminho)) return;
 
   for (const linha of fs.readFileSync(caminho, 'utf8').split('\n')) {

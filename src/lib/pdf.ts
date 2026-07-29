@@ -4,8 +4,8 @@ import fs from 'fs';
 import path from 'path';
 import type { Familiar } from './familiares';
 import type { Leitura } from './leitura';
+import { FONTES, pastaDoPedido } from './caminhos';
 
-const ASSETS = path.join(process.cwd(), 'assets');
 const A5_LARGURA = 419.53;
 const A5_ALTURA = 595.28;
 
@@ -44,7 +44,7 @@ export async function gerarPdf(pedidoId: string, params: ParametrosPdf): Promise
   const pdf = await PDFDocument.create();
   pdf.registerFontkit(fontkit);
 
-  const ler = (nome: string) => fs.readFileSync(path.join(ASSETS, 'fonts', nome));
+  const ler = (nome: string) => fs.readFileSync(path.join(FONTES, nome));
 
   // subset: false — o subsetter do pdf-lib descarta glifos indevidamente nessas fontes
   const cormorant = await pdf.embedFont(ler('CormorantGaramond-Regular-nolig.ttf'), { subset: false });
@@ -180,7 +180,7 @@ export async function gerarPdf(pedidoId: string, params: ParametrosPdf): Promise
   }
 
   const bytes = await pdf.save();
-  const dir = path.join(process.cwd(), 'storage', 'orders', pedidoId);
+  const dir = pastaDoPedido(pedidoId);
   fs.mkdirSync(dir, { recursive: true });
   const pdfPath = path.join(dir, 'revelacao.pdf');
   fs.writeFileSync(pdfPath, bytes);

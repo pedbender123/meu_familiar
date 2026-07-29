@@ -35,13 +35,14 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# app data
-/data/
-/storage/*
-!/storage/.gitkeep
+# var/ — estado de runtime: banco SQLite e artes geradas por pedido.
+# Nunca versionado, nunca sobrescrito por deploy.
+/var/*
+!/var/.gitkeep
 
-# imagens brutas e fusões geradas p/ produção de conteúdo (grandes, não versionar)
-/imagens/
+# conteudo/ — matéria-prima de divulgação (265 MB), fora do runtime do app
+/conteudo/
+
 *.png
 !/public/**/*.png
-!/assets/**/*.png
+!/src/assets/**/*.png
