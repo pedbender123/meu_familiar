@@ -22,7 +22,7 @@ sugestão:
 
 | SPEC v1 | Código hoje |
 |---|---|
-| Mercado Pago (Payment Brick), seção 10.1 | **Asaas** Checkout hospedado — gateway que não aparece em nenhuma versão do SPEC |
+| Mercado Pago (Payment Brick), seção 10.1 — **decisão definitiva** | **Asaas** Checkout hospedado (ver histórico abaixo) |
 | Quiz de 26 itens, circumplexo de 2 eixos (2.2) | 8 perguntas, `+2 pontos por bicho` (`lib/familiares.ts`) |
 | Signo com peso **ZERO** na escolha (2.4) | elemento do signo solar **é o critério de desempate** |
 | Gemini 3.5 na voz, 3.1 só na vigilância (8.1) | 3.1-flash-lite na voz; vigilância inexistente |
@@ -49,6 +49,21 @@ a página provavelmente não é alcançável.
 **Sem vendas concluídas:** o banco tem pedidos, todos em
 `aguardando_pagamento`. Nenhum cliente para migrar — o remodelamento tem mão
 livre.
+
+### Histórico do gateway (pra ninguém achar que o Asaas foi acidente)
+
+Três etapas, e só a última é decisão de arquitetura:
+
+1. **Stripe** — era o que o SPEC v0 dizia, sem nenhuma investigação por trás.
+2. **Asaas** — foi o que entrou de fato, porque era a conta que já existia.
+   Escolha pragmática pra conseguir vender, não preferência técnica. É por isso
+   que ele não aparece em nenhuma versão do SPEC.
+3. **Mercado Pago** — **decisão definitiva** (SPEC 10.1, travado). Pix nativo,
+   bandeiras e parcelamento nacionais, checkout que o público brasileiro
+   reconhece, suporte em português.
+
+Ou seja: a migração Asaas → Mercado Pago está decidida e é só uma questão de
+quando. Não há o que reavaliar aqui.
 
 ## Stack
 
