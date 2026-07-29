@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+:root {
+  --tinta: #171225;
+  --pergaminho: #EAE0CC;
+  --vela: #D9A441;
+  --violeta-bruma: #7B6394;
+  --musgo: #4A5D4E;
+}
+
+@theme inline {
+  --color-tinta: var(--tinta);
+  --color-pergaminho: var(--pergaminho);
+  --color-vela: var(--vela);
+  --color-violeta: var(--violeta-bruma);
+  --color-musgo: var(--musgo);
+  --font-display: var(--font-cormorant);
+  --font-corpo: var(--font-sora);
+  --font-ritual: var(--font-pinyon);
+}
+
+html {
+  background: var(--tinta);
+}
+
+body {
+  background: var(--tinta);
+  color: var(--pergaminho);
+  font-family: var(--font-sora), sans-serif;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
