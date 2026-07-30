@@ -58,8 +58,8 @@ elemento do signo solar. O sintoma relatado é o comportamento projetado.
 **Risco aberto:** existe campo de texto livre (`src/components/FormularioOraculo.tsx`)
 gravando pergunta do usuário sem lista de gatilhos, sem classificador e sem
 protocolo de crise — o que o SPEC 0.4 chama de "inegociável enquanto o campo
-existir". Atenuante: o DNS do domínio nunca foi apontado (ver Pendências), então
-a página provavelmente não é alcançável.
+existir". **O atenuante acabou:** o site está no ar em
+`https://bruxario.com.br`, alcançável por qualquer um.
 
 **Sem vendas concluídas:** o banco tem pedidos, todos em
 `aguardando_pagamento`. Nenhum cliente para migrar — o remodelamento tem mão
@@ -283,18 +283,10 @@ padrões que já existiam ali, sem introduzir ferramentas novas:
 
 ### ⚠️ Pendências pra ativar de verdade
 
-1. **DNS do `bruxario.com.br` ainda não aponta pro servidor.** No momento do
-   deploy, o domínio estava nos nameservers de "parking" da Hostinger
-   (`dns-parking.com`), sem registro A nenhum. Enquanto isso não for
-   corrigido, o site só responde direto pelo IP (`http://72.61.133.109` com
-   `Host: bruxario.com.br`), sem HTTPS.
-   **Ação necessária:** painel Hostinger → domínio → desativar "parking" →
-   nameservers da própria Hostinger (ou apontar A record direto) → registro
-   **A** `@` e `www` → `72.61.133.109`.
-   Depois disso, rodar (uma vez, no servidor):
-   ```bash
-   certbot --nginx -d bruxario.com.br -d www.bruxario.com.br --redirect
-   ```
+1. ~~**DNS não aponta pro servidor**~~ — **resolvido.** Conferido em
+   30/07/2026: `bruxario.com.br` e `www` apontam para `72.61.133.109`, o HTTP
+   redireciona 301 pro HTTPS, e o certificado Let's Encrypt é válido até
+   06/10/2026. O `certbot --nginx` já rodou.
 
 2. **Credenciais do Mercado Pago ainda não existem.** Enquanto
    `MP_ACCESS_TOKEN` estiver vazio o app roda no provedor fake e aprova tudo
@@ -311,11 +303,32 @@ padrões que já existiam ali, sem introduzir ferramentas novas:
    cadastrar `https://bruxario.com.br/api/webhook`, marcar o tópico
    **Pagamentos**, e copiar a "assinatura secreta" pro `MP_WEBHOOK_SECRET`.
 
-4. **Nada foi testado contra a API real** — não há credencial. O código foi
+4. **Domínio não verificado no Resend.** Sem isso o envio só chega no e-mail
+   da própria conta do Resend — cliente nenhum recebe. Agora é possível,
+   porque o DNS funciona.
+   **Ação necessária:** painel do Resend → Domains → adicionar
+   `bruxario.com.br` → copiar os registros SPF, DKIM e DMARC que ele mostra →
+   cadastrar na zona DNS da Hostinger → clicar em Verify. Depois trocar
+   `EMAIL_REMETENTE` no `.env` do servidor para
+   `"Bruxário <familiar@bruxario.com.br>"`.
+
+5. **`RESEND_API_KEY` está vazia no `.env` da VPS.** A chave existe (foi
+   criada em 30/07), só não foi colada lá.
+
+6. **Nada foi testado contra a API real** — não há credencial. O código foi
    escrito contra a documentação oficial e usa o SDK `mercadopago` v3 (inclusive
    `WebhookSignatureValidator`, em vez de reimplementar o HMAC na mão). Antes da
    primeira venda vale rodar os caminhos feios no sandbox: recusa, Pix expirado,
    webhook repetido, estorno.
+
+7. **O `.env` da VPS já tem os campos novos** (`MP_ACCESS_TOKEN`,
+   `NEXT_PUBLIC_MP_PUBLIC_KEY`, `MP_WEBHOOK_SECRET`, `EMAIL_REMETENTE`),
+   acrescentados em 30/07 sem tocar nas linhas antigas — o app no ar ainda é o
+   código do Asaas e depende delas. Backup em `.env.bak-20260730-161324`.
+
+8. **O `scripts/backup.sh` da VPS aponta pros caminhos antigos** `data/` e
+   `storage/`, que viraram `var/`. Depois do próximo deploy ele passa a gerar
+   `.tar.gz` vazio sem reclamar.
 
 ### Redeploy manual (até existir CI/CD)
 
