@@ -7,6 +7,7 @@ import { pastaDoPedido } from '@/lib/caminhos';
 const ARQUIVOS_PERMITIDOS: Record<string, string> = {
   'story.png': 'image/png',
   'feed.png': 'image/png',
+  'carta.webp': 'image/webp',
   'revelacao.pdf': 'application/pdf',
 };
 

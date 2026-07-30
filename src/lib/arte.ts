@@ -178,17 +178,82 @@ async function compor(
     .toBuffer();
 }
 
+/**
+ * A carta do familiar: lua + animal, **sem texto nenhum**.
+ *
+ * Story e feed existem para sair do site — vão pro Instagram, onde ninguém tem
+ * o contexto, então precisam trazer nome, regência e invocação impressos. A
+ * carta é o oposto: ela é exibida na tela de revelação, apoiada numa folha de
+ * pergaminho que já diz tudo isso em texto de verdade. Repetir ali seria dizer
+ * a mesma coisa duas vezes, uma delas em pixel que não dá pra selecionar.
+ *
+ * Proporção 2:3, de baralho — é o que faz a moldura ler como carta e não como
+ * print recortado.
+ *
+ * Sai em **webp**, diferente de story e feed. Aqueles são PNG porque a pessoa
+ * baixa e reposta, e PNG é o que qualquer app aceita sem reclamar. A carta só é
+ * exibida na nossa tela, então o formato é escolha nossa: em PNG ela pesava
+ * 4,4 MB por pedido, contra cerca de 150 kB aqui.
+ */
+async function comporCarta(
+  largura: number,
+  altura: number,
+  familiar: Familiar,
+  lua: LuaId
+): Promise<Buffer> {
+  const luaMeta = await sharp(luaPng(lua)).metadata();
+  const luaLargura = luaMeta.width ?? 2048;
+  const luaAltura = luaMeta.height ?? 2048;
+  const margemLua = Math.round(luaLargura * 0.06);
+
+  const fundoLua = await sharp(luaPng(lua))
+    .extract({
+      left: margemLua,
+      top: margemLua,
+      width: luaLargura - margemLua * 2,
+      height: luaAltura - margemLua * 2,
+    })
+    .resize(largura, altura, { fit: 'cover' })
+    .toBuffer();
+
+  const tamanhoAnimal = Math.round(largura * 0.84);
+  const animal = await sharp(familiarPng(familiar.id))
+    .resize(tamanhoAnimal, tamanhoAnimal, {
+      fit: 'contain',
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    })
+    .toBuffer();
+
+  return sharp({
+    create: { width: largura, height: altura, channels: 4, background: CORES.tinta },
+  })
+    .composite([
+      { input: fundoLua, top: 0, left: 0 },
+      {
+        input: animal,
+        top: Math.round(altura * 0.1),
+        left: Math.round((largura - tamanhoAnimal) / 2),
+      },
+    ])
+    .webp({ quality: 86 })
+    .toBuffer();
+}
+
 export async function gerarArtes(pedidoId: string, params: ParametrosArte) {
   const dir = pastaDoPedido(pedidoId);
   fs.mkdirSync(dir, { recursive: true });
 
   const story = await compor(1080, 1920, params);
   const feed = await compor(1080, 1350, params);
+  // 2x o tamanho exibido, para tela retina
+  const carta = await comporCarta(1200, 1800, params.familiar, params.lua);
 
   const storyPath = path.join(dir, 'story.png');
   const feedPath = path.join(dir, 'feed.png');
+  const cartaPath = path.join(dir, 'carta.webp');
   fs.writeFileSync(storyPath, story);
   fs.writeFileSync(feedPath, feed);
+  fs.writeFileSync(cartaPath, carta);
 
-  return { storyPath, feedPath };
+  return { storyPath, feedPath, cartaPath };
 }

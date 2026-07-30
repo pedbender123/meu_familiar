@@ -6,6 +6,24 @@
   --vela: #D9A441;
   --violeta-bruma: #7B6394;
   --musgo: #4A5D4E;
+
+  /* ── estética "grimório vivo" ──────────────────────────────────────────
+     O pergaminho é um OBJETO dentro de um quarto escuro, nunca o fundo da
+     página. Estas derivadas existem para sustentar essa distinção:
+
+     - `quarto-*` é o ambiente: mais fundo que a tinta nas bordas, com um halo
+       quente onde a vela alcança.
+     - `folha` e `escrita` são a superfície e a tinta sobre ela. A escrita
+       NUNCA é preto puro — preto sobre pergaminho lê como PDF exportado, não
+       como algo escrito à mão. */
+  --quarto-fundo: #0C0916;
+  --quarto-luz: #221A33;
+  --folha: #E7DCC4;
+  --escrita: #2E2438;
+  --escrita-fraca: #6B5F72;
+  --escrita-corpo: #3A2F44;
+  --ouro-velho: #8A6A2F;
+  --ouro-profundo: #6B4E1E;
 }
 
 @theme inline {
@@ -14,17 +32,56 @@
   --color-vela: var(--vela);
   --color-violeta: var(--violeta-bruma);
   --color-musgo: var(--musgo);
+
+  --color-quarto: var(--quarto-fundo);
+  --color-folha: var(--folha);
+  --color-escrita: var(--escrita);
+  --color-escrita-fraca: var(--escrita-fraca);
+  --color-escrita-corpo: var(--escrita-corpo);
+  --color-ouro-velho: var(--ouro-velho);
+  --color-ouro-profundo: var(--ouro-profundo);
+
   --font-display: var(--font-cormorant);
   --font-corpo: var(--font-sora);
   --font-ritual: var(--font-pinyon);
 }
 
+/* Luz de vela: dois gradientes em vez de um, porque luz real tem núcleo e
+   penumbra. Usada por qualquer tela que queira ser "o quarto". */
+.quarto-de-vela {
+  background:
+    radial-gradient(ellipse 60% 45% at 50% 22%, var(--quarto-luz) 0%, transparent 70%),
+    radial-gradient(ellipse 100% 80% at 50% 30%, rgba(217, 164, 65, 0.07) 0%, transparent 60%);
+}
+
+/* Capitular no primeiro parágrafo da leitura: marca onde o texto começa de
+   fato, depois de toda a cerimônia acima dele. */
+.leitura-grimorio > p:first-child::first-letter {
+  font-family: var(--font-cormorant), Georgia, serif;
+  font-size: 3.5em;
+  font-weight: 600;
+  float: left;
+  line-height: 0.82;
+  padding: 0.06em 0.1em 0 0;
+  color: var(--ouro-velho);
+}
+
+.chama-tremula {
+  transform-origin: center bottom;
+  animation: tremular 2.6s ease-in-out infinite;
+}
+
+@keyframes tremular {
+  0%, 100% { transform: rotate(-1.5deg) scaleY(1); }
+  50%      { transform: rotate(1.5deg) scaleY(1.05); }
+}
+
 html {
-  background: var(--tinta);
+  background: var(--quarto-fundo);
 }
 
 body {
-  background: var(--tinta);
+  background: var(--quarto-fundo);
   color: var(--pergaminho);
   font-family: var(--font-sora), sans-serif;
 }

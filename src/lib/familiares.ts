@@ -15,12 +15,31 @@ export type FamiliarId =
 
 export type LuaId = 'nova' | 'crescente' | 'cheia' | 'minguante';
 
+/**
+ * O sigilo de cada familiar é **geometria, não desenho**: N pontos igualmente
+ * espaçados num círculo, ligados de `passo` em `passo` até o traço fechar.
+ *
+ * Isso dá 12 sigilos distintos sem ninguém desenhar nada — e, o que importa
+ * mais, sigilos que são *consistentes*: o mesmo familiar traça sempre a mesma
+ * figura, então ela funciona como assinatura.
+ *
+ * A escolha de cada par não é aleatória. Quando `passo` e `pontos` não têm
+ * divisor comum, o traço visita todos os vértices numa estrela fechada — bom
+ * para os familiares de leitura densa. Quando têm, o traço fecha antes e
+ * sobra um polígono simples — bom para os de leitura direta.
+ */
+export interface Sigilo {
+  pontos: number;
+  passo: number;
+}
+
 export interface Familiar {
   id: FamiliarId;
   nome: string;
   arquetipo: string;
   notaArte: string;
   elemento: Elemento;
+  sigilo: Sigilo;
 }
 
 export const FAMILIARES: Record<FamiliarId, Familiar> = {
@@ -31,6 +50,8 @@ export const FAMILIARES: Record<FamiliarId, Familiar> = {
       'Guardiã do limiar: independência, intuição doméstica, afeto seletivo',
     notaArte: 'sentada, olhos de âmbar, cauda enrolada nas patas',
     elemento: 'terra',
+    // estrela fechada de 10 pontas: afeto seletivo
+    sigilo: { pontos: 10, passo: 3 },
   },
   corvo: {
     id: 'corvo',
@@ -38,6 +59,8 @@ export const FAMILIARES: Record<FamiliarId, Familiar> = {
     arquetipo: 'Mensageiro: inteligência afiada, memória longa, transformação',
     notaArte: 'pousado em galho seco, algo brilhante no bico',
     elemento: 'ar',
+    // estrela densa de 12 pontas: memória longa
+    sigilo: { pontos: 12, passo: 5 },
   },
   coruja: {
     id: 'coruja',
@@ -45,6 +68,8 @@ export const FAMILIARES: Record<FamiliarId, Familiar> = {
     arquetipo: 'Vidente: sabedoria paciente, enxerga no escuro dos outros',
     notaArte: 'de frente, olhos imensos, penas como pergaminho',
     elemento: 'ar',
+    // eneagrama contínuo: análise que não para
+    sigilo: { pontos: 9,  passo: 4 },
   },
   raposa: {
     id: 'raposa',
@@ -52,6 +77,8 @@ export const FAMILIARES: Record<FamiliarId, Familiar> = {
     arquetipo: 'Trapaceira sábia: charme, adaptação, saída onde não há porta',
     notaArte: 'meio corpo virado, olhar por cima do ombro',
     elemento: 'fogo',
+    // onze pontos, nenhuma simetria fácil
+    sigilo: { pontos: 11, passo: 4 },
   },
   lobo: {
     id: 'lobo',
@@ -59,6 +86,8 @@ export const FAMILIARES: Record<FamiliarId, Familiar> = {
     arquetipo: 'Protetor: lealdade feroz, instinto, matilha escolhida',
     notaArte: 'uivando de perfil ou olhar frontal calmo',
     elemento: 'fogo',
+    // heptagrama: a matilha escolhida
+    sigilo: { pontos: 7,  passo: 3 },
   },
   serpente: {
     id: 'serpente',
@@ -66,6 +95,8 @@ export const FAMILIARES: Record<FamiliarId, Familiar> = {
     arquetipo: 'Renascida: cura, muda de pele, poder silencioso',
     notaArte: 'enrolada em espiral, escamas com brilho de lua',
     elemento: 'agua',
+    // o espelho do corvo — a mesma figura, outra pele
+    sigilo: { pontos: 12, passo: 7 },
   },
   mariposa: {
     id: 'mariposa',
@@ -73,6 +104,8 @@ export const FAMILIARES: Record<FamiliarId, Familiar> = {
     arquetipo: 'Buscadora: sensibilidade, atração pela luz mesmo com risco',
     notaArte: 'asas abertas com padrões de olho',
     elemento: 'fogo',
+    // octograma: simetria de asa
+    sigilo: { pontos: 8,  passo: 3 },
   },
   aranha: {
     id: 'aranha',
@@ -80,6 +113,8 @@ export const FAMILIARES: Record<FamiliarId, Familiar> = {
     arquetipo: 'Tecelã: criação, paciência, destino tramado fio a fio',
     notaArte: 'no centro de teia com orvalho',
     elemento: 'terra',
+    // fecha em triângulos sobrepostos: a teia
+    sigilo: { pontos: 12, passo: 4 },
   },
   lebre: {
     id: 'lebre',
@@ -87,6 +122,8 @@ export const FAMILIARES: Record<FamiliarId, Familiar> = {
     arquetipo: 'Lunar: velocidade, ideias férteis, travessia entre mundos',
     notaArte: 'em salto ou ereta ouvindo a noite',
     elemento: 'ar',
+    // treze pontos, o traço mais agitado dos doze
+    sigilo: { pontos: 13, passo: 5 },
   },
   morcego: {
     id: 'morcego',
@@ -94,6 +131,8 @@ export const FAMILIARES: Record<FamiliarId, Familiar> = {
     arquetipo: 'Vidente às avessas: renascimento, escuta o que ninguém vê',
     notaArte: 'asas semiabertas, pendurado ou em voo',
     elemento: 'agua',
+    // fecha em pentágono duplo: escuta em camadas
+    sigilo: { pontos: 10, passo: 4 },
   },
   cervo: {
     id: 'cervo',
@@ -101,6 +140,8 @@ export const FAMILIARES: Record<FamiliarId, Familiar> = {
     arquetipo: 'Coração da floresta: gentileza firme, presença que acalma',
     notaArte: 'galhada com brotos/estrelas',
     elemento: 'terra',
+    // dois triângulos: a galhada
+    sigilo: { pontos: 6,  passo: 2 },
   },
   sapo: {
     id: 'sapo',
@@ -108,6 +149,8 @@ export const FAMILIARES: Record<FamiliarId, Familiar> = {
     arquetipo: 'Alquimista: transformação profunda, magia de chuva e cura',
     notaArte: 'sobre pedra musgosa, pele com reflexo de água',
     elemento: 'agua',
+    // três triângulos: transformação em etapas
+    sigilo: { pontos: 9,  passo: 3 },
   },
 };
 
