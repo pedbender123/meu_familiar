@@ -31,10 +31,8 @@ ou seja, não são sugestão:
 
 | SPEC v1 | Código hoje |
 |---|---|
-| Quiz de 26 itens, circumplexo de 2 eixos (2.2) | 8 perguntas, `+2 pontos por bicho` (`src/lib/familiares.ts`) |
-| Signo com peso **ZERO** na escolha (2.4) | elemento do signo solar **é o critério de desempate** |
+| Quiz de 26 itens, circumplexo de 2 eixos (2.2) | motor **pronto e testado** em `src/lib/quiz/`, mas ainda não ligado à tela do ritual — a tela ainda usa as 8 perguntas antigas |
 | Gemini 3.5 na voz, 3.1 só na vigilância (8.1) | 3.1-flash-lite na voz; vigilância inexistente |
-| 12 escores de afinidade salvos (0.8) | não são calculados; sem coluna no schema |
 | Micro-avisos em 9 pontos do fluxo (7.4) | um link no rodapé (`src/components/RodapeLegal.tsx`) |
 | Conta, verificação de e-mail, endereço permanente (0.5) | pedido anônimo identificado por uuid |
 | Oráculo com 3 perguntas grátis (0.4) | `/api/oraculo` só grava e-mail + pergunta numa lista de espera |
@@ -42,13 +40,12 @@ ou seja, não são sugestão:
 | Tiragem diária, perfil público, roda dos 12 (0.3) | não existem |
 | Leitura mora em endereço permanente, não em arquivo (0.5) | PDF de 4 páginas ainda é o centro da entrega (`src/lib/pdf.ts`) |
 
-**Entrega por e-mail: removida.** O link permanente já é gerado, então mandar
-e-mail era um segundo caminho pra mesma coisa — com chave de API, domínio
-verificado e mais um jeito de falhar. `src/lib/email.ts` e a dependência
-`resend` saíram; `/obrigado/[id]` redireciona pro link sozinho quando a geração
-termina. Próximo passo natural nessa direção: **QR code do perfil**, que torna
-o link compartilhável no mundo físico (print, adesivo, story) sem depender de
-caixa de entrada nenhuma.
+**Entrega por e-mail: voltou, e com o PDF anexado.** Ela tinha sido removida
+por ser um segundo caminho pra mesma coisa; voltou quando a Revelação passou a
+ter link com prazo. Como o link expira em 7 dias, um e-mail que só apontasse
+pra ele expiraria junto — com o anexo, a caixa de entrada é a cópia
+permanente. Sem `RESEND_API_KEY` o módulo imprime no console em vez de enviar,
+o que permite desenvolver sem depender do painel.
 
 O diagnóstico da seção 2.1 do SPEC — *"não parece que as perguntas definem o
 familiar, e sim o signo"* — está literalmente no código: com 8 itens para 12
@@ -132,9 +129,10 @@ estava repetido em seis arquivos, e foi exatamente o que tornou esta
 reorganização mais trabalhosa do que precisava — se as pastas mudarem de novo,
 mexe-se em um arquivo.
 
-Não há testes no projeto. Vale notar que o SPEC 0.7 abre justamente pedindo o
-motor de pontuação como "lógica pura, testável no terminal" — é o primeiro
-lugar onde teste passa a fazer diferença.
+`npm test` roda 26 testes do motor de pontuação (`node:test` via `tsx`,
+sem framework). Eles cobrem o banco de itens, a geometria do circumplexo e a
+pontuação — e já pegaram dois defeitos reais, incluindo um viés de ordem que
+eu mesmo tinha introduzido escrevendo os itens.
 
 ## Pasta `conteudo/` (produção de conteúdo)
 
