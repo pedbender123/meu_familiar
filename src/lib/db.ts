@@ -23,6 +23,8 @@ db.exec(`
     status TEXT NOT NULL DEFAULT 'aguardando_pagamento',
     pagamento_id TEXT,
     pix_copia_e_cola TEXT,
+    perfil_json TEXT,
+    desempatado_pela_pessoa INTEGER NOT NULL DEFAULT 0,
     leitura_json TEXT,
     tentativas INTEGER NOT NULL DEFAULT 0,
     criado_em TEXT NOT NULL,
@@ -40,6 +42,19 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     tipo TEXT NOT NULL,
     pedido_id TEXT,
+    criado_em TEXT NOT NULL
+  );
+
+  -- SPEC 0.8: "desafios como entidade no banco, mesmo vazia". Nasce sem uso e
+  -- é isso mesmo — o crescimento é a Parte VI e está fora do v1. Existe agora
+  -- porque criar a tabela depois é fácil, mas RECONSTRUIR o histórico que ela
+  -- deveria ter acumulado é impossível.
+  CREATE TABLE IF NOT EXISTS desafios (
+    id TEXT PRIMARY KEY,
+    pedido_id TEXT NOT NULL,
+    descricao TEXT NOT NULL,
+    origem TEXT NOT NULL,
+    superado_em TEXT,
     criado_em TEXT NOT NULL
   );
 `);
@@ -79,6 +94,11 @@ function garantirColunas() {
   adicionarColunaSeFaltar('produto', `TEXT NOT NULL DEFAULT '${PRODUTO_PADRAO}'`);
   const pagamentoIdNasceuAgora = adicionarColunaSeFaltar('pagamento_id', 'TEXT');
   adicionarColunaSeFaltar('pix_copia_e_cola', 'TEXT');
+  // SPEC 0.8, travado: os 12 escores salvos, não só o vencedor. É barato agora
+  // e evita ter que refazer o quiz de todo mundo quando a roda dos 12 e o
+  // crescimento (Parte VI) precisarem do dado.
+  adicionarColunaSeFaltar('perfil_json', 'TEXT');
+  adicionarColunaSeFaltar('desempatado_pela_pessoa', 'INTEGER NOT NULL DEFAULT 0');
 
   // Herança do Asaas: se `pagamento_id` acabou de nascer num banco que ainda
   // tem a coluna antiga, copia os IDs para não perder o histórico. Quem criou
@@ -112,6 +132,9 @@ export interface Pedido {
   signo_sol: string | null;
   signo_lua: string | null;
   produto: ProdutoId;
+  /** JSON com eixos, ângulo, magnitude e os 12 escores (SPEC 0.8). */
+  perfil_json: string | null;
+  desempatado_pela_pessoa: number;
   status: StatusPedido;
   pagamento_id: string | null;
   pix_copia_e_cola: string | null;
