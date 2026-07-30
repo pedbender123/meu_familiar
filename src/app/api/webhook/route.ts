@@ -94,7 +94,31 @@ export async function POST(req: NextRequest) {
   }
 }
 
-/** Devolve uma resposta 401 se a assinatura não conferir; `null` se estiver ok. */
+/** Janela contra replay. 5 min absorve deriva de relógio da VPS. */
+export const TOLERANCIA_SEGUNDOS = 300;
+
+/**
+ * Devolve uma resposta 401 se a assinatura não conferir; `null` se estiver ok.
+ *
+ * ── Por que a tolerância é conferida aqui e não pelo SDK ───────────────────
+ *
+ * O `toleranceSeconds` do `mercadopago` v3.2.1 **está quebrado para webhooks
+ * reais**. Ele lê o `ts` do cabeçalho como milissegundos:
+ *
+ *     const tsMs = Number(ts);
+ *     const driftSeconds = Math.abs(now() - tsMs) / 1000;
+ *
+ * mas o Mercado Pago envia `ts` em **segundos** (o exemplo da própria
+ * documentação é `ts=1704908010`, dez dígitos). A conta dá uma deriva de
+ * ~56 anos, e a validação recusa **toda** notificação legítima.
+ *
+ * O efeito seria o pior possível e silencioso: 401 em todo webhook, nenhum
+ * pedido pago entregue, e nada no log dizendo que a causa é uma unidade de
+ * tempo. Confirmado em teste com o segredo real em 30/07/2026.
+ *
+ * Então: o SDK continua fazendo o que faz bem — o HMAC — e a janela de replay
+ * é conferida aqui, aceitando as duas unidades.
+ */
 function validarAssinatura(
   req: NextRequest,
   dataIdQuery: string | null
@@ -107,16 +131,16 @@ function validarAssinatura(
     return null;
   }
 
+  const xSignature = req.headers.get('x-signature');
+
   try {
     WebhookSignatureValidator.validate({
-      xSignature: req.headers.get('x-signature'),
+      xSignature,
       xRequestId: req.headers.get('x-request-id'),
       dataId: dataIdQuery,
       secret: segredo,
-      // Janela contra replay. 5 min absorve deriva de relógio da VPS.
-      toleranceSeconds: 300,
+      // `toleranceSeconds` de propósito ausente — ver o comentário acima.
     });
-    return null;
   } catch (erro) {
     if (erro instanceof InvalidWebhookSignatureError) {
       console.warn(
@@ -126,4 +150,37 @@ function validarAssinatura(
     }
     throw erro;
   }
+
+  if (!dentroDaJanela(xSignature)) {
+    console.warn('[webhook] timestamp fora da janela de replay');
+    return NextResponse.json({ erro: 'não autorizado' }, { status: 401 });
+  }
+
+  return null;
+}
+
+/**
+ * Confere se o `ts` do cabeçalho está dentro da janela de replay.
+ *
+ * Aceita segundos e milissegundos: o MP manda segundos hoje, mas nada garante
+ * que não mude, e tratar 10 dígitos como milissegundos daria 1970.
+ */
+export function dentroDaJanela(
+  xSignature: string | null,
+  agora = Date.now()
+): boolean {
+  if (!xSignature) return false;
+
+  const ts = xSignature
+    .split(',')
+    .map((parte) => parte.trim().split('='))
+    .find(([chave]) => chave === 'ts')?.[1];
+
+  if (!ts || !/^\d+$/.test(ts)) return false;
+
+  const numero = Number(ts);
+  // Menos de 1e11 só pode ser segundos: em milissegundos isso seria 1973.
+  const ms = numero < 1e11 ? numero * 1000 : numero;
+
+  return Math.abs(agora - ms) / 1000 <= TOLERANCIA_SEGUNDOS;
 }

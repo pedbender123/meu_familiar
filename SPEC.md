@@ -1362,7 +1362,7 @@ disponibilidade em português.
 - Exline et al. — escala de lutas religiosas/espirituais
 - Fraley, Waller & Brennan — ECR-R (dimensões de apego)
 - Russell — UCLA Loneliness Scale; versão curta de 3 itens (Hughes et al.)
-
+tipo 
 **Mudança e conselho**
 - Miller & Rollnick — *Entrevista Motivacional*
 - Deci & Ryan — Teoria da Autodeterminação

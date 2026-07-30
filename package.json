@@ -9,7 +9,7 @@
     "lint": "eslint",
     "reprocessar": "tsx scripts/reprocessar.ts",
     "gerar-fusoes": "tsx scripts/gerar-fusoes.ts",
-    "test": "tsx --test src/**/*.test.ts"
+    "test": "tsx --test \"src/**/*.test.ts\""
   },
   "dependencies": {
     "@google/genai": "^2.10.0",

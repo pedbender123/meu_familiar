@@ -30,8 +30,16 @@ const CORES = {
   violeta: '#7B6394',
 };
 
+/**
+ * Aspas sobrando quebram o envio inteiro com um erro que não diz a causa
+ * ("Invalid `from` field"). O carregador de .env dos scripts já as remove,
+ * mas um `.env` editado à mão em produção é o tipo de coisa que ninguém
+ * revisa — então limpa de novo aqui, onde o custo é zero.
+ */
 function remetente(): string {
-  return process.env.EMAIL_REMETENTE || 'Bruxário <onboarding@resend.dev>';
+  const bruto = process.env.EMAIL_REMETENTE?.trim();
+  if (!bruto) return 'Bruxário <onboarding@resend.dev>';
+  return bruto.replace(/^["']|["']$/g, '');
 }
 
 function base(): string {
