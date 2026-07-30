@@ -4,7 +4,12 @@ import { FolhaPergaminho } from '@/components/FolhaPergaminho';
 import { SigiloFamiliar } from '@/components/SigiloFamiliar';
 import { RodapeLegal } from '@/components/RodapeLegal';
 import { FAMILIARES, type FamiliarId } from '@/lib/familiares';
-import { PRODUTOS, precoFormatado } from '@/lib/produtos';
+import {
+  PRODUTOS,
+  PRODUTOS_PRINCIPAIS,
+  precoFormatado,
+  type Produto,
+} from '@/lib/produtos';
 import { TOTAL_DE_ITENS } from '@/lib/quiz/itens';
 import { DESCRICAO_DOS_EIXOS } from '@/lib/quiz/eixos';
 
@@ -154,7 +159,7 @@ const PASSOS = [
   {
     titulo: 'Fica com você',
     texto:
-      'A leitura mora num endereço permanente, não num arquivo que você perde. Você abre quando quiser e manda pra quem quiser.',
+      'A revelação vem em PDF e em imagens prontas pra postar, e chega também no seu e-mail. Se quiser um endereço permanente e o perfil no Bruxário, é a Completa que faz isso.',
   },
 ];
 
@@ -201,18 +206,26 @@ function OQueAcontece() {
  * prometer o que o backend não libera — se alguém tirar a roda dos 12 da
  * Completa no código, ela some daqui junto.
  */
-const LINHAS: { rotulo: string; de: (p: (typeof PRODUTOS)['completa']) => boolean | string }[] = [
+const LINHAS: { rotulo: string; de: (p: Produto) => boolean | string }[] = [
   { rotulo: 'Seu familiar e a leitura', de: () => true },
-  { rotulo: 'Carta pra compartilhar', de: () => true },
-  { rotulo: 'Leitura longa', de: (p) => p.leituraLonga },
-  { rotulo: 'A roda dos 12 escores', de: (p) => p.rodaDosDoze },
-  { rotulo: 'Perfil público permanente', de: (p) => p.perfilPublico },
+  { rotulo: 'PDF e imagens pra compartilhar', de: (p) => p.pdf && p.imagens },
+  {
+    rotulo: 'Quanto tempo o link dura',
+    de: (p) =>
+      p.diasDeAcesso === null ? 'para sempre' : `${p.diasDeAcesso} dias`,
+  },
+  { rotulo: 'Leitura longa', de: (p) => p.relatorioCompleto },
+  { rotulo: 'Gráficos do seu perfil', de: (p) => p.graficos },
+  { rotulo: 'Perfil público com link próprio', de: (p) => p.perfilPublico },
   { rotulo: 'Tiragem diária', de: (p) => p.tiragemDiaria },
-  { rotulo: 'Perguntas ao oráculo', de: (p) => `${p.perguntasOraculo}` },
+  {
+    rotulo: 'Consultas ao Oráculo no lançamento',
+    de: (p) => (p.perguntasOraculo > 0 ? `${p.perguntasOraculo}` : false),
+  },
 ];
 
 function OsProdutos() {
-  const lista = [PRODUTOS.revelacao, PRODUTOS.completa];
+  const lista = PRODUTOS_PRINCIPAIS;
 
   return (
     <section className="w-full max-w-2xl flex flex-col items-center gap-6">
@@ -269,8 +282,9 @@ function OsProdutos() {
       </div>
 
       <p className="font-corpo font-light text-xs text-pergaminho/50 text-center max-w-[42ch]">
-        A carta para compartilhar é de todo mundo, inclusive de quem não comprar
-        nada. Você escolhe o plano depois de conhecer seu familiar.
+        Você escolhe o plano depois de conhecer seu familiar. Quem levar a
+        Revelação e quiser guardar o link para sempre pode fazer isso depois,
+        por {`R$ ${precoFormatado(PRODUTOS.link_permanente)}`}.
       </p>
     </section>
   );

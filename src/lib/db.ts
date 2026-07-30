@@ -25,6 +25,8 @@ db.exec(`
     pix_copia_e_cola TEXT,
     perfil_json TEXT,
     desempatado_pela_pessoa INTEGER NOT NULL DEFAULT 0,
+    expira_em TEXT,
+    pago_em TEXT,
     leitura_json TEXT,
     tentativas INTEGER NOT NULL DEFAULT 0,
     criado_em TEXT NOT NULL,
@@ -99,6 +101,10 @@ function garantirColunas() {
   // crescimento (Parte VI) precisarem do dado.
   adicionarColunaSeFaltar('perfil_json', 'TEXT');
   adicionarColunaSeFaltar('desempatado_pela_pessoa', 'INTEGER NOT NULL DEFAULT 0');
+  // Acesso temporário da Revelação. `expira_em` NULL significa "para sempre" —
+  // é o estado da Completa e de quem comprou o link permanente depois.
+  adicionarColunaSeFaltar('expira_em', 'TEXT');
+  adicionarColunaSeFaltar('pago_em', 'TEXT');
 
   // Herança do Asaas: se `pagamento_id` acabou de nascer num banco que ainda
   // tem a coluna antiga, copia os IDs para não perder o histórico. Quem criou
@@ -135,6 +141,9 @@ export interface Pedido {
   /** JSON com eixos, ângulo, magnitude e os 12 escores (SPEC 0.8). */
   perfil_json: string | null;
   desempatado_pela_pessoa: number;
+  /** ISO. `null` = acesso permanente. */
+  expira_em: string | null;
+  pago_em: string | null;
   status: StatusPedido;
   pagamento_id: string | null;
   pix_copia_e_cola: string | null;
