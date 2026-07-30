@@ -1,10 +1,9 @@
 import Database from 'better-sqlite3';
-import path from 'path';
 import fs from 'fs';
 import { BANCO, DADOS } from './caminhos';
+import { PRODUTO_PADRAO, type ProdutoId } from './produtos';
 
-const dataDir = DADOS;
-if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+if (!fs.existsSync(DADOS)) fs.mkdirSync(DADOS, { recursive: true });
 
 const db = new Database(BANCO);
 db.pragma('journal_mode = WAL');
@@ -20,9 +19,10 @@ db.exec(`
     lua TEXT NOT NULL,
     signo_sol TEXT,
     signo_lua TEXT,
+    produto TEXT NOT NULL DEFAULT '${PRODUTO_PADRAO}',
     status TEXT NOT NULL DEFAULT 'aguardando_pagamento',
-    asaas_payment_id TEXT,
-    invoice_url TEXT,
+    pagamento_id TEXT,
+    pix_copia_e_cola TEXT,
     leitura_json TEXT,
     tentativas INTEGER NOT NULL DEFAULT 0,
     criado_em TEXT NOT NULL,
@@ -44,6 +44,56 @@ db.exec(`
   );
 `);
 
+/**
+ * Migração idempotente. O schema acima só vale para banco novo — o que já
+ * existe na VPS foi criado na época do Asaas, com `asaas_payment_id` e
+ * `invoice_url` e sem coluna de produto. Roda a cada boot: barato, e evita um
+ * passo manual de deploy que alguém esquece.
+ *
+ * Precisa tolerar **concorrência**, não só repetição: o `next build` sobe vários
+ * workers, cada um importa este módulo, e todos leem o schema antes de qualquer
+ * um escrever. Sem isso o segundo worker morre com "duplicate column name" e o
+ * build inteiro falha — foi exatamente o que aconteceu.
+ */
+function adicionarColunaSeFaltar(coluna: string, tipo: string): boolean {
+  try {
+    db.exec(`ALTER TABLE pedidos ADD COLUMN ${coluna} ${tipo}`);
+    return true;
+  } catch (erro) {
+    // Outro processo chegou primeiro (ou a coluna já existia): é sucesso, não
+    // falha. Qualquer outro erro de SQL continua subindo.
+    if (erro instanceof Error && /duplicate column name/i.test(erro.message)) {
+      return false;
+    }
+    throw erro;
+  }
+}
+
+function garantirColunas() {
+  const colunasAntigas = new Set(
+    (db.prepare(`PRAGMA table_info(pedidos)`).all() as { name: string }[]).map(
+      (c) => c.name
+    )
+  );
+
+  adicionarColunaSeFaltar('produto', `TEXT NOT NULL DEFAULT '${PRODUTO_PADRAO}'`);
+  const pagamentoIdNasceuAgora = adicionarColunaSeFaltar('pagamento_id', 'TEXT');
+  adicionarColunaSeFaltar('pix_copia_e_cola', 'TEXT');
+
+  // Herança do Asaas: se `pagamento_id` acabou de nascer num banco que ainda
+  // tem a coluna antiga, copia os IDs para não perder o histórico. Quem criou
+  // a coluna é quem faz o backfill, então isso roda uma vez só mesmo com
+  // vários processos subindo juntos.
+  if (pagamentoIdNasceuAgora && colunasAntigas.has('asaas_payment_id')) {
+    db.exec(`UPDATE pedidos SET pagamento_id = asaas_payment_id`);
+  }
+
+  // A coluna antiga não é dropada de propósito: SQLite < 3.35 não suporta
+  // DROP COLUMN, e uma coluna órfã custa menos que um deploy que quebra no
+  // ALTER.
+}
+garantirColunas();
+
 export type StatusPedido =
   | 'aguardando_pagamento'
   | 'pago'
@@ -61,9 +111,10 @@ export interface Pedido {
   lua: string;
   signo_sol: string | null;
   signo_lua: string | null;
+  produto: ProdutoId;
   status: StatusPedido;
-  asaas_payment_id: string | null;
-  invoice_url: string | null;
+  pagamento_id: string | null;
+  pix_copia_e_cola: string | null;
   leitura_json: string | null;
   tentativas: number;
   criado_em: string;
@@ -79,12 +130,13 @@ export function criarPedido(p: {
   lua: string;
   signo_sol: string;
   signo_lua: string;
+  produto: ProdutoId;
 }) {
   const agora = new Date().toISOString();
   db.prepare(
     `INSERT INTO pedidos
-      (id, nome, email, respostas_json, familiar, lua, signo_sol, signo_lua, status, criado_em, atualizado_em)
-     VALUES (@id, @nome, @email, @respostas_json, @familiar, @lua, @signo_sol, @signo_lua, 'aguardando_pagamento', @agora, @agora)`
+      (id, nome, email, respostas_json, familiar, lua, signo_sol, signo_lua, produto, status, criado_em, atualizado_em)
+     VALUES (@id, @nome, @email, @respostas_json, @familiar, @lua, @signo_sol, @signo_lua, @produto, 'aguardando_pagamento', @agora, @agora)`
   ).run({ ...p, agora });
 }
 
@@ -94,10 +146,10 @@ export function buscarPedido(id: string): Pedido | undefined {
     | undefined;
 }
 
-export function buscarPedidoPorPaymentId(asaasPaymentId: string): Pedido | undefined {
+export function buscarPedidoPorPagamentoId(pagamentoId: string): Pedido | undefined {
   return db
-    .prepare('SELECT * FROM pedidos WHERE asaas_payment_id = ?')
-    .get(asaasPaymentId) as Pedido | undefined;
+    .prepare('SELECT * FROM pedidos WHERE pagamento_id = ?')
+    .get(pagamentoId) as Pedido | undefined;
 }
 
 export function atualizarPedido(id: string, campos: Partial<Pedido>) {

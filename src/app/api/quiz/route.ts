@@ -4,6 +4,7 @@ import { calcularFamiliar, calcularLua, SIGNO_ELEMENTO, QUIZ } from '@/lib/famil
 import { calcularSignos } from '@/lib/astro';
 import { criarPedido } from '@/lib/db';
 import { validarEmail, validarNome } from '@/lib/validacao';
+import { ehProdutoValido, PRODUTO_PADRAO } from '@/lib/produtos';
 import { excedeuLimite } from '@/lib/rate-limit';
 
 export async function POST(req: NextRequest) {
@@ -13,7 +14,7 @@ export async function POST(req: NextRequest) {
   }
 
   const corpo = await req.json();
-  const { respostas, nome, email, dataNascimento, horaNascimento } = corpo ?? {};
+  const { respostas, nome, email, dataNascimento, horaNascimento, produto } = corpo ?? {};
 
   if (!respostas || typeof respostas !== 'object') {
     return NextResponse.json({ erro: 'Respostas do ritual ausentes.' }, { status: 400 });
@@ -48,6 +49,9 @@ export async function POST(req: NextRequest) {
     lua,
     signo_sol: signoSol,
     signo_lua: '',
+    // Produto inválido cai no padrão em vez de recusar o pedido: perder a
+    // venda por causa de um parâmetro de UI é o pior desfecho possível.
+    produto: ehProdutoValido(produto) ? produto : PRODUTO_PADRAO,
   });
 
   return NextResponse.json({ id: pedidoId });

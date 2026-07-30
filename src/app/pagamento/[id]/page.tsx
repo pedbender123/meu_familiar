@@ -1,61 +1,43 @@
-'use client';
+import { notFound, redirect } from 'next/navigation';
+import { buscarPedido } from '@/lib/db';
+import { chavePublica, pagamentoEhFake } from '@/lib/pagamento';
+import { precoEmReais, produtoDe } from '@/lib/produtos';
+import { CheckoutMercadoPago } from '@/components/CheckoutMercadoPago';
+import { PagamentoFake } from '@/components/PagamentoFake';
 
-import { useState, useEffect, useCallback, use } from 'react';
-import { Flame } from 'lucide-react';
+/**
+ * Server component de propósito: o preço é lido do produto no servidor, não
+ * calculado no navegador. A versão anterior tinha `const PRECO = 980/100`
+ * hardcoded no cliente, o que significava que mudar de produto exigia mudar
+ * código de UI.
+ */
+export default async function Pagamento({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const pedido = buscarPedido(id);
+  if (!pedido) notFound();
 
-const PRECO = (980 / 100).toFixed(2).replace('.', ',');
+  // Pedido já adiantado: não faz sentido mostrar checkout.
+  if (pedido.status === 'entregue') redirect(`/revelacao/${id}`);
+  if (pedido.status !== 'aguardando_pagamento') redirect(`/obrigado/${id}`);
 
-export default function Pagamento({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
-  const [enviando, setEnviando] = useState(false);
-  const [erro, setErro] = useState('');
-
-  const prosseguir = useCallback(async () => {
-    setErro('');
-    setEnviando(true);
-    try {
-      const resposta = await fetch(`/api/pedido/${id}/pagamento`, { method: 'POST' });
-      const dados = await resposta.json();
-      if (!resposta.ok) {
-        setErro(dados.erro || 'O véu está denso esta noite. Tente novamente.');
-        setEnviando(false);
-        return;
-      }
-      window.location.href = dados.redirect;
-    } catch {
-      setErro('O véu está denso esta noite. Tente novamente em instantes.');
-      setEnviando(false);
-    }
-  }, [id]);
-
-  useEffect(() => {
-    prosseguir();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const produto = produtoDe(pedido.produto);
+  const chave = chavePublica();
 
   return (
-    <main className="flex-1 flex flex-col items-center justify-center px-6 py-16 gap-6 text-center">
-      <Flame className="text-vela" size={30} strokeWidth={1.5} />
-      <h1 className="font-display italic text-3xl text-pergaminho max-w-sm">
-        Encontramos. Ele está esperando do outro lado.
-      </h1>
-      <p className="font-display text-3xl text-vela">R$ {PRECO}</p>
-
-      {erro ? (
-        <>
-          <p className="text-sm text-red-300 max-w-xs">{erro}</p>
-          <button
-            onClick={prosseguir}
-            disabled={enviando}
-            className="bg-vela text-tinta font-corpo font-medium px-8 py-4 rounded-full hover:brightness-110 transition disabled:opacity-60"
-          >
-            Tentar novamente
-          </button>
-        </>
+    <main className="flex-1 flex flex-col items-center justify-center px-6 py-16">
+      {pagamentoEhFake() || !chave ? (
+        <PagamentoFake pedidoId={id} />
       ) : (
-        <p className="font-corpo font-light text-pergaminho/70 text-sm">
-          Preparando seu pagamento seguro...
-        </p>
+        <CheckoutMercadoPago
+          pedidoId={id}
+          chavePublica={chave}
+          valorEmReais={precoEmReais(produto)}
+          nomeProduto={produto.nome}
+        />
       )}
     </main>
   );

@@ -31,12 +31,10 @@ ou seja, não são sugestão:
 
 | SPEC v1 | Código hoje |
 |---|---|
-| Mercado Pago (Payment Brick), seção 10.1 — **decisão definitiva** | **Asaas** Checkout hospedado (ver histórico abaixo) |
 | Quiz de 26 itens, circumplexo de 2 eixos (2.2) | 8 perguntas, `+2 pontos por bicho` (`src/lib/familiares.ts`) |
 | Signo com peso **ZERO** na escolha (2.4) | elemento do signo solar **é o critério de desempate** |
 | Gemini 3.5 na voz, 3.1 só na vigilância (8.1) | 3.1-flash-lite na voz; vigilância inexistente |
 | 12 escores de afinidade salvos (0.8) | não são calculados; sem coluna no schema |
-| Dois produtos, R$ 9,80 e R$ 18,90 (0.3) | um preço, `980` hardcoded em dois arquivos |
 | Micro-avisos em 9 pontos do fluxo (7.4) | um link no rodapé (`src/components/RodapeLegal.tsx`) |
 | Conta, verificação de e-mail, endereço permanente (0.5) | pedido anônimo identificado por uuid |
 | Oráculo com 3 perguntas grátis (0.4) | `/api/oraculo` só grava e-mail + pergunta numa lista de espera |
@@ -79,8 +77,9 @@ Três etapas, e só a última é decisão de arquitetura:
    bandeiras e parcelamento nacionais, checkout que o público brasileiro
    reconhece, suporte em português.
 
-Ou seja: a migração Asaas → Mercado Pago está decidida e é só uma questão de
-quando. Não há o que reavaliar aqui.
+**Estado: migrado.** O Asaas saiu do código inteiro. Falta só preencher as
+credenciais no `.env` e cadastrar o webhook no painel — ver "Pendências pra
+ativar de verdade".
 
 ## Stack
 
@@ -90,9 +89,10 @@ quando. Não há o que reavaliar aqui.
 - **pdf-lib** (+ `@pdf-lib/fontkit`) — PDF de 4 páginas
 - **astronomy-engine** — signo solar/lunar calculado 100% offline
 - **Gemini** (`@google/genai`, modelo `gemini-3.1-flash-lite`) — texto da leitura
-- **Asaas** — pagamento via **Checkout hospedado** (`/v3/checkouts`) — Pix e
-  Cartão de Crédito. Sem chave configurada, cai automaticamente num "pagamento
-  fake" pra dev local (ver `src/lib/pagamento.ts`)
+- **Mercado Pago** (`mercadopago` SDK v3) — **Payment Brick** renderizado no
+  próprio site: cartão de crédito e débito, Pix e boleto num só módulo. Sem
+  `MP_ACCESS_TOKEN` configurado, cai automaticamente num "pagamento fake" pra
+  dev local (ver `src/lib/pagamento.ts`)
 - **rembg** (Python, `isnet-general-use`) — usado *uma única vez*, offline, pra
   remover o fundo dos 12 PNGs dos animais. Não roda em produção; as saídas já
   ficam versionadas em `src/assets/familiares/`. O `.venv/` de 955 MB que sobrou
@@ -174,45 +174,52 @@ quebra, mas perde a identidade visual.
 ### Variáveis de ambiente (`.env`)
 
 ```
-ASAAS_API_KEY=
-ASAAS_WEBHOOK_TOKEN=
-ASAAS_ENV=sandbox   # sandbox | production
+MP_ACCESS_TOKEN=              # token privado, painel Suas Integrações
+NEXT_PUBLIC_MP_PUBLIC_KEY=    # chave pública do Brick (vai pro navegador)
+MP_WEBHOOK_SECRET=            # "assinatura secreta" da aplicação
 GEMINI_API_KEY=
 BASE_URL=http://localhost:3000
-PRICE_CENTAVOS=980
 ```
 
-- **`ASAAS_API_KEY` vazia** → o app usa um provedor de pagamento "fake": o
-  checkout confirma na hora, sem ir pra Asaas de verdade. Ótimo pra testar o
-  fluxo completo (quiz → leitura → artes → PDF → link) sem gateway nenhum.
-- **⚠️ Cuidado com `$` no valor da chave.** As chaves da Asaas começam com
-  `$aact_...`. O Next.js expande `$NOME_DE_VARIAVEL` dentro do `.env`
-  automaticamente — se não escapar, o `$aact_...` vira string vazia
-  silenciosamente. Sempre escrever como `\$aact_...` (contrabarra antes do `$`).
-- **`ASAAS_WEBHOOK_TOKEN`** não é algo que a Asaas te dá — você inventa
-  qualquer string aleatória e cadastra o mesmo valor no painel da Asaas
-  (Configurações → Webhooks) na hora de registrar a URL do webhook. É assim
-  que o `/api/webhook` confirma que quem está chamando é realmente a Asaas.
-- **Sandbox × Produção são contas completamente separadas na Asaas**,
-  inclusive a chave Pix precisa ser cadastrada nas duas de forma independente
-  (`sandbox.asaas.com` × `www.asaas.com`).
-- **`DEBIT_CARD` não existe no endpoint de Checkout** (`/v3/checkouts`) da
-  Asaas — só nas cobranças avulsas (`/v3/payments`). Testado e confirmado
-  direto contra a API de produção. Por isso `billingTypes` em
-  `src/lib/pagamento.ts` é só `['PIX', 'CREDIT_CARD']`.
+Os preços **não** são variável de ambiente: moram em
+[`src/lib/produtos.ts`](src/lib/produtos.ts) junto com o que cada produto
+entrega, porque a tela de preço é gerada dali. Assim não existe o caso de a
+tela prometer algo que o backend não libera.
+
+- **`MP_ACCESS_TOKEN` vazio** → o app usa um provedor de pagamento "fake": a
+  compra confirma na hora, sem ir pro Mercado Pago. Ótimo pra testar o fluxo
+  completo (quiz → leitura → artes → link) sem gateway nenhum.
+- **Credenciais de teste e produção são pares distintos** no painel do MP, e o
+  Brick precisa da chave pública do **mesmo** par do access token. Misturar os
+  pares dá erro de token inválido que não diz que o problema é esse.
+- **`MP_WEBHOOK_SECRET` é gerado pelo Mercado Pago**, diferente do Asaas onde
+  você inventava o token. Fica em Suas Integrações → sua aplicação → Webhooks →
+  "assinatura secreta". A validação usa `WebhookSignatureValidator` do SDK
+  oficial (HMAC-SHA256 sobre `data.id` + `x-request-id` + timestamp), com
+  tolerância de 5 min contra replay.
+- **O preço nunca vem do navegador.** O Brick manda um `transaction_amount` no
+  formData, mas `src/lib/pagamento.ts` relê o valor do produto no servidor —
+  senão o preço seria editável pelo DevTools.
+- **`issuer_id` vem como string do Brick e a API espera número.** Convertido em
+  `montarCorpo()`; sem isso o MP recusa com um erro que não explica a causa.
 
 ## Arquitetura do fluxo de compra
 
 ```
-/ritual (12 passos: 8 perguntas + nome + data + hora + email)
-  → POST /api/quiz            cria o pedido (status: aguardando_pagamento)
-/pagamento/[id]                auto-chama a API de pagamento e redireciona
-  → POST /api/pedido/[id]/pagamento
-       fake  → marca "pago" na hora, dispara geração, volta pra /obrigado/[id]
-       real  → cria checkout na Asaas, redireciona pro link hospedado deles
-                (Pix/Cartão — nenhum dado de pagamento passa pelo nosso servidor)
-Asaas confirma pagamento
-  → POST /api/webhook (header asaas-access-token validado)
+/ritual (12 passos: 8 perguntas + nome + data + hora + e-mail)
+  → POST /api/quiz            cria o pedido (status: aguardando_pagamento,
+                              com o produto escolhido)
+/pagamento/[id]                server component: lê o preço do produto e
+                               monta o Payment Brick NA PRÓPRIA PÁGINA
+                               (sem redirect — SPEC 10.3)
+  → POST /api/pedido/[id]/pagamento   recebe o formData do Brick
+       fake     → marca "pago" na hora, dispara geração, vai pra /obrigado/[id]
+       cartão   → POST /v1/payments; approved manda pra /obrigado/[id]
+       Pix      → POST /v1/payments; devolve QR + copia-e-cola na tela
+       recusado → mensagem traduzida pra voz do produto, tenta de novo
+Mercado Pago confirma pagamento
+  → POST /api/webhook   assinatura HMAC validada; o status é RELIDO da API
+                        (o corpo da notificação traz só data.id)
        marca "pago" → dispara src/lib/processar.ts em background
 /obrigado/[id]                 tela de carregamento (poll em /api/pedido/[id])
   → quando status = "entregue", redireciona pra:
@@ -228,16 +235,28 @@ Roda em background (fire-and-forget) — se o processo cair no
 meio, `pedidosTravados()` em `src/lib/db.ts` + `scripts/reprocessar.ts`
 (`npm run reprocessar`) reencaminham pedidos presos em `pago`/`gerando`/`erro`.
 
-### Por que Checkout hospedado, não `/v3/payments`
+### Por que Payment Brick e não checkout redirecionado
 
-A primeira versão pedia CPF no próprio site antes de criar a cobrança
-(`customer` + `payment` na Asaas). Trocamos pro **Checkout hospedado**
-(`/v3/checkouts`) porque:
+O Asaas usava Checkout hospedado: criava a cobrança e mandava a pessoa pra
+página deles. Funcionava, e a troca **não** foi por problema técnico — foi o
+SPEC 10.3, que trata a ambientação como parte do produto: "mandar alguém do
+meio de um ritual de vela e lua para uma tela laranja e voltar" quebra o que o
+resto do site constrói.
 
-1. Evita pedir CPF duas vezes (uma no nosso site, outra na página da Asaas)
-2. A própria página da Asaas já coleta nome/CPF/e-mail/forma de pagamento —
-   uma UX padrão que qualquer brasileiro já conhece
-3. Menos requisições (era `/customers` + `/payments`, agora só `/checkouts`)
+Consequências de projeto que vêm com essa escolha:
+
+1. **Não existe mais URL de checkout.** O Brick coleta no navegador, gera um
+   `token` e chama nosso backend, que cria o pagamento em `POST /v1/payments`.
+   Dado de cartão nunca toca nosso servidor — é o que mantém a conformidade PCI.
+2. **A tela de pagamento virou server component**, porque o preço precisa ser
+   lido do produto no servidor. A versão anterior tinha `const PRECO = 980/100`
+   hardcoded no cliente.
+3. **A resposta síncrona não libera acesso.** Cartão volta `approved` na hora,
+   Pix volta `pending` com QR. Em nenhum dos dois casos é ela que decide: quem
+   libera é o webhook (SPEC 10.6).
+4. **Recusa de cartão precisa de texto próprio.** É o momento mais frágil da
+   compra — mensagem genérica faz desistir, `cc_rejected_bad_filled_date`
+   assusta. A tradução está em `CheckoutMercadoPago.tsx`.
 
 ## Deploy (estado atual em produção)
 
@@ -277,18 +296,26 @@ padrões que já existiam ali, sem introduzir ferramentas novas:
    certbot --nginx -d bruxario.com.br -d www.bruxario.com.br --redirect
    ```
 
-2. **Webhook não está cadastrado no painel da Asaas.** Sem isso, pagamentos
-   confirmados não avisam o site (o pedido fica preso em "aguardando
+2. **Credenciais do Mercado Pago ainda não existem.** Enquanto
+   `MP_ACCESS_TOKEN` estiver vazio o app roda no provedor fake e aprova tudo
+   sem cobrar — ou seja, **não deixe subir pra produção assim**.
+   **Ação necessária:** painel do MP → Suas Integrações → criar aplicação →
+   copiar o access token e a chave pública (par de **produção**) pro `.env` do
+   servidor.
+
+3. **Webhook não está cadastrado no painel do Mercado Pago.** Sem isso,
+   pagamento confirmado não avisa o site (o pedido fica preso em "aguardando
    pagamento" mesmo depois de pago — a revelação só é gerada se alguém rodar
    `npm run reprocessar` manualmente).
-   **Ação necessária:** painel da Asaas (produção) → Configurações →
-   Webhooks → cadastrar `https://bruxario.com.br/api/webhook`, marcar os
-   eventos `PAYMENT_CONFIRMED` e `PAYMENT_RECEIVED`, e usar como "token de
-   acesso" o mesmo valor de `ASAAS_WEBHOOK_TOKEN` do `.env` do servidor.
+   **Ação necessária:** Suas Integrações → sua aplicação → Webhooks →
+   cadastrar `https://bruxario.com.br/api/webhook`, marcar o tópico
+   **Pagamentos**, e copiar a "assinatura secreta" pro `MP_WEBHOOK_SECRET`.
 
-3. **Ambiente é `production` com a chave oficial da Asaas.** Qualquer
-   checkout concluído a partir de agora é uma cobrança real. Testado até a
-   geração do link de checkout (sem finalizar nenhum pagamento automatizado).
+4. **Nada foi testado contra a API real** — não há credencial. O código foi
+   escrito contra a documentação oficial e usa o SDK `mercadopago` v3 (inclusive
+   `WebhookSignatureValidator`, em vez de reimplementar o HMAC na mão). Antes da
+   primeira venda vale rodar os caminhos feios no sandbox: recusa, Pix expirado,
+   webhook repetido, estorno.
 
 ### Redeploy manual (até existir CI/CD)
 
