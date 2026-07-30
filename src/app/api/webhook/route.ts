@@ -10,6 +10,7 @@ import {
   registrarEvento,
 } from '@/lib/db';
 import { pagamento, statusLiberaAcesso } from '@/lib/pagamento';
+import { calcularExpiracao, produtoDe } from '@/lib/produtos';
 import { processarPedido } from '@/lib/processar';
 
 /**
@@ -73,7 +74,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    atualizarPedido(pedido.id, { status: 'pago', pagamento_id: idPagamento });
+    // A contagem dos 7 dias começa AGORA, no momento em que o pagamento
+    // confirmou — não quando a geração terminar. Se o pipeline demorar ou
+    // falhar e for reprocessado amanhã, a pessoa não pode perder um dia.
+    const pagoEm = new Date();
+    atualizarPedido(pedido.id, {
+      status: 'pago',
+      pagamento_id: idPagamento,
+      pago_em: pagoEm.toISOString(),
+      expira_em: calcularExpiracao(produtoDe(pedido.produto), pagoEm),
+    });
     registrarEvento('pagamento_confirmado', pedido.id);
     processarPedido(pedido.id);
 

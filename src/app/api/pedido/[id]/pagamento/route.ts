@@ -6,7 +6,7 @@ import {
   statusLiberaAcesso,
   type FormDataBrick,
 } from '@/lib/pagamento';
-import { produtoDe } from '@/lib/produtos';
+import { calcularExpiracao, produtoDe } from '@/lib/produtos';
 import { processarPedido } from '@/lib/processar';
 import { excedeuLimite } from '@/lib/rate-limit';
 
@@ -54,7 +54,12 @@ export async function POST(
   }
 
   if (pagamentoEhFake()) {
-    atualizarPedido(id, { status: 'pago' });
+    const pagoEm = new Date();
+    atualizarPedido(id, {
+      status: 'pago',
+      pago_em: pagoEm.toISOString(),
+      expira_em: calcularExpiracao(produtoDe(pedido.produto), pagoEm),
+    });
     registrarEvento('pagamento_confirmado_fake', id);
     processarPedido(id);
     return NextResponse.json({ status: 'approved', redirect: `/obrigado/${id}` });

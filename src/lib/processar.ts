@@ -4,6 +4,7 @@ import { calcularSignos } from './astro';
 import { gerarLeitura } from './leitura';
 import { gerarArtes } from './arte';
 import { gerarPdf } from './pdf';
+import { enviarRevelacao } from './email';
 
 /**
  * Roda em background após a confirmação de pagamento: calcula signos, gera a
@@ -11,9 +12,10 @@ import { gerarPdf } from './pdf';
  * Nunca deve lançar para o chamador — erros marcam `erro` para o job de
  * reprocessamento pegar depois.
  *
- * Não há envio de e-mail: a entrega é o próprio link permanente
- * (/revelacao/[id]), para onde /obrigado/[id] redireciona sozinho quando o
- * status vira `entregue`.
+ * A entrega tem dois caminhos, e os dois importam: o link (para onde
+ * /obrigado/[id] redireciona sozinho) e o e-mail com o PDF anexado. O segundo
+ * existe porque o link da Revelação **expira em 7 dias** — sem o anexo, quem
+ * pagou R$ 9,80 ficaria sem cópia nenhuma depois disso.
  */
 export async function processarPedido(pedidoId: string): Promise<void> {
   const pedido = buscarPedido(pedidoId);
@@ -64,6 +66,25 @@ export async function processarPedido(pedidoId: string): Promise<void> {
       leitura_json: JSON.stringify(leitura),
     });
     registrarEvento('pedido_entregue', pedidoId);
+
+    // O e-mail é o último passo e falha isolada: se o Resend estiver fora do
+    // ar, a revelação já está gerada e acessível pelo link. Marcar o pedido
+    // como `erro` por causa disso faria o job de reprocessamento gerar tudo de
+    // novo — inclusive uma segunda chamada paga ao Gemini.
+    try {
+      await enviarRevelacao({
+        nome: pedido.nome,
+        email: pedido.email,
+        pedidoId,
+        produtoId: pedido.produto,
+        nomeFamiliar: familiar.nome,
+        nomeSecreto: leitura.nome_secreto,
+        expiraEm: pedido.expira_em,
+      });
+    } catch (erroEmail) {
+      console.error(`[processarPedido] e-mail falhou no pedido ${pedidoId}:`, erroEmail);
+      registrarEvento('email_falhou', pedidoId);
+    }
   } catch (erro) {
     console.error(`[processarPedido] erro no pedido ${pedidoId}:`, erro);
     atualizarPedido(pedidoId, { status: 'erro' });

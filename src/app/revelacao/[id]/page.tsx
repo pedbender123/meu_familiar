@@ -12,6 +12,8 @@ import { Constelacao } from '@/components/Constelacao';
 import { FormularioOraculo } from '@/components/FormularioOraculo';
 import { BotaoCompartilhar } from '@/components/BotaoCompartilhar';
 import { RodapeLegal } from '@/components/RodapeLegal';
+import { AvisoDeExpiracao, AcessoExpirado } from '@/components/AvisoDeExpiracao';
+import { acessoExpirou } from '@/lib/produtos';
 
 export const metadata = {
   robots: { index: false, follow: false },
@@ -49,6 +51,12 @@ export default async function Revelacao({
     );
   }
 
+  // O prazo é checado no SERVIDOR, antes de qualquer render. Esconder o
+  // conteúdo no cliente deixaria a leitura inteira no HTML de quem já expirou.
+  if (acessoExpirou(pedido.expira_em)) {
+    return <AcessoExpirado pedidoId={id} />;
+  }
+
   const leitura: Leitura = JSON.parse(pedido.leitura_json);
   const familiar = FAMILIARES[pedido.familiar as FamiliarId];
 
@@ -64,6 +72,10 @@ export default async function Revelacao({
       */}
       <main className="quarto-de-vela relative z-10 flex-1 flex flex-col items-center px-5 pt-10 pb-16 gap-8 sm:gap-12 sm:pt-16">
         <Vela />
+
+        {pedido.expira_em && (
+          <AvisoDeExpiracao pedidoId={id} expiraEm={pedido.expira_em} />
+        )}
 
         <FolhaPergaminho>
           <SigiloFamiliar sigilo={familiar.sigilo} tamanho={200} />
