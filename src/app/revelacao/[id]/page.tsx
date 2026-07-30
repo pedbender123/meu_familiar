@@ -11,6 +11,7 @@ import { PoeiraNaLuz } from '@/components/PoeiraNaLuz';
 import { Constelacao } from '@/components/Constelacao';
 import { FormularioOraculo } from '@/components/FormularioOraculo';
 import { BotaoCompartilhar } from '@/components/BotaoCompartilhar';
+import { RodapeLegal } from '@/components/RodapeLegal';
 
 export const metadata = {
   robots: { index: false, follow: false },
@@ -132,11 +133,7 @@ export default async function Revelacao({
           <FormularioOraculo nomeSecreto={leitura.nome_secreto} />
         </section>
 
-        <p className="font-corpo text-[0.7rem] leading-relaxed text-pergaminho/35 max-w-[44ch] text-center">
-          O Bruxário é entretenimento e autoconhecimento simbólico. As leituras
-          são geradas com auxílio de inteligência artificial e não substituem
-          orientação profissional de nenhuma natureza.
-        </p>
+        <RodapeLegal />
       </main>
     </>
   );

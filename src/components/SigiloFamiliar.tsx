@@ -14,12 +14,26 @@ import type { Sigilo } from '@/lib/familiares';
  * O traço acelera no começo e assenta no fim — pena de verdade não tem
  * velocidade constante.
  */
+/**
+ * Duas paletas, como a Constelacao: tinta sobre pergaminho ou luz sobre o
+ * escuro. O mesmo traço não funciona nos dois fundos.
+ */
+const PALETA = {
+  papel: { moldura: 'rgba(107,95,114,0.32)', traco: 'rgba(46,36,56,0.62)', no: 'rgba(138,106,47,0.85)' },
+  quarto: { moldura: 'rgba(123,99,148,0.45)', traco: 'rgba(234,224,204,0.55)', no: 'rgba(217,164,65,0.9)' },
+} as const;
+
 export function SigiloFamiliar({
   sigilo,
   tamanho = 240,
+  variante = 'papel',
+  animado = true,
 }: {
   sigilo: Sigilo;
   tamanho?: number;
+  variante?: 'papel' | 'quarto';
+  /** Doze sigilos animando ao mesmo tempo viram festa. Na vitrine, estáticos. */
+  animado?: boolean;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
 
@@ -55,20 +69,22 @@ export function SigiloFamiliar({
     ordem.push(vertices[0]);
 
     const segmentos = ordem.length - 1;
-    const semMovimento = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const semMovimento =
+      !animado || matchMedia('(prefers-reduced-motion: reduce)').matches;
     const duracao = semMovimento ? 0 : 2600;
+    const cor = PALETA[variante];
 
     function desenhar(progresso: number) {
       ctx!.clearRect(0, 0, tamanho, tamanho);
 
       // círculo externo: sempre completo, discreto — é a moldura do sigilo
-      ctx!.strokeStyle = 'rgba(107,95,114,0.32)';
+      ctx!.strokeStyle = cor.moldura;
       ctx!.lineWidth = 1;
       ctx!.beginPath();
       ctx!.arc(centro, centro, raio + tamanho * 0.058, 0, Math.PI * 2);
       ctx!.stroke();
 
-      ctx!.strokeStyle = 'rgba(46,36,56,0.62)';
+      ctx!.strokeStyle = cor.traco;
       ctx!.lineWidth = 1.3;
       ctx!.lineCap = 'round';
       ctx!.lineJoin = 'round';
@@ -86,7 +102,7 @@ export function SigiloFamiliar({
       ctx!.stroke();
 
       // nós nos vértices já alcançados
-      ctx!.fillStyle = 'rgba(138,106,47,0.85)';
+      ctx!.fillStyle = cor.no;
       for (let i = 0; i <= Math.floor(avanco) && i < ordem.length; i++) {
         ctx!.beginPath();
         ctx!.arc(ordem[i].x, ordem[i].y, 2, 0, Math.PI * 2);
@@ -111,7 +127,7 @@ export function SigiloFamiliar({
     animacao = requestAnimationFrame(animar);
 
     return () => cancelAnimationFrame(animacao);
-  }, [sigilo, tamanho]);
+  }, [sigilo, tamanho, variante, animado]);
 
   return (
     <canvas
