@@ -9,7 +9,7 @@
     "lint": "eslint",
     "reprocessar": "tsx scripts/reprocessar.ts",
     "gerar-fusoes": "tsx scripts/gerar-fusoes.ts",
-    "test": "tsx --test \"src/**/*.test.ts\"",
+    "test": "dir=$(mktemp -d) && BRUXARIO_DIR_DADOS=\"$dir\" tsx --test \"src/**/*.test.ts\"; codigo=$?; rm -rf \"$dir\"; exit $codigo",
     "lembrar-carrinho": "tsx scripts/lembrar-carrinho.ts",
     "semear-mural": "tsx scripts/semear-mural.ts",
     "gerar-og": "tsx scripts/gerar-og.ts",
