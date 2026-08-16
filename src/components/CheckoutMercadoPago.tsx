@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Flame, Copy, Check } from 'lucide-react';
+import { marcar } from '@/lib/marcar';
 
 /**
  * Payment Brick do Mercado Pago montado dentro da nossa tela.
@@ -63,17 +64,31 @@ export function CheckoutMercadoPago({
   chavePublica,
   valorEmReais,
   nomeProduto,
+  cupom,
+  modo,
+  generoDoFamiliar,
+  itens,
 }: {
   pedidoId: string;
   chavePublica: string;
   valorEmReais: number;
   nomeProduto: string;
+  /** Sete dos doze familiares são femininos — o texto precisa concordar. */
+  generoDoFamiliar?: 'm' | 'f';
+  /** O que a pessoa leva. No checkout ninguém lembra o que tinha no plano. */
+  itens?: string[];
+  /** Presente só quando o pedido nasceu com cupom. */
+  cupom?: { codigo: string; descontoPercentual: number; cheioEmReais: number };
+  /** Quando não é `producao`, a tela precisa dizer isso em voz alta. */
+  modo?: 'fake' | 'teste' | 'producao';
 }) {
   const container = useRef<HTMLDivElement>(null);
   const jaMontou = useRef(false);
   const [erro, setErro] = useState('');
   const [pix, setPix] = useState<Pix | null>(null);
   const [recusado, setRecusado] = useState('');
+  // Cartão em análise: o webhook ainda pode aprovar, então a tela espera.
+  const [emAnalise, setEmAnalise] = useState(false);
 
   useEffect(() => {
     // StrictMode monta o efeito duas vezes em dev; sem essa guarda o Brick
@@ -94,20 +109,59 @@ export function CheckoutMercadoPago({
           initialization: {
             amount: valorEmReais,
           },
+          /**
+           * ── Por que só Pix e cartão de crédito ──────────────────────────
+           *
+           * **Boleto saiu.** Compensa em 1 a 3 dias úteis, e isto é uma
+           * compra de impulso de quinze reais que só existe no minuto em que
+           * a pessoa terminou o teste. Oferecer boleto é oferecer adiar — e
+           * adiar, aqui, é não comprar.
+           *
+           * **Débito saiu.** Praticamente ninguém usa débito virtual no
+           * Brasil; a linha só engordava a lista e dava cara de gateway
+           * genérico.
+           *
+           * ── A cor ────────────────────────────────────────────────────────
+           *
+           * O ciano é o padrão do Bricks e destoa de tudo: a paleta do site é
+           * índigo, creme e âmbar. Depois de treze minutos de ritual, um
+           * botão turquesa de fintech quebra a ilusão inteira.
+           */
           customization: {
             paymentMethods: {
               creditCard: 'all',
-              debitCard: 'all',
               bankTransfer: 'all', // Pix
-              ticket: 'all', // boleto
+              debitCard: [],
+              ticket: [],
+              // Parcelar quinze reais faz o produto parecer mais caro do que é.
+              maxInstallments: 1,
             },
-            visual: { style: { theme: 'dark' } },
+            visual: {
+              style: {
+                theme: 'dark',
+                customVariables: {
+                  baseColor: '#D9A441',
+                  baseColorFirstVariant: '#C08F33',
+                  baseColorSecondVariant: '#8A6A2F',
+                  textPrimaryColor: '#EAE0CC',
+                  textSecondaryColor: 'rgba(234,224,204,0.65)',
+                  inputBackgroundColor: 'rgba(234,224,204,0.05)',
+                  formBackgroundColor: 'transparent',
+                  baseColorInverted: '#171225',
+                  borderRadiusMedium: '12px',
+                  borderRadiusLarge: '16px',
+                },
+              },
+            },
           },
           callbacks: {
             onReady: () => {},
             onSubmit: async ({ formData }: { formData: unknown }) => {
               setErro('');
               setRecusado('');
+              // Estava declarado em MARCOS e nunca disparava. É o degrau
+              // "apertou pagar" — distinto de "abriu o checkout".
+              marcar('pagamento_tentado');
               const resposta = await fetch(`/api/pedido/${pedidoId}/pagamento`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -128,7 +182,10 @@ export function CheckoutMercadoPago({
                 setPix(dados.pix);
                 return;
               }
-              // pendente/recusado sem Pix: cartão negado, boleto emitido, etc.
+              // pendente/recusado sem Pix: cartão negado ou em análise.
+              const pendente =
+                dados.status === 'pending' || dados.status === 'in_process';
+              setEmAnalise(pendente);
               setRecusado(mensagemDeStatus(dados.status, dados.statusDetalhe));
             },
             onError: (e: unknown) => {
@@ -150,18 +207,37 @@ export function CheckoutMercadoPago({
     };
   }, [pedidoId, chavePublica, valorEmReais]);
 
-  if (pix) return <TelaPix pix={pix} />;
+  if (pix) return <TelaPix pix={pix} pedidoId={pedidoId} />;
+  if (emAnalise) return <TelaEmAnalise pedidoId={pedidoId} />;
 
   return (
     <div className="w-full max-w-md flex flex-col gap-6">
+      {modo && modo !== 'producao' && <FaixaDeModo modo={modo} />}
+
       <div className="text-center flex flex-col items-center gap-3">
         <Flame className="text-vela" size={28} strokeWidth={1.5} />
         <h1 className="font-display italic text-2xl text-pergaminho">
-          Ele está esperando do outro lado.
+          {generoDoFamiliar === 'f'
+            ? 'Ela está esperando do outro lado.'
+            : 'Ele está esperando do outro lado.'}
         </h1>
         <p className="font-corpo font-light text-sm text-pergaminho/60">
-          {nomeProduto} · R$ {valorEmReais.toFixed(2).replace('.', ',')}
+          {cupom ? (
+            <>
+              <span className="line-through opacity-50">
+                {`R$ ${cupom.cheioEmReais.toFixed(2).replace('.', ',')}`}
+              </span>{' '}
+              {`${nomeProduto} · R$ ${valorEmReais.toFixed(2).replace('.', ',')}`}
+            </>
+          ) : (
+            `${nomeProduto} · R$ ${valorEmReais.toFixed(2).replace('.', ',')}`
+          )}
         </p>
+        {cupom && (
+          <p className="font-corpo text-xs text-ouro-profundo mt-1">
+            {`Cupom ${cupom.codigo} · ${cupom.descontoPercentual}% de desconto`}
+          </p>
+        )}
       </div>
 
       {recusado && (
@@ -173,13 +249,186 @@ export function CheckoutMercadoPago({
         <p className="font-corpo text-sm text-center text-red-300">{erro}</p>
       )}
 
+      {/*
+        O que ela leva, aqui no checkout.
+        Entre escolher o plano e digitar o cartão passam duas telas — ninguém
+        chega aqui lembrando o que tinha na lista. "Completa" sozinho, no
+        momento de pagar, não significa nada.
+      */}
+      {itens && itens.length > 0 && (
+        <ul className="flex flex-col gap-1.5 rounded-2xl border border-pergaminho/12 px-5 py-4">
+          {itens.map((i) => (
+            <li key={i}
+              className="font-corpo font-light text-[13px] text-pergaminho/70 leading-snug flex gap-2">
+              <span className="text-vela/70 shrink-0">·</span>
+              {i}
+            </li>
+          ))}
+        </ul>
+      )}
+
       <div id="brick-pagamento" ref={container} />
+
+      {/*
+        Sinal de confiança no fim, não no topo: quem está lendo aqui já
+        decidiu e está com o cartão na mão. No topo, isto seria só ruído
+        antes da decisão.
+      */}
+      <div className="flex flex-col items-center gap-1.5 text-center">
+        <p className="font-corpo text-[11px] text-pergaminho/45 leading-relaxed max-w-[38ch]">
+          Pagamento processado pelo Mercado Pago. Não guardamos o número do seu
+          cartão.
+        </p>
+        <p className="font-corpo text-[11px] text-pergaminho/45 leading-relaxed max-w-[38ch]">
+          Assim que confirmar, a leitura é gerada e cai no seu e-mail. Sete
+          dias para desistir e receber tudo de volta, sem precisar explicar.
+        </p>
+      </div>
     </div>
   );
 }
 
-function TelaPix({ pix }: { pix: Pix }) {
+/**
+ * Faixa de modo não-produção.
+ *
+ * Existe porque o erro mais caro aqui é silencioso nos dois sentidos: achar
+ * que uma cobrança de teste foi real (e esperar dinheiro que não vem), ou
+ * achar que uma cobrança real foi teste (e cobrar alguém sem querer). A tela
+ * precisa dizer, sem que ninguém precise abrir o .env.
+ */
+function FaixaDeModo({ modo }: { modo: 'fake' | 'teste' }) {
+  const texto =
+    modo === 'fake'
+      ? 'Sem gateway configurado — a compra é aprovada na hora, nada é cobrado.'
+      : 'Modo de teste do Mercado Pago — use os cartões de teste. Nenhuma cobrança real acontece.';
+
+  return (
+    <p
+      role="status"
+      className="w-full text-center font-corpo text-xs leading-relaxed text-tinta bg-vela/90 rounded-xl px-4 py-2.5"
+    >
+      <strong className="font-semibold tracking-wide uppercase">
+        {modo === 'fake' ? 'Sem cobrança' : 'Modo teste'}
+      </strong>
+      <br />
+      {texto}
+    </p>
+  );
+}
+
+/**
+ * Cartão em análise: mesma espera do Pix, outra copy.
+ *
+ * O Mercado Pago às vezes devolve `in_process` e aprova segundos depois. A
+ * tela antiga mostrava "está em análise" e parava ali — a pessoa tinha o
+ * dinheiro reservado no cartão e nenhuma indicação de que algo ia acontecer.
+ */
+function TelaEmAnalise({ pedidoId }: { pedidoId: string }) {
+  const pronto = useEsperaDoPagamento(pedidoId);
+
+  if (pronto) return <TelaConfirmado />;
+
+  return (
+    <div className="w-full max-w-sm flex flex-col items-center gap-4 text-center">
+      <Flame className="text-vela animate-pulse" size={32} strokeWidth={1.5} />
+      <h1 className="font-display italic text-2xl text-pergaminho">
+        Seu banco está conferindo.
+      </h1>
+      <p className="font-corpo font-light text-sm text-pergaminho/60 max-w-xs">
+        Isso costuma levar alguns segundos. Deixe esta página aberta — ela
+        avança sozinha quando aprovar. Se demorar, a revelação chega no seu
+        e-mail.
+      </p>
+      <span className="font-corpo text-[11px] text-pergaminho/35 inline-flex items-center gap-2">
+        <span className="w-1.5 h-1.5 rounded-full bg-vela animate-pulse" />
+        Esperando a confirmação
+      </span>
+    </div>
+  );
+}
+
+function TelaConfirmado() {
+  return (
+    <div className="w-full max-w-sm flex flex-col items-center gap-4 text-center">
+      <Check className="text-vela" size={40} strokeWidth={1.5} />
+      <h1 className="font-display italic text-2xl text-pergaminho">
+        Pagamento confirmado.
+      </h1>
+      <p className="font-corpo font-light text-sm text-pergaminho/60">
+        Abrindo a sua revelação...
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Pergunta ao NOSSO servidor se o pedido saiu de `aguardando_pagamento`.
+ *
+ * Quem confirma o pagamento é o webhook do Mercado Pago (SPEC 10.6); isto
+ * aqui só observa o resultado. Devolve `true` uma vez e para de perguntar.
+ */
+function useEsperaDoPagamento(pedidoId: string): boolean {
+  const [pronto, setPronto] = useState(false);
+
+  useEffect(() => {
+    let vivo = true;
+    const comecou = Date.now();
+
+    const conferir = async () => {
+      if (!vivo || Date.now() - comecou > 15 * 60_000) return;
+      try {
+        const r = await fetch(`/api/pedido/${pedidoId}`, { cache: 'no-store' });
+        const d = await r.json();
+        if (!vivo) return;
+        if (d.status && d.status !== 'aguardando_pagamento') {
+          setPronto(true);
+          // Um respiro para a pessoa VER que confirmou antes de a tela trocar.
+          setTimeout(() => window.location.assign(`/obrigado/${pedidoId}`), 1200);
+          return;
+        }
+      } catch {
+        // Rede instável no meio do pagamento não pode derrubar a tela.
+      }
+      if (vivo) setTimeout(conferir, 4000);
+    };
+
+    const t = setTimeout(conferir, 4000);
+    return () => {
+      vivo = false;
+      clearTimeout(t);
+    };
+  }, [pedidoId]);
+
+  return pronto;
+}
+
+/**
+ * A tela do Pix, agora com polling.
+ *
+ * ── O bug que isto conserta ───────────────────────────────────────────────
+ *
+ * A pessoa pagava o Pix no aplicativo do banco e voltava para uma tela
+ * parada, mostrando o mesmo QR de sempre. Nada dizia que tinha dado certo —
+ * só recarregando na mão é que ela saía dali. Depois de transferir dinheiro,
+ * uma tela que não reage lê como "o pagamento não passou", e o próximo passo
+ * da pessoa é pedir estorno ou mandar mensagem no Instagram.
+ *
+ * O webhook do Mercado Pago é quem confirma de verdade (SPEC 10.6), então
+ * aqui é só perguntar ao nosso servidor se o pedido já mudou de estado.
+ *
+ * ── Por que 4 segundos, e por que desiste em 15 minutos ───────────────────
+ *
+ * Pix costuma cair em segundos, mas o webhook pode demorar. Quatro segundos
+ * é frequente o bastante para parecer instantâneo e raro o bastante para não
+ * pesar. Depois de 15 minutos a pessoa provavelmente fechou a aba ou não vai
+ * pagar — continuar perguntando seria bater no servidor à toa, e o e-mail de
+ * entrega cobre quem pagar mais tarde.
+ */
+function TelaPix({ pix, pedidoId }: { pix: Pix; pedidoId: string }) {
   const [copiado, setCopiado] = useState(false);
+  const pronto = useEsperaDoPagamento(pedidoId);
+
+  if (pronto) return <TelaConfirmado />;
 
   return (
     <div className="w-full max-w-sm flex flex-col items-center gap-5 text-center">
@@ -208,9 +457,14 @@ function TelaPix({ pix }: { pix: Pix }) {
         {copiado ? 'Copiado' : 'Copiar código Pix'}
       </button>
       <p className="font-corpo font-light text-xs text-pergaminho/50 max-w-xs">
-        Assim que o pagamento cair, sua revelação começa a ser preparada — esta
-        página não precisa ficar aberta.
+        Deixe esta página aberta: assim que o pagamento cair, ela avança
+        sozinha. Se você fechar, a revelação chega no seu e-mail do mesmo
+        jeito.
       </p>
+      <span className="font-corpo text-[11px] text-pergaminho/35 inline-flex items-center gap-2">
+        <span className="w-1.5 h-1.5 rounded-full bg-vela animate-pulse" />
+        Esperando o pagamento cair
+      </span>
     </div>
   );
 }

@@ -7,8 +7,8 @@ import {
   type FormDataBrick,
 } from '@/lib/pagamento';
 import { calcularExpiracao, produtoDe } from '@/lib/produtos';
-import { processarPedido } from '@/lib/processar';
-import { excedeuLimite } from '@/lib/rate-limit';
+import { aposPagamento } from '@/lib/processar';
+import { excedeuLimite, LIMITES } from '@/lib/rate-limit';
 
 /**
  * Recebe o `formData` do Payment Brick e cria o pagamento no Mercado Pago.
@@ -27,7 +27,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const ip = req.headers.get('x-forwarded-for') ?? 'local';
-  if (excedeuLimite(ip)) {
+  if (excedeuLimite(`pagamento:${ip}`, LIMITES.pagamento)) {
     return NextResponse.json(
       { erro: 'Muitas tentativas. Aguarde um instante.' },
       { status: 429 }
@@ -61,7 +61,7 @@ export async function POST(
       expira_em: calcularExpiracao(produtoDe(pedido.produto), pagoEm),
     });
     registrarEvento('pagamento_confirmado_fake', id);
-    processarPedido(id);
+    aposPagamento(id);
     return NextResponse.json({ status: 'approved', redirect: `/obrigado/${id}` });
   }
 
@@ -83,10 +83,26 @@ export async function POST(
       produto: produtoDe(pedido.produto),
       pedidoId: id,
       emailDoPedido: pedido.email,
+      // Lido do PEDIDO, nunca do corpo da requisição: é o cupom que já foi
+      // validado contra o banco quando o pedido nasceu.
+      descontoPercentual: pedido.desconto_percentual ?? 0,
     });
 
+    /**
+     * O que foi tentado fica gravado AQUI, na tentativa — não na aprovação.
+     *
+     * `metodo_pagamento` é escrito pelo webhook, e webhook só chega quando dá
+     * certo. Sem estas colunas, uma recusa some do banco: sobrava o evento
+     * `pagamento_criado_rejected` sem dizer se era cartão, Pix ou boleto, nem
+     * por quê. É justamente a tentativa que falha que precisa ser analisada.
+     */
     atualizarPedido(id, {
       pagamento_id: resultado.idExterno,
+      metodo_tentado: resultado.metodo ?? form.payment_method_id ?? null,
+      motivo_recusa: statusLiberaAcesso(resultado.status)
+        ? null
+        : resultado.statusDetalhe || null,
+      tentativas_pagamento: (pedido.tentativas_pagamento ?? 0) + 1,
       ...(resultado.pix ? { pix_copia_e_cola: resultado.pix.copiaECola } : {}),
     });
     registrarEvento(`pagamento_criado_${resultado.status}`, id);

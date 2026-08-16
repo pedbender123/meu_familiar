@@ -1,9 +1,12 @@
 import { notFound, redirect } from 'next/navigation';
 import { buscarPedido } from '@/lib/db';
-import { chavePublica, pagamentoEhFake } from '@/lib/pagamento';
-import { precoEmReais, produtoDe } from '@/lib/produtos';
+import { chavePublica, modoAtual, pagamentoEhFake } from '@/lib/pagamento';
+import { produtoDe } from '@/lib/produtos';
+import { precoDoPedido } from '@/lib/cupons';
 import { CheckoutMercadoPago } from '@/components/CheckoutMercadoPago';
 import { PagamentoFake } from '@/components/PagamentoFake';
+import { MarcoDoCheckout } from '@/components/MarcoDoCheckout';
+import { FAMILIARES, type FamiliarId } from '@/lib/familiares';
 
 /**
  * Server component de propósito: o preço é lido do produto no servidor, não
@@ -25,20 +28,54 @@ export default async function Pagamento({
   if (pedido.status !== 'aguardando_pagamento') redirect(`/obrigado/${id}`);
 
   const produto = produtoDe(pedido.produto);
+  // O valor exibido sai da MESMA função que monta a cobrança no Mercado Pago,
+  // lendo o cupom gravado no pedido. Não existe caminho em que a tela mostre
+  // um preço e o cartão seja debitado por outro.
+  const preco = precoDoPedido(pedido);
   const chave = chavePublica();
 
   return (
     <main className="flex-1 flex flex-col items-center justify-center px-6 py-16">
+      <MarcoDoCheckout valorEmReais={preco.finalCentavos / 100} />
       {pagamentoEhFake() || !chave ? (
         <PagamentoFake pedidoId={id} />
       ) : (
         <CheckoutMercadoPago
           pedidoId={id}
           chavePublica={chave}
-          valorEmReais={precoEmReais(produto)}
+          valorEmReais={preco.finalCentavos / 100}
           nomeProduto={produto.nome}
+          generoDoFamiliar={FAMILIARES[pedido.familiar as FamiliarId]?.genero}
+          itens={itensDoProduto(produto.id)}
+          cupom={
+            pedido.cupom
+              ? { codigo: pedido.cupom, descontoPercentual: preco.descontoPercentual, cheioEmReais: preco.cheioCentavos / 100 }
+              : undefined
+          }
+          modo={modoAtual()}
         />
       )}
     </main>
   );
+}
+
+/**
+ * O resumo do que está sendo comprado, para a tela de pagamento.
+ *
+ * Curto de propósito — três linhas. Aqui não é lugar de vender de novo, é
+ * lugar de confirmar que a pessoa está comprando o que ela acha que está.
+ */
+function itensDoProduto(id: string): string[] {
+  if (id === 'completa') {
+    return [
+      'Quem é o seu familiar, com o retrato e o nome secreto',
+      'A leitura longa, escrita a partir das suas 26 respostas',
+      'A narração em áudio, os gráficos do seu perfil e o link permanente',
+    ];
+  }
+  return [
+    'Quem é o seu familiar, com o retrato e o nome secreto',
+    'A leitura escrita a partir das suas 26 respostas',
+    'PDF e as artes no seu e-mail, na hora',
+  ];
 }

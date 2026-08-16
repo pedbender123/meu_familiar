@@ -9,9 +9,9 @@ import {
   atualizarPedido,
   registrarEvento,
 } from '@/lib/db';
-import { pagamento, statusLiberaAcesso } from '@/lib/pagamento';
+import { pagamento, segredoDoWebhook, statusLiberaAcesso } from '@/lib/pagamento';
 import { calcularExpiracao, produtoDe } from '@/lib/produtos';
-import { processarPedido } from '@/lib/processar';
+import { aposPagamento } from '@/lib/processar';
 
 /**
  * Webhook do Mercado Pago — **a única fonte de verdade sobre pagamento**
@@ -83,9 +83,16 @@ export async function POST(req: NextRequest) {
       pagamento_id: idPagamento,
       pago_em: pagoEm.toISOString(),
       expira_em: calcularExpiracao(produtoDe(pedido.produto), pagoEm),
+      // O que o MP diz ter cobrado e repassado. Guardado no momento da
+      // confirmação porque é a única hora em que temos a resposta dele em
+      // mãos — depois exigiria uma consulta nova por pedido.
+      bruto_centavos: resultado.brutoCentavos,
+      taxa_centavos: resultado.taxaCentavos,
+      liquido_centavos: resultado.liquidoCentavos,
+      metodo_pagamento: resultado.metodo,
     });
     registrarEvento('pagamento_confirmado', pedido.id);
-    processarPedido(pedido.id);
+    aposPagamento(pedido.id);
 
     return NextResponse.json({ ok: true });
   } catch (erro) {
@@ -123,11 +130,11 @@ function validarAssinatura(
   req: NextRequest,
   dataIdQuery: string | null
 ): NextResponse | null {
-  const segredo = process.env.MP_WEBHOOK_SECRET;
+  const segredo = segredoDoWebhook();
 
   if (!segredo) {
     // Aceitável em dev; em produção é buraco aberto, por isso grita no log.
-    console.warn('[webhook] MP_WEBHOOK_SECRET ausente: assinatura NÃO validada');
+    console.warn('[webhook] segredo ausente para o modo atual: assinatura NÃO validada');
     return null;
   }
 
