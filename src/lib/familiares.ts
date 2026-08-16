@@ -40,6 +40,8 @@ export interface Familiar {
   notaArte: string;
   elemento: Elemento;
   sigilo: Sigilo;
+  /** Gênero gramatical do `nome` ("A Coruja" vs "O Corvo") — usado pra escolher a voz da narração. */
+  genero: 'm' | 'f';
 }
 
 export const FAMILIARES: Record<FamiliarId, Familiar> = {
@@ -50,6 +52,7 @@ export const FAMILIARES: Record<FamiliarId, Familiar> = {
       'Guardiã do limiar: independência, intuição doméstica, afeto seletivo',
     notaArte: 'sentada, olhos de âmbar, cauda enrolada nas patas',
     elemento: 'terra',
+    genero: 'f',
     // estrela fechada de 10 pontas: afeto seletivo
     sigilo: { pontos: 10, passo: 3 },
   },
@@ -59,6 +62,7 @@ export const FAMILIARES: Record<FamiliarId, Familiar> = {
     arquetipo: 'Mensageiro: inteligência afiada, memória longa, transformação',
     notaArte: 'pousado em galho seco, algo brilhante no bico',
     elemento: 'ar',
+    genero: 'm',
     // estrela densa de 12 pontas: memória longa
     sigilo: { pontos: 12, passo: 5 },
   },
@@ -68,6 +72,7 @@ export const FAMILIARES: Record<FamiliarId, Familiar> = {
     arquetipo: 'Vidente: sabedoria paciente, enxerga no escuro dos outros',
     notaArte: 'de frente, olhos imensos, penas como pergaminho',
     elemento: 'ar',
+    genero: 'f',
     // eneagrama contínuo: análise que não para
     sigilo: { pontos: 9,  passo: 4 },
   },
@@ -77,6 +82,7 @@ export const FAMILIARES: Record<FamiliarId, Familiar> = {
     arquetipo: 'Trapaceira sábia: charme, adaptação, saída onde não há porta',
     notaArte: 'meio corpo virado, olhar por cima do ombro',
     elemento: 'fogo',
+    genero: 'f',
     // onze pontos, nenhuma simetria fácil
     sigilo: { pontos: 11, passo: 4 },
   },
@@ -86,6 +92,7 @@ export const FAMILIARES: Record<FamiliarId, Familiar> = {
     arquetipo: 'Protetor: lealdade feroz, instinto, matilha escolhida',
     notaArte: 'uivando de perfil ou olhar frontal calmo',
     elemento: 'fogo',
+    genero: 'm',
     // heptagrama: a matilha escolhida
     sigilo: { pontos: 7,  passo: 3 },
   },
@@ -95,6 +102,7 @@ export const FAMILIARES: Record<FamiliarId, Familiar> = {
     arquetipo: 'Renascida: cura, muda de pele, poder silencioso',
     notaArte: 'enrolada em espiral, escamas com brilho de lua',
     elemento: 'agua',
+    genero: 'f',
     // o espelho do corvo — a mesma figura, outra pele
     sigilo: { pontos: 12, passo: 7 },
   },
@@ -104,6 +112,7 @@ export const FAMILIARES: Record<FamiliarId, Familiar> = {
     arquetipo: 'Buscadora: sensibilidade, atração pela luz mesmo com risco',
     notaArte: 'asas abertas com padrões de olho',
     elemento: 'fogo',
+    genero: 'f',
     // octograma: simetria de asa
     sigilo: { pontos: 8,  passo: 3 },
   },
@@ -113,6 +122,7 @@ export const FAMILIARES: Record<FamiliarId, Familiar> = {
     arquetipo: 'Tecelã: criação, paciência, destino tramado fio a fio',
     notaArte: 'no centro de teia com orvalho',
     elemento: 'terra',
+    genero: 'f',
     // fecha em triângulos sobrepostos: a teia
     sigilo: { pontos: 12, passo: 4 },
   },
@@ -122,6 +132,7 @@ export const FAMILIARES: Record<FamiliarId, Familiar> = {
     arquetipo: 'Lunar: velocidade, ideias férteis, travessia entre mundos',
     notaArte: 'em salto ou ereta ouvindo a noite',
     elemento: 'ar',
+    genero: 'f',
     // treze pontos, o traço mais agitado dos doze
     sigilo: { pontos: 13, passo: 5 },
   },
@@ -131,6 +142,7 @@ export const FAMILIARES: Record<FamiliarId, Familiar> = {
     arquetipo: 'Vidente às avessas: renascimento, escuta o que ninguém vê',
     notaArte: 'asas semiabertas, pendurado ou em voo',
     elemento: 'agua',
+    genero: 'm',
     // fecha em pentágono duplo: escuta em camadas
     sigilo: { pontos: 10, passo: 4 },
   },
@@ -140,6 +152,7 @@ export const FAMILIARES: Record<FamiliarId, Familiar> = {
     arquetipo: 'Coração da floresta: gentileza firme, presença que acalma',
     notaArte: 'galhada com brotos/estrelas',
     elemento: 'terra',
+    genero: 'm',
     // dois triângulos: a galhada
     sigilo: { pontos: 6,  passo: 2 },
   },
@@ -149,6 +162,7 @@ export const FAMILIARES: Record<FamiliarId, Familiar> = {
     arquetipo: 'Alquimista: transformação profunda, magia de chuva e cura',
     notaArte: 'sobre pedra musgosa, pele com reflexo de água',
     elemento: 'agua',
+    genero: 'm',
     // três triângulos: transformação em etapas
     sigilo: { pontos: 9,  passo: 3 },
   },

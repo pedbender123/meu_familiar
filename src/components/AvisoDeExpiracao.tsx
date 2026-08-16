@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { PRODUTOS, diasRestantes, precoFormatado } from '@/lib/produtos';
+import { PRODUTOS, diasRestantes, precoFormatado, linkPublicoExpirou } from '@/lib/produtos';
 
 /**
  * O aviso de que o link vai sumir, com a oferta de torná-lo permanente.
@@ -20,12 +20,16 @@ import { PRODUTOS, diasRestantes, precoFormatado } from '@/lib/produtos';
 export function AvisoDeExpiracao({
   pedidoId,
   expiraEm,
+  ehADona = false,
 }: {
   pedidoId: string;
   expiraEm: string;
+  /** Muda o texto: a dona nunca perde o acesso, só a possibilidade de mostrar. */
+  ehADona?: boolean;
 }) {
   const dias = diasRestantes(expiraEm);
   const permanente = PRODUTOS.link_permanente;
+  const jaExpirou = linkPublicoExpirou(expiraEm);
 
   const quando =
     dias <= 0
@@ -37,15 +41,32 @@ export function AvisoDeExpiracao({
   return (
     <aside className="w-full max-w-md flex flex-col items-center gap-3 text-center rounded-2xl border border-vela/25 bg-vela/[0.07] px-5 py-4">
       <p className="font-corpo text-sm leading-relaxed text-pergaminho/85">
-        <span className="text-vela">Este endereço fica no ar até {quando}.</span>{' '}
-        O PDF que enviamos no seu e-mail é seu para sempre — ele não expira.
+        {jaExpirou ? (
+          <>
+            <span className="text-vela">
+              Este link não abre mais para outras pessoas.
+            </span>{' '}
+            Você continua vendo o seu sempre que entrar na sua conta.
+          </>
+        ) : (
+          <>
+            <span className="text-vela">
+              {`Quem receber este link consegue abrir até ${quando}.`}
+            </span>{' '}
+            {ehADona
+              ? 'Depois disso ele fecha para estranhos — o seu acesso pela conta não muda.'
+              : 'Depois disso ele fecha.'}
+          </>
+        )}
       </p>
 
       <Link
         href={`/pagamento/${pedidoId}?produto=${permanente.id}`}
         className="font-corpo text-sm text-pergaminho underline underline-offset-4 decoration-vela/50 hover:decoration-vela transition"
       >
-        Guardar este link para sempre por {`R$ ${precoFormatado(permanente)}`}
+        {jaExpirou
+          ? `Reabrir para compartilhar por R$ ${precoFormatado(permanente)}`
+          : `Deixar este link aberto para sempre por R$ ${precoFormatado(permanente)}`}
       </Link>
     </aside>
   );
@@ -58,12 +79,15 @@ export function AcessoExpirado({ pedidoId }: { pedidoId: string }) {
   return (
     <main className="quarto-de-vela flex-1 flex flex-col items-center justify-center px-6 py-16 text-center gap-5">
       <h1 className="font-display italic text-2xl sm:text-3xl text-pergaminho max-w-sm text-balance">
-        Este endereço se fechou.
+        Este link não abre mais.
       </h1>
 
-      <p className="font-corpo font-light text-sm leading-relaxed text-pergaminho/70 max-w-[38ch]">
-        Seu familiar não foi embora — o PDF que enviamos por e-mail continua
-        sendo seu. O que expirou foi só o endereço na internet.
+      <p className="font-corpo font-light text-sm leading-relaxed text-pergaminho/70 max-w-[40ch]">
+        Ele era temporário. Se esta revelação é sua,{' '}
+        <Link href="/entrar" className="text-vela underline underline-offset-4">
+          entre na sua conta
+        </Link>{' '}
+        — ela continua guardada lá, inteira.
       </p>
 
       <Link

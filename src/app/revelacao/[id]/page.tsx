@@ -9,15 +9,54 @@ import { SigiloFamiliar } from '@/components/SigiloFamiliar';
 import { TextoEscrito, BlocoRevelado } from '@/components/TextoEscrito';
 import { PoeiraNaLuz } from '@/components/PoeiraNaLuz';
 import { Constelacao } from '@/components/Constelacao';
-import { FormularioOraculo } from '@/components/FormularioOraculo';
 import { BotaoCompartilhar } from '@/components/BotaoCompartilhar';
+import { MarcarNoStory } from '@/components/MarcarNoStory';
+import { marcacaoDoPedido } from '@/lib/marcacoes';
 import { RodapeLegal } from '@/components/RodapeLegal';
 import { AvisoDeExpiracao, AcessoExpirado } from '@/components/AvisoDeExpiracao';
-import { acessoExpirou } from '@/lib/produtos';
+import { linkPublicoExpirou, produtoDe } from '@/lib/produtos';
+import { sessaoAtual } from '@/lib/sessao-servidor';
+import { comentarioDoPedido } from '@/lib/db';
+import { PedidoDeOpiniao } from '@/components/PedidoDeOpiniao';
+import { RelatorioCompleto, type Perfil } from '@/components/RelatorioCompleto';
+import { TocaAudio } from '@/components/TocaAudio';
+import { MarcaCompra } from '@/components/MarcaCompra';
 
-export const metadata = {
-  robots: { index: false, follow: false },
-};
+/**
+ * Metadados por revelação: o card mostra o familiar DA PESSOA.
+ *
+ * É a diferença entre "olha esse site" e "olha o que me encontrou" — e é o que
+ * faz o link circular. `robots` continua bloqueando indexação: a revelação é
+ * para ser compartilhada por quem quiser, não para aparecer no Google.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const pedido = buscarPedido(id);
+
+  const padrao = { robots: { index: false, follow: false } };
+  if (!pedido || pedido.status !== 'entregue' || !pedido.leitura_json) return padrao;
+
+  const leitura: Leitura = JSON.parse(pedido.leitura_json);
+  const familiar = FAMILIARES[pedido.familiar as FamiliarId];
+  const titulo = `${familiar.nome} · ${leitura.nome_secreto}`;
+
+  return {
+    ...padrao,
+    title: `O familiar de ${pedido.nome}`,
+    description: leitura.frase_de_invocacao,
+    openGraph: {
+      title: `O familiar de ${pedido.nome}: ${titulo}`,
+      description: leitura.frase_de_invocacao,
+      images: [
+        { url: `/api/storage/${id}/og.png`, width: 1200, height: 630 },
+      ],
+    },
+  };
+}
 
 /**
  * A fase da lua vira anotação manuscrita sob a carta. Antes ela era só fundo
@@ -51,18 +90,55 @@ export default async function Revelacao({
     );
   }
 
-  // O prazo é checado no SERVIDOR, antes de qualquer render. Esconder o
-  // conteúdo no cliente deixaria a leitura inteira no HTML de quem já expirou.
-  if (acessoExpirou(pedido.expira_em)) {
+  /**
+   * O prazo vale para ESTRANHOS, nunca para a dona.
+   *
+   * Ela comprou; o que expira é a possibilidade de mostrar a outra pessoa. Se
+   * a checagem não olhasse a sessão, o produto trancaria a cliente para fora
+   * do que ela pagou — que é o pior desfecho possível aqui.
+   *
+   * A verificação roda no SERVIDOR, antes de renderizar: esconder no cliente
+   * deixaria a leitura inteira no HTML de quem não pode ver.
+   */
+  const sessao = await sessaoAtual();
+  const ehADona =
+    !!sessao &&
+    (sessao.tipo === 'admin' ||
+      sessao.email.toLowerCase() === pedido.email.toLowerCase());
+
+  if (linkPublicoExpirou(pedido.expira_em) && !ehADona) {
     return <AcessoExpirado pedidoId={id} />;
   }
 
   const leitura: Leitura = JSON.parse(pedido.leitura_json);
   const familiar = FAMILIARES[pedido.familiar as FamiliarId];
+  const produto = produtoDe(pedido.produto);
+
+  // Os gráficos só existem na Completa — é o que ela vende. Pedidos antigos
+  // não têm perfil salvo, então a ausência também esconde a seção em vez de
+  // quebrar a página.
+  const perfil: Perfil | null =
+    produto.graficos && pedido.perfil_json
+      ? (JSON.parse(pedido.perfil_json) as Perfil)
+      : null;
 
   return (
     <>
       <PoeiraNaLuz />
+
+      {/*
+        Só a DONA dispara `Purchase` — este link é compartilhável, e quem
+        recebe de outra pessoa vê a mesma página sem ter comprado nada. Sem
+        essa guarda, cada visualização de quem recebeu o link contaria como
+        uma nova venda para o Ads Manager. `exemplo` também fica de fora: é
+        amostra nossa para o mural, não cliente de verdade.
+      */}
+      {ehADona && !pedido.exemplo && (
+        <MarcaCompra
+          pedidoId={id}
+          valorEmReais={(pedido.bruto_centavos ?? produto.precoCentavos) / 100}
+        />
+      )}
 
       {/*
         A composição segue a regra da estética: o que é grimório vai DENTRO da
@@ -74,7 +150,11 @@ export default async function Revelacao({
         <Vela />
 
         {pedido.expira_em && (
-          <AvisoDeExpiracao pedidoId={id} expiraEm={pedido.expira_em} />
+          <AvisoDeExpiracao
+            pedidoId={id}
+            expiraEm={pedido.expira_em}
+            ehADona={ehADona}
+          />
         )}
 
         <FolhaPergaminho>
@@ -104,6 +184,17 @@ export default async function Revelacao({
             {leitura.saudacao}
           </TextoEscrito>
 
+          {/*
+            Só existe pra quem comprou um produto com `narracaoAudio` (hoje,
+            só a Completa) — ver `processarPedido` em `processar.ts`.
+          */}
+          {pedido.audio_narracao === 1 && (
+            <TocaAudio
+              src={`/api/storage/${id}/narracao.mp3`}
+              rotulo="Ouvir a leitura narrada"
+            />
+          )}
+
           {pedido.signo_sol && pedido.signo_lua && (
             <Constelacao
               signoSol={pedido.signo_sol as Signo}
@@ -123,6 +214,10 @@ export default async function Revelacao({
           <TextoEscrito className="font-display italic text-xl sm:text-2xl leading-snug text-center max-w-[30ch] mt-3 text-ouro-profundo text-balance">
             {leitura.frase_de_invocacao}
           </TextoEscrito>
+
+          {perfil && (
+            <RelatorioCompleto perfil={perfil} familiar={pedido.familiar as FamiliarId} />
+          )}
         </FolhaPergaminho>
 
         <BlocoRevelado className="flex justify-center">
@@ -132,21 +227,44 @@ export default async function Revelacao({
           />
         </BlocoRevelado>
 
-        <section className="w-full max-w-md flex flex-col items-center gap-3.5 text-center border-t border-pergaminho/10 pt-8 sm:pt-10">
-          <h2 className="font-display italic font-medium text-xl text-pergaminho">
-            O Oráculo do Bruxário
-          </h2>
+        {/*
+          A troca por compartilhamento fica logo abaixo dos botões de
+          compartilhar, e só para a dona logada — a página tem link público, e
+          um estranho registraria um @ no pedido de outra pessoa.
+        */}
+        {ehADona && sessao?.tipo === 'conta' && (
+          <BlocoRevelado className="flex justify-center">
+            <MarcarNoStory
+              pedidoId={id}
+              jaRegistrado={marcacaoDoPedido(id)?.arroba ?? null}
+              conferido={!!marcacaoDoPedido(id)?.recompensado}
+            />
+          </BlocoRevelado>
+        )}
+
+        {/*
+          O recado para o Oráculo saiu daqui e foi para a área da conta.
+          Aqui ele pedia texto livre a quem talvez nem tivesse conta, numa
+          página que também é vista por estranhos com o link. Na conta, é a
+          própria pessoa, identificada, num lugar que é dela.
+        */}
+        <section className="w-full max-w-md flex flex-col items-center gap-3 text-center border-t border-pergaminho/10 pt-8 sm:pt-10">
           <p className="font-display italic text-lg leading-snug text-pergaminho/70 max-w-[30ch]">
             &ldquo;{leitura.sussurro_final}&rdquo;
           </p>
-          <p className="font-corpo text-xs text-pergaminho/45 max-w-[32ch]">
-            Em breve, o Oráculo abre as portas para responder.
-          </p>
-          <FormularioOraculo nomeSecreto={leitura.nome_secreto} />
         </section>
 
         <RodapeLegal />
       </main>
+
+      {/*
+        Só quem comprou é convidado a opinar, e só quem está logado consegue
+        de fato enviar (a rota confere a sessão). Sem isso, o mural viraria
+        caixa de texto pública para qualquer um que receba o link.
+      */}
+      {ehADona && sessao?.tipo === 'conta' && (
+        <PedidoDeOpiniao pedidoId={id} jaComentou={!!comentarioDoPedido(id)} />
+      )}
     </>
   );
 }

@@ -8,7 +8,10 @@ const ARQUIVOS_PERMITIDOS: Record<string, string> = {
   'story.png': 'image/png',
   'feed.png': 'image/png',
   'carta.webp': 'image/webp',
+  'og.png': 'image/png',
   'revelacao.pdf': 'application/pdf',
+  'narracao.mp3': 'audio/mpeg',
+  'veu.webp': 'image/webp',
 };
 
 export async function GET(
@@ -22,7 +25,25 @@ export async function GET(
   }
 
   const pedido = buscarPedido(id);
-  if (!pedido || pedido.status !== 'entregue') {
+  if (!pedido) {
+    return NextResponse.json({ erro: 'não encontrado' }, { status: 404 });
+  }
+
+  /**
+   * O véu sai antes do pagamento, e só ele.
+   *
+   * É a arte do familiar já destruída pelo desfoque no servidor (ver
+   * `gerarVeu`): mostra que existe uma imagem, não mostra qual. Liberar o
+   * arquivo NÍTIDO aqui entregaria de graça o que a leitura vende.
+   *
+   * `carta.webp`/`og.png` continuam liberados no set porque o card de
+   * compartilhamento (pós-pagamento) precisa ser buscável por robô de rede
+   * social, que não manda cookie nem segue redirecionamento — mas hoje eles só
+   * existem depois de `entregue`, então esta linha é defensiva, não uma porta
+   * aberta de verdade.
+   */
+  const LIBERADOS_ANTES = new Set(['carta.webp', 'og.png', 'veu.webp']);
+  if (pedido.status !== 'entregue' && !LIBERADOS_ANTES.has(arquivo)) {
     return NextResponse.json({ erro: 'não encontrado' }, { status: 404 });
   }
 

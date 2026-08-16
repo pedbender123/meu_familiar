@@ -62,10 +62,25 @@ export function BotaoCompartilhar({
   const [aberto, setAberto] = useState(false);
   const [copiado, setCopiado] = useState(false);
 
+  /**
+   * O endereço que a pessoa manda para os amigos, com a marca de indicação.
+   *
+   * ── Por que o link compartilhado aponta para a HOME e não para a revelação
+   *
+   * Antes ele mandava `/revelacao/<id>` — a revelação DELA. Quem recebia caía
+   * numa leitura que não era sua, sem nada a fazer ali além de ler o resultado
+   * de outra pessoa. Agora vai para a porta da frente com `?s=<código>`, que é
+   * onde o amigo pode fazer o próprio.
+   *
+   * O código são os 8 primeiros caracteres do id do pedido. Não abre nada: ele
+   * só credita a indicação a quem compartilhou, para o painel poder mostrar
+   * "esta venda veio pelo link da Marina".
+   */
   function enderecoPermanente() {
     if (urlPerfil) return urlPerfil;
+    const codigo = pedidoId.replace(/-/g, '').slice(0, 8).toLowerCase();
     return typeof window !== 'undefined'
-      ? `${window.location.origin}/revelacao/${pedidoId}`
+      ? `${window.location.origin}/?s=${codigo}`
       : '';
   }
 

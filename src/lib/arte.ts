@@ -6,6 +6,7 @@ import type { Signo } from './astro';
 import { glifoSvg } from './zodiaco';
 import type { Leitura } from './leitura';
 import { familiarPng, luaPng, pastaDoPedido } from './caminhos';
+import { gerarOgDaRevelacao } from './og';
 
 const CORES = {
   tinta: '#171225',
@@ -239,6 +240,71 @@ async function comporCarta(
     .toBuffer();
 }
 
+/**
+ * O véu: a arte do familiar borrada até virar só uma presença.
+ *
+ * ── Por que existe ────────────────────────────────────────────────────────
+ *
+ * Depois de 26 cenas, a tela pós-teste entregava uma frase de quinze palavras
+ * e um preço. Treze minutos de esforço para nada que se possa OLHAR — e a
+ * pessoa que investiu tudo isso ia embora sem clicar. O véu devolve o peso
+ * visual sem devolver a resposta: dá para ver que há alguma coisa ali, e não
+ * dá para dizer o quê.
+ *
+ * ── Por que borrar no servidor e não com CSS ──────────────────────────────
+ *
+ * `filter: blur()` no navegador recebe a imagem NÍTIDA e só a desfoca na
+ * pintura — quem abrir o inspetor baixa o original e mata a curiosidade que
+ * este arquivo existe para criar. Aqui os pixels saem daqui já destruídos.
+ *
+ * O sigma é proporcional à largura para o efeito não mudar se a arte de
+ * origem mudar de tamanho, e é alto de propósito: silhueta reconhecível como
+ * "bicho" e não como "qual bicho".
+ */
+export async function gerarVeu(pedidoId: string, familiar: Familiar): Promise<string> {
+  const dir = pastaDoPedido(pedidoId);
+  fs.mkdirSync(dir, { recursive: true });
+
+  const caminho = path.join(dir, 'veu.webp');
+  if (fs.existsSync(caminho)) return caminho;
+
+  const L = 640;
+  const A = 640;
+
+  const silhueta = await sharp(familiarPng(familiar.id))
+    .resize(L, A, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .blur(L * 0.055)
+    .modulate({ brightness: 1.15, saturation: 0.65 })
+    .toBuffer();
+
+  // Vinheta por cima: escurece as bordas e concentra o pouco que se vê no
+  // centro, que é o que faz a silhueta parecer "atrás de alguma coisa".
+  const vinheta = Buffer.from(`
+<svg xmlns="http://www.w3.org/2000/svg" width="${L}" height="${A}">
+  <defs>
+    <radialGradient id="v" cx="50%" cy="46%" r="62%">
+      <stop offset="0%" stop-color="${CORES.tinta}" stop-opacity="0" />
+      <stop offset="58%" stop-color="${CORES.tinta}" stop-opacity="0.35" />
+      <stop offset="100%" stop-color="${CORES.tinta}" stop-opacity="0.98" />
+    </radialGradient>
+  </defs>
+  <rect width="${L}" height="${A}" fill="url(#v)" />
+</svg>`);
+
+  const veu = await sharp({
+    create: { width: L, height: A, channels: 4, background: CORES.tinta },
+  })
+    .composite([
+      { input: silhueta, top: 0, left: 0 },
+      { input: vinheta, top: 0, left: 0 },
+    ])
+    .webp({ quality: 72 })
+    .toBuffer();
+
+  fs.writeFileSync(caminho, veu);
+  return caminho;
+}
+
 export async function gerarArtes(pedidoId: string, params: ParametrosArte) {
   const dir = pastaDoPedido(pedidoId);
   fs.mkdirSync(dir, { recursive: true });
@@ -248,12 +314,24 @@ export async function gerarArtes(pedidoId: string, params: ParametrosArte) {
   // 2x o tamanho exibido, para tela retina
   const carta = await comporCarta(1200, 1800, params.familiar, params.lua);
 
+  // Card de compartilhamento: é o que aparece quando alguém cola o link no
+  // WhatsApp ou no Instagram. Gerado aqui, uma vez, junto com o resto — não
+  // sob demanda a cada visita de robô de rede social.
+  const og = await gerarOgDaRevelacao({
+    nome: params.nome,
+    familiar: params.familiar,
+    lua: params.lua,
+    nomeSecreto: params.leitura.nome_secreto,
+  });
+
   const storyPath = path.join(dir, 'story.png');
   const feedPath = path.join(dir, 'feed.png');
   const cartaPath = path.join(dir, 'carta.webp');
+  const ogPath = path.join(dir, 'og.png');
   fs.writeFileSync(storyPath, story);
   fs.writeFileSync(feedPath, feed);
   fs.writeFileSync(cartaPath, carta);
+  fs.writeFileSync(ogPath, og);
 
-  return { storyPath, feedPath, cartaPath };
+  return { storyPath, feedPath, cartaPath, ogPath };
 }
