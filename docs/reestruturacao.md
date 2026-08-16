@@ -401,12 +401,25 @@ considerar a Fase 1 inteiramente fechada.
 
 ---
 
-### Fase 4 · Módulos existentes migram
-Familiar + teste viram `src/modulos/perfil/`. O horóscopo atual entra como módulo e
-o silo `src/lib/horoscopo/` some, com `horoscopo.db` fundido no banco principal.
+### Fase 4 · Módulos existentes migram — 🟡 parcial
+- ✅ **`src/nucleo/modulos.ts`**: registro de módulos (`Modulo`/`ItemDeMenu`
+  da seção 8), com `perfil` e `horoscopo` anunciados apontando para onde já
+  moram hoje. `menuParaConta(direitos)` já dá pra Fase 5 montar o menu
+  lateral sem esperar o resto.
+- ⬜ **Deliberadamente não feito**: a relocação física de
+  `familiares.ts`/`leitura.ts`/`quiz/*` para `src/modulos/perfil/`, e a
+  fusão de `horoscopo.db` no banco principal. Os dois exigem exatamente o
+  que a disciplina 5 pede — teste ponta a ponta num navegador de
+  verdade — e esta sessão não tem ferramenta de navegador disponível.
+  Fazer a relocação (que toca virtualmente todo arquivo do caminho crítico,
+  seção 4) ou a fusão de banco (dados reais de clientes) sem essa
+  verificação é apostar a venda numa mudança que não dá pra confirmar —
+  contra a regra central deste documento. Fica pendente até haver como
+  testar de verdade, ou até o dono decidir aceitar o risco conscientemente.
 
 Prova o formato modular com código que já existe e já vende, antes de construir
-coisa nova em cima dele.
+coisa nova em cima dele — a parte que prova isso (o registro) está pronta; a
+parte que exige mexer no código do caminho crítico, não.
 
 ---
 
