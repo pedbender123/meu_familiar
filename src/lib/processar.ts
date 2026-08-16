@@ -21,6 +21,8 @@ import { ITENS } from './quiz/itens';
 import { produtoDe } from './produtos';
 import { DESCRICAO_DOS_EIXOS, type Eixo } from './quiz/eixos';
 import { FAMILIARES as TODOS } from './familiares';
+import { interruptorLigado } from './interruptores';
+import { criarAssinatura } from '../nucleo/assinaturas';
 
 /**
  * Traduz o perfil numérico para PALAVRAS antes de mandar ao Gemini.
@@ -302,7 +304,7 @@ export async function processarPedido(pedidoId: string): Promise<void> {
      */
     try {
       const contaNova = !contaJaExistia;
-      garantirConta(pedido.email);
+      const conta = garantirConta(pedido.email);
       const token = criarTokenMagico(pedido.email, 'conta');
       const base = process.env.BASE_URL || 'http://localhost:3000';
       await enviarContaCriada({
@@ -314,6 +316,31 @@ export async function processarPedido(pedidoId: string): Promise<void> {
         contaNova,
       });
       registrarEvento(contaNova ? 'conta_criada' : 'conta_acesso_enviado', pedidoId);
+
+      /**
+       * Fase 2 de docs/reestruturacao.md: escrita dupla, atrás de
+       * interruptor DESLIGADO por padrão (disciplina 3) — sem ninguém ligar
+       * `assinaturas_escrita_dupla` no banco, esta chamada não faz nada.
+       * Cria a assinatura equivalente ao pedido, pro núcleo novo (acesso.ts)
+       * poder ser comparado em sombra contra produtos.ts sem decidir nada
+       * ainda. Nunca pode atrapalhar a entrega: falha aqui só loga.
+       */
+      if (interruptorLigado('assinaturas_escrita_dupla', conta.id)) {
+        try {
+          criarAssinatura({
+            contaId: conta.id,
+            planoId: produto.id,
+            pedidoId,
+            inicio: new Date(),
+            fim: null, // hoje o acesso da dona nunca expira — ver produtos.ts
+          });
+        } catch (erroAssinatura) {
+          console.error(
+            `[processarPedido] escrita dupla de assinatura falhou no ${pedidoId}:`,
+            erroAssinatura
+          );
+        }
+      }
     } catch (erroConta) {
       console.error(`[processarPedido] conta falhou no pedido ${pedidoId}:`, erroConta);
       registrarEvento('conta_falhou', pedidoId);

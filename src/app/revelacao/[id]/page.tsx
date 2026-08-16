@@ -21,6 +21,8 @@ import { PedidoDeOpiniao } from '@/components/PedidoDeOpiniao';
 import { RelatorioCompleto, type Perfil } from '@/components/RelatorioCompleto';
 import { TocaAudio } from '@/components/TocaAudio';
 import { MarcaCompra } from '@/components/MarcaCompra';
+import { buscarConta } from '@/lib/autenticacao';
+import { compararAcessoEmSombra } from '@/nucleo/sombra';
 
 /**
  * Metadados por revelação: o card mostra o familiar DA PESSOA.
@@ -121,6 +123,24 @@ export default async function Revelacao({
     produto.graficos && pedido.perfil_json
       ? (JSON.parse(pedido.perfil_json) as Perfil)
       : null;
+
+  // Fase 2 de docs/reestruturacao.md: compara em sombra o que produtos.ts
+  // decidiu aqui contra o que o núcleo novo (acesso.ts) diria — nunca decide
+  // nada, só registra divergência quando já dá pra comparar de verdade.
+  if (ehADona) {
+    const conta = buscarConta(pedido.email);
+    if (conta) {
+      compararAcessoEmSombra(conta.id, pedido.id, {
+        pdf: produto.pdf,
+        imagens: produto.imagens,
+        relatorioCompleto: produto.relatorioCompleto,
+        graficos: produto.graficos,
+        perfilPublico: produto.perfilPublico,
+        tiragemDiaria: produto.tiragemDiaria,
+        narracaoAudio: produto.narracaoAudio,
+      });
+    }
+  }
 
   return (
     <>
