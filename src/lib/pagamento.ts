@@ -144,11 +144,25 @@ export interface DadosCriacao {
   descontoPercentual: number;
 }
 
+/** O suficiente pra reconciliação achar o pedido — detalhe financeiro completo vem de `consultarPagamento`. */
+export interface PagamentoResumido {
+  idExterno: string;
+  status: string;
+  referenciaExterna: string | null;
+}
+
 export interface ProvedorPagamento {
   criarPagamento(dados: DadosCriacao): Promise<ResultadoPagamento>;
   consultarPagamento(idExterno: string): Promise<ResultadoPagamento | null>;
   /** Estorno integral. Devolve o motivo da falha em vez de lançar. */
   estornar(idExterno: string): Promise<{ ok: boolean; erro?: string }>;
+  /**
+   * Todo pagamento aprovado pelo MP num intervalo, pela data em que foi
+   * aprovado — para a reconciliação (`src/nucleo/reconciliacao.ts`) comparar
+   * com o que o webhook gravou aqui. `[]` em caso de erro: reconciliação que
+   * não roda hoje tenta de novo amanhã; não é motivo para lançar.
+   */
+  listarPagosNoPeriodo(desde: Date, ate: Date): Promise<PagamentoResumido[]>;
 }
 
 class ProvedorMercadoPago implements ProvedorPagamento {
@@ -213,6 +227,47 @@ class ProvedorMercadoPago implements ProvedorPagamento {
       console.error(`[pagamento] falha ao estornar ${idExterno}:`, erro);
       return { ok: false, erro: mensagem };
     }
+  }
+
+  async listarPagosNoPeriodo(desde: Date, ate: Date): Promise<PagamentoResumido[]> {
+    const resumidos: PagamentoResumido[] = [];
+    let offset = 0;
+    const limite = 50;
+
+    try {
+      // Pagina até esgotar — em operação deste tamanho a janela de
+      // reconciliação (tipicamente 1 dia) não passa de umas poucas páginas.
+      for (;;) {
+        const pagina = await this.pagamentos.search({
+          options: {
+            range: 'date_approved',
+            begin_date: desde.toISOString(),
+            end_date: ate.toISOString(),
+            sort: 'date_approved',
+            criteria: 'asc',
+            limit: limite,
+            offset,
+          },
+        });
+
+        const resultados = pagina.results ?? [];
+        for (const r of resultados) {
+          resumidos.push({
+            idExterno: String(r.id ?? ''),
+            status: r.status ?? 'unknown',
+            referenciaExterna: r.external_reference ?? null,
+          });
+        }
+
+        offset += limite;
+        if (resultados.length < limite || offset >= (pagina.paging?.total ?? 0)) break;
+      }
+    } catch (erro) {
+      console.error('[pagamento] falha ao listar período para reconciliação:', erro);
+      return [];
+    }
+
+    return resumidos;
   }
 }
 
@@ -305,6 +360,11 @@ class ProvedorFake implements ProvedorPagamento {
 
   async estornar(): Promise<{ ok: boolean; erro?: string }> {
     return { ok: true };
+  }
+
+  // Sem gateway não existe histórico pra reconciliar contra.
+  async listarPagosNoPeriodo(): Promise<PagamentoResumido[]> {
+    return [];
   }
 }
 
@@ -403,6 +463,7 @@ export const pagamento: ProvedorPagamento = {
   criarPagamento: (dados) => obterProvedor().criarPagamento(dados),
   consultarPagamento: (id) => obterProvedor().consultarPagamento(id),
   estornar: (id) => obterProvedor().estornar(id),
+  listarPagosNoPeriodo: (desde, ate) => obterProvedor().listarPagosNoPeriodo(desde, ate),
 };
 
 export function pagamentoEhFake(): boolean {
