@@ -7,6 +7,8 @@ import {
 import { statusLiberaAcesso, type ResultadoPagamento } from './pagamento';
 import { calcularExpiracao, produtoDe } from './produtos';
 import { aposPagamento } from './processar';
+import { checarEmLinha } from '../nucleo/sentinela/emLinha';
+import { checarValorCobrado } from '../nucleo/sentinela/invariantes/financeiro';
 
 export type DesfechoNotificacao =
   | 'nao_libera_acesso'
@@ -84,6 +86,11 @@ export async function processarNotificacaoDePagamento(
     metodo_pagamento: resultado.metodo,
   });
   registrarEvento('pagamento_confirmado', pedido.id);
+
+  // Vigilância em linha: confere, no instante em que o pagamento é gravado,
+  // se o valor bate com produto e cupom (docs/reestruturacao.md §5). Falha
+  // aberto — nunca atrasa nem derruba a entrega.
+  checarEmLinha('valor_cobrado', () => checarValorCobrado(buscarPedido(pedido.id)!));
 
   // Sem `await` de propósito — ver o comentário em `ResultadoNotificacao.entrega`.
   const entrega = aposPagamento(pedido.id);

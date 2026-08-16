@@ -6,6 +6,7 @@ import { processarPedido } from './processar';
 import { processarNotificacaoDePagamento } from './webhook-pagamento';
 import type { ResultadoPagamento } from './pagamento';
 import type { ProdutoId } from './produtos';
+import { anomaliasAbertas } from '../nucleo/sentinela/registrar';
 
 /**
  * O caminho crítico de ponta a ponta (docs/reestruturacao.md, Fase 0):
@@ -83,6 +84,7 @@ function eventosSemPedido(tipo: string): number {
 beforeEach(() => {
   db.exec('DELETE FROM eventos');
   db.exec('DELETE FROM pedidos');
+  db.exec('DELETE FROM anomalias');
 });
 
 describe('caminho crítico: pedido → pagamento → webhook → entrega → evento', () => {
@@ -195,6 +197,21 @@ describe('caminho crítico: pedido → pagamento → webhook → entrega → eve
       'pagamento_confirmado',
       'ritual_pendente_apos_pagamento',
     ]);
+  });
+
+  test('a Sentinela acusa em linha um pagamento confirmado com valor que não bate com o produto', async () => {
+    const pedidoId = novoPedido({ produto: 'completa' }); // 1890 centavos de tabela
+    const resultado = resultadoAprovado({
+      referenciaExterna: pedidoId,
+      brutoCentavos: 100, // muito abaixo do devido, sem cupom que justifique
+    });
+    const { entrega } = await processarNotificacaoDePagamento(resultado);
+    await entrega;
+
+    const abertas = anomaliasAbertas('critico');
+    assert.equal(abertas.length, 1);
+    assert.equal(abertas[0].invariante, 'valor_cobrado_bate_com_produto_e_cupom');
+    assert.equal(abertas[0].entidadeId, pedidoId);
   });
 
   test('pedido sem e-mail registra o evento e não tenta enviar nada', async () => {
