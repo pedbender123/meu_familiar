@@ -25,7 +25,17 @@ export function validarCpf(cpfEntrada: string): boolean {
   return digito1 === parseInt(cpf[9], 10) && digito2 === parseInt(cpf[10], 10);
 }
 
-export function validarNome(nome: string): boolean {
+/**
+ * O nome como a pessoa quer ser chamada.
+ *
+ * Mínimo de três caracteres, e não um: o nome vai para dentro da leitura, do
+ * PDF e da arte que ela compartilha. Uma letra solta passa na validação e
+ * depois aparece impressa numa carta — e não há como consertar depois de
+ * gerada. Três é curto o bastante para caber apelido ("Bia", "Duh") e longo
+ * o bastante para barrar clique acidental.
+ */
+export function validarNome(nome: unknown): boolean {
+  if (typeof nome !== 'string') return false;
   const limpo = nome.trim();
-  return limpo.length > 0 && limpo.length <= 40 && !/[<>]/.test(limpo);
+  return limpo.length >= 3 && limpo.length <= 40 && !/[<>]/.test(limpo);
 }

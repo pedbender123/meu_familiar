@@ -82,6 +82,36 @@ export interface Resultado {
 export const LIMIAR_DE_EMPATE = 8;
 
 /**
+ * O limiar ampliado do Sapo. **Esta é uma decisão comercial, não estatística.**
+ *
+ * ── O que ela faz ─────────────────────────────────────────────────────────
+ *
+ * Quando o Sapo é o primeiro colocado, o empate é declarado com uma folga
+ * maior que a normal — então a pessoa cai na 27ª pergunta e escolhe entre ele
+ * e o segundo, em vez de receber o Sapo direto.
+ *
+ * ── O que ela NÃO faz, e por que isso importa ─────────────────────────────
+ *
+ * Ela **não** troca o resultado nem esconde o Sapo: ele continua aparecendo
+ * como uma das duas opções, com o mesmo peso visual da outra, e quem quiser
+ * fica com ele. Os 12 escores gravados continuam sendo os que o teste mediu —
+ * `perfil_json` não é tocado. Ninguém é informado de nada falso.
+ *
+ * ── O custo, registrado aqui porque alguém vai perguntar ──────────────────
+ *
+ * O Sapo passa a ser subrepresentado nos resultados finais em relação ao que o
+ * teste de fato mede, e essa assimetria vale só para ele. A distribuição
+ * medida de 7,4%–9,2% entre os doze deixa de valer para o familiar entregue —
+ * ela continua valendo para o placar. Se um dia a página de método afirmar
+ * "todos têm a mesma chance", a afirmação precisa citar esta exceção.
+ *
+ * A origem é reclamação real de gente nos comentários. A alternativa mais
+ * honesta seria reescrever o Sapo para ele parar de parecer um castigo — o que
+ * resolveria a causa em vez do sintoma, e continua valendo a pena fazer.
+ */
+export const LIMIAR_DO_SAPO = 22;
+
+/**
  * A partir de quantos respondentes a normalização passa a usar a base real.
  * O SPEC 2.5 usa ~200 como marco para rodar as métricas psicométricas; o mesmo
  * número serve aqui, pelo mesmo motivo: abaixo disso a média amostral balança
@@ -188,6 +218,9 @@ export function pontuar(
   // sobre a distância entre os arquétipos, que é sempre 30° entre vizinhos.
   const diferenca = Math.abs(segundo.distancia - primeiro.distancia);
 
+  // Ver LIMIAR_DO_SAPO: só quando ele é o primeiro colocado.
+  const limiar = primeiro.familiar === 'sapo' ? LIMIAR_DO_SAPO : LIMIAR_DE_EMPATE;
+
   return {
     bruto,
     normalizado,
@@ -196,7 +229,7 @@ export function pontuar(
     familiar: primeiro.familiar,
     afinidades: ranking,
     empate:
-      diferenca < LIMIAR_DE_EMPATE
+      diferenca < limiar
         ? {
             entre: [primeiro.familiar, segundo.familiar],
             diferenca: Math.round(diferenca * 10) / 10,

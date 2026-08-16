@@ -21,30 +21,29 @@
  * longo com os gráficos do que o teste realmente mede, o perfil público com
  * URL própria, e as 3 consultas ao Oráculo quando ele abrir.
  *
- * ── Por que a Revelação expira ────────────────────────────────────────────
+ * ── O que expira NÃO é o acesso: é o link público ─────────────────────────
  *
- * Porque o endereço permanente é o que a Completa vende, e um produto de
- * R$ 9,80 que já entrega isso não deixa razão para o de R$ 18,90 existir.
+ * Quem compra qualquer coisa ganha conta no Bruxário, e a revelação fica
+ * registrada nela **para sempre**. O que a Revelação não tem é o endereço
+ * público — passados os dias, o link para de abrir para estranhos, mas a dona
+ * continua lendo o dela, logada.
  *
- * **Nota de rota:** o SPEC 0.3 decidiu o contrário — carta compartilhável
- * grátis para todos, inclusive não-compradores, como motor de aquisição. A
- * inversão foi decisão do dono do produto em jul/2026, com a ressalva
- * registrada: prender o compartilhamento no plano caro significa que só quem
- * paga mais divulga. O contrapeso escolhido foi manter PDF **e imagens** na
- * Revelação, para que ela ainda circule no Instagram sem levar o perfil.
+ * A distinção importa e é de produto, não de implementação: ninguém perde o
+ * que pagou. O que se vende é a **possibilidade de mostrar**, não o acesso.
+ *
+ * **Nota de rota:** o SPEC 0.3 queria a carta compartilhável grátis para
+ * todos, como motor de aquisição. Prender o compartilhamento é decisão do dono
+ * do produto (jul/2026); o contrapeso é que PDF e imagens continuam saindo na
+ * Revelação, então ela ainda circula no Instagram sem levar o perfil.
  */
 export type ProdutoId = 'revelacao' | 'link_permanente' | 'completa';
 
 /**
- * Sete dias, e o número não é arbitrário: é o prazo de arrependimento do
- * Código de Defesa do Consumidor (art. 49), que o SPEC 7.5-B manda tratar como
- * benefício e não como letra miúda.
- *
- * O alinhamento resolve um problema sozinho — o link só some **depois** que o
- * direito de reembolso já passou. Ninguém perde o acesso ainda podendo pedir
- * dinheiro de volta, que seria a pior combinação possível para o suporte.
+ * Sete dias de link público, e o número não é arbitrário: é o prazo de
+ * arrependimento do Código de Defesa do Consumidor (art. 49), que o SPEC 7.5-B
+ * manda tratar como benefício e não como letra miúda.
  */
-export const DIAS_DE_ACESSO_TEMPORARIO = 7;
+export const DIAS_DE_LINK_PUBLICO = 7;
 
 export interface Produto {
   id: ProdutoId;
@@ -56,11 +55,11 @@ export interface Produto {
   /** `adicional` não é comprável sozinho — só a partir de um pedido existente. */
   tipo: 'principal' | 'adicional';
 
-  /** `null` = para sempre. Número = dias até o endereço expirar. */
-  diasDeAcesso: number | null;
-
-  /** Exige criar conta no Bruxário (link mágico por e-mail). */
-  exigeConta: boolean;
+  /**
+   * Por quantos dias o endereço abre para **quem não é a dona**.
+   * `null` = para sempre. Não afeta o acesso dela, que é pela conta.
+   */
+  diasDeLinkPublico: number | null;
 
   pdf: boolean;
   imagens: boolean;
@@ -73,6 +72,14 @@ export interface Produto {
   tiragemDiaria: boolean;
   /** Consultas ao Oráculo liberadas quando ele abrir (SPEC 0.4). */
   perguntasOraculo: number;
+  /**
+   * Narração em áudio da leitura completa, gerada por IA (`narracao.ts`).
+   * Só a Completa por enquanto — o custo é irrelevante (~R$0,10 por pedido),
+   * mas a narração em si é um diferencial de produto, não algo que dilui o
+   * preço de entrada. Pode virar adicional avulso pra quem comprou a
+   * Revelação depois.
+   */
+  narracaoAudio: boolean;
 }
 
 export const PRODUTOS: Record<ProdutoId, Produto> = {
@@ -82,8 +89,7 @@ export const PRODUTOS: Record<ProdutoId, Produto> = {
     precoCentavos: 980,
     descricao: 'Revelação do seu familiar, em PDF e imagens',
     tipo: 'principal',
-    diasDeAcesso: DIAS_DE_ACESSO_TEMPORARIO,
-    exigeConta: false,
+    diasDeLinkPublico: DIAS_DE_LINK_PUBLICO,
     pdf: true,
     imagens: true,
     relatorioCompleto: false,
@@ -91,6 +97,7 @@ export const PRODUTOS: Record<ProdutoId, Produto> = {
     perfilPublico: false,
     tiragemDiaria: false,
     perguntasOraculo: 0,
+    narracaoAudio: false,
   },
 
   link_permanente: {
@@ -99,8 +106,7 @@ export const PRODUTOS: Record<ProdutoId, Produto> = {
     precoCentavos: 590,
     descricao: 'Seu link de revelação, para sempre',
     tipo: 'adicional',
-    diasDeAcesso: null,
-    exigeConta: false,
+    diasDeLinkPublico: null,
     pdf: true,
     imagens: true,
     relatorioCompleto: false,
@@ -108,6 +114,7 @@ export const PRODUTOS: Record<ProdutoId, Produto> = {
     perfilPublico: false,
     tiragemDiaria: false,
     perguntasOraculo: 0,
+    narracaoAudio: false,
   },
 
   completa: {
@@ -116,15 +123,15 @@ export const PRODUTOS: Record<ProdutoId, Produto> = {
     precoCentavos: 1890,
     descricao: 'Leitura longa, gráficos do seu perfil e conta no Bruxário',
     tipo: 'principal',
-    diasDeAcesso: null,
-    exigeConta: true,
+    diasDeLinkPublico: null,
     pdf: true,
     imagens: true,
     relatorioCompleto: true,
     graficos: true,
     perfilPublico: true,
     tiragemDiaria: true,
-    perguntasOraculo: 3,
+    perguntasOraculo: 10,
+    narracaoAudio: true,
   },
 };
 
@@ -152,7 +159,7 @@ export function precoEmReais(produto: Produto): number {
 }
 
 /**
- * Quando o acesso a um pedido expira, em ISO. `null` = nunca.
+ * Quando o LINK PÚBLICO deixa de abrir, em ISO. `null` = nunca.
  *
  * Recebe a data de pagamento e não `Date.now()` de propósito: a contagem
  * começa quando a pessoa pagou, não quando alguém rodou esta função.
@@ -161,9 +168,9 @@ export function calcularExpiracao(
   produto: Produto,
   pagoEm: Date
 ): string | null {
-  if (produto.diasDeAcesso === null) return null;
+  if (produto.diasDeLinkPublico === null) return null;
   const fim = new Date(pagoEm);
-  fim.setDate(fim.getDate() + produto.diasDeAcesso);
+  fim.setDate(fim.getDate() + produto.diasDeLinkPublico);
   return fim.toISOString();
 }
 
@@ -173,7 +180,16 @@ export function diasRestantes(expiraEm: string, agora = new Date()): number {
   return Math.ceil(ms / 86_400_000);
 }
 
-export function acessoExpirou(expiraEm: string | null, agora = new Date()): boolean {
+/**
+ * O link público ainda abre para estranhos?
+ *
+ * O nome diz "link público" de propósito: a dona nunca é barrada por isto.
+ * Quem confundir os dois vai trancar cliente para fora do que ela comprou.
+ */
+export function linkPublicoExpirou(
+  expiraEm: string | null,
+  agora = new Date()
+): boolean {
   if (!expiraEm) return false;
   return new Date(expiraEm).getTime() <= agora.getTime();
 }
