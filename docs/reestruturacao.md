@@ -423,7 +423,21 @@ parte que exige mexer no código do caminho crítico, não.
 
 ---
 
-### Fase 5 · A casca da plataforma
+### Fase 5 · A casca da plataforma — ✅ concluída (estrutura)
+- ✅ `src/plataforma/NavegacaoDaPlataforma.tsx` — lateral no desktop, barra
+  inferior no celular com `env(safe-area-inset-bottom)`. Item sem direito
+  aparece apagado, não some.
+- ✅ Menu montado do registro de módulos + direitos, no layout, uma vez só.
+- ✅ Rotas novas: `/conta/familiar`, `/conta/calendario`; `/conta/oraculo`
+  virou o chat.
+- ✅ `ConversaDoOraculo` — histórico + composer funcionando; a resposta é a
+  ficção até a Fase 8 ligar o cérebro.
+- ✅ `direitosEfetivos()` em `acesso.ts`: une assinaturas novas + pedidos
+  pagos antigos, senão a casca trancaria cliente pagante do lado de fora.
+- 🟡 Verificado por HTTP com sessão real (5 rotas em 200, menu e chat
+  renderizando), **não em aparelho físico** — o teste de iOS/Android com
+  teclado aberto e rotação que esta fase pede continua pendente.
+
 Menu lateral, Oráculo no centro, mobile impecável. **Risco zero de venda:** é tela
 de quem já comprou; o funil não é tocado.
 
