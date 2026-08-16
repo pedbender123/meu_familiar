@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import db from '@/lib/db';
 import { sessaoAtual } from '@/lib/sessao-servidor';
 import { PRODUTOS, precoFormatado, type ProdutoId } from '@/lib/produtos';
@@ -143,8 +144,14 @@ export default async function Pedidos() {
                 return (
                   <tr key={p.id} className="border-t hover:bg-pergaminho/[0.03]"
                     style={{ borderColor: 'var(--admin-borda)' }}>
-                    <td className="px-2.5 py-1.5 font-mono text-[10px] text-pergaminho/40">
-                      {p.id.slice(0, 8)}
+                    <td className="px-2.5 py-1.5 font-mono text-[10px]">
+                      <Link
+                        href={`/painel/pedidos/${p.id}`}
+                        className="text-pergaminho/40 hover:text-vela transition"
+                        title="Ver a linha do tempo deste pedido"
+                      >
+                        {p.id.slice(0, 8)}
+                      </Link>
                     </td>
                     <td className="px-2.5 py-1.5 whitespace-nowrap">{p.nome}</td>
                     <td className="px-2.5 py-1.5 max-w-[14rem] truncate">{p.email}</td>
