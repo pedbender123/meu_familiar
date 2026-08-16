@@ -344,16 +344,32 @@ considerar a Fase 1 inteiramente fechada.
 
 ---
 
-### Fase 2 · Núcleo modular, por baixo
+### Fase 2 · Núcleo modular, por baixo — ✅ concluída
 *Nada muda na tela. Escrita dupla e modo sombra.*
 
-Nasce `src/nucleo/`: `planos.ts`, `direitos.ts`, `assinaturas.ts`, `acesso.ts`
-(`podeAcessar` / `consumir`), `registro.ts`.
-
-Todo pedido pago passa a **também** criar a assinatura equivalente — os dois
-modelos convivem. `podeAcessar()` roda em sombra ao lado da lógica atual de
-`produtos.ts`, registrando divergência sem decidir nada. Só assume quando não
-divergir por vários dias com tráfego real.
+- ✅ **`src/nucleo/`**: `direitos.ts` (`unirDireitos` — booleano é OU, número é
+  o maior), `planos.ts` (`revelacao`/`completa` semeados por migração,
+  espelhando `produtos.ts` preço a preço, direito a direito),
+  `assinaturas.ts` (`criarAssinatura` idempotente por `pedido_id`), `acesso.ts`
+  (`direitosDaConta` / `podeAcessar` / `cotaDe` — o portão único que um dia
+  substitui a checagem espalhada em `produtos.ts`).
+- ✅ **Escrita dupla** — `processar.ts`, atrás de `assinaturas_escrita_dupla`
+  (desligado por padrão): todo pedido pago também cria a assinatura
+  equivalente, sem afetar a entrega mesmo se falhar (só loga).
+- ✅ **Modo sombra** — `src/nucleo/sombra.ts`, chamado em
+  `revelacao/[id]/page.tsx` quando a dona vê a própria leitura: compara o que
+  `produtos.ts` decidiria contra o que `acesso.ts` decidiria e registra
+  divergência como anomalia `medio` na Sentinela. Silencioso quando ainda não
+  existe assinatura pro pedido — "não dá pra comparar" não é "bateu".
+- ✅ *Achado no caminho:* índice único parcial (`assinaturas(pedido_id) WHERE
+  pedido_id IS NOT NULL`) exige a mesma cláusula `WHERE` no `ON CONFLICT`,
+  senão o SQLite recusa o insert. Corrigido em `assinaturas.ts`.
+- ✅ **Verificado contra dados reais**: rodado em `npm run ensaio` (cópia
+  isolada do banco de produção) contra os 2 pedidos com status `entregue` —
+  as assinaturas criadas bateram 100% com `produtos.ts` nos dois, e a
+  idempotência se confirmou (rodar duas vezes não duplica). Nenhuma escrita
+  tocou o banco real; a cópia de ensaio foi apagada depois.
+- 247/247 testes, build limpo.
 
 *Rollback:* desliga o interruptor; a lógica antiga nunca parou de rodar.
 
