@@ -635,3 +635,84 @@ export async function enviarResgateDoRitual(params: {
     texto: [...paragrafos, '', url].join('\n\n'),
   });
 }
+
+/**
+ * O resumo que a Sentinela manda pro admin — docs/reestruturacao.md §5:
+ * anomalia crítica/alta merece e-mail, não só uma linha num painel que
+ * ninguém está olhando às 3 da manhã.
+ *
+ * Chamado só quando `alarmes.ts` decide que HÁ algo pra reportar — este
+ * módulo não decide isso, só formata e envia.
+ */
+export async function enviarResumoDeAlarmes(params: {
+  destino: string;
+  anomaliasCriticas: { entidadeTipo: string; entidadeId: string; esperado: string; encontrado: string }[];
+  anomaliasAltas: { entidadeTipo: string; entidadeId: string; esperado: string; encontrado: string }[];
+  pedidosTravados: number;
+  capiFalhouDefinitivo: number;
+}): Promise<void> {
+  const { destino, anomaliasCriticas, anomaliasAltas, pedidosTravados, capiFalhouDefinitivo } = params;
+
+  const linhaAnomalia = (a: { entidadeTipo: string; entidadeId: string; esperado: string; encontrado: string }) =>
+    `<li style="margin:0 0 10px;font-family:Arial,sans-serif;font-size:13px;color:#3A2F44;">
+       <strong>${a.entidadeTipo}:${a.entidadeId}</strong><br/>
+       esperado: ${a.esperado}<br/>
+       encontrado: ${a.encontrado}
+     </li>`;
+
+  const secao = (titulo: string, itens: typeof anomaliasCriticas) =>
+    itens.length === 0
+      ? ''
+      : `<p style="margin:20px 0 6px;font-family:Arial,sans-serif;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#6B5F72;">${titulo}</p>
+         <ul style="margin:0;padding-left:18px;">${itens.map(linhaAnomalia).join('')}</ul>`;
+
+  const html = moldura(`
+    <p style="margin:0 0 6px;font-family:Arial,sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#6B5F72;">Sentinela</p>
+    <p style="margin:0 0 18px;font-size:22px;font-style:italic;color:#2E2438;">Tem coisa pra olhar</p>
+    ${secao('Crítico', anomaliasCriticas)}
+    ${secao('Alto', anomaliasAltas)}
+    ${
+      pedidosTravados > 0
+        ? `<p style="margin:20px 0 0;font-family:Arial,sans-serif;font-size:13px;color:#3A2F44;">${pedidosTravados} pedido(s) travado(s) (pago/gerando/erro) — <code>npm run reprocessar</code>.</p>`
+        : ''
+    }
+    ${
+      capiFalhouDefinitivo > 0
+        ? `<p style="margin:8px 0 0;font-family:Arial,sans-serif;font-size:13px;color:#3A2F44;">${capiFalhouDefinitivo} evento(s) do Pixel desistiram de vez — <code>scripts/backfill-pixel.ts</code> manual.</p>`
+        : ''
+    }
+    <p style="margin:24px 0 0;">${botao(`${base()}/painel`, 'Abrir o painel')}</p>
+  `);
+
+  const texto = [
+    'Sentinela — tem coisa pra olhar',
+    '',
+    anomaliasCriticas.length > 0
+      ? `CRÍTICO (${anomaliasCriticas.length}):\n` +
+        anomaliasCriticas
+          .map((a) => `- ${a.entidadeTipo}:${a.entidadeId} — esperado ${a.esperado}; encontrado ${a.encontrado}`)
+          .join('\n')
+      : '',
+    anomaliasAltas.length > 0
+      ? `ALTO (${anomaliasAltas.length}):\n` +
+        anomaliasAltas
+          .map((a) => `- ${a.entidadeTipo}:${a.entidadeId} — esperado ${a.esperado}; encontrado ${a.encontrado}`)
+          .join('\n')
+      : '',
+    pedidosTravados > 0 ? `${pedidosTravados} pedido(s) travado(s) — npm run reprocessar` : '',
+    capiFalhouDefinitivo > 0 ? `${capiFalhouDefinitivo} evento(s) do CAPI desistiram — backfill manual` : '',
+    '',
+    `${base()}/painel`,
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+
+  await enviar({
+    para: destino,
+    assunto: `[Bruxário] ${anomaliasCriticas.length > 0 ? '🔴' : '⚠️'} ${
+      anomaliasCriticas.length + anomaliasAltas.length
+    } alarme(s) aberto(s)`,
+    html,
+    texto,
+  });
+}

@@ -21,7 +21,8 @@
     "ensaio": "tsx scripts/ensaio.ts",
     "sentinela": "tsx scripts/sentinela.ts",
     "capi": "tsx scripts/processar-fila-capi.ts",
-    "reconciliar": "tsx scripts/reconciliar.ts"
+    "reconciliar": "tsx scripts/reconciliar.ts",
+    "alarmes": "tsx scripts/alarmes.ts"
   },
   "dependencies": {
     "@google/genai": "^2.16.0",
