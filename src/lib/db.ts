@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import fs from 'fs';
 import { BANCO, DADOS } from './caminhos';
 import { PRODUTO_PADRAO, type ProdutoId } from './produtos';
+import { executarMigracoes } from './migracoes/runner';
 
 if (!fs.existsSync(DADOS)) fs.mkdirSync(DADOS, { recursive: true });
 
@@ -543,6 +544,17 @@ function garantirColunas() {
   // ALTER.
 }
 garantirColunas();
+
+/**
+ * A partir daqui, mudança de schema é migração numerada
+ * (`src/lib/migracoes/`), não mais `adicionarColunaSeFaltar` solto aqui em
+ * cima. `001_base` não faz nada — o schema acima continua vivendo aqui e
+ * seguirá sendo criado por `CREATE TABLE IF NOT EXISTS`/`garantirColunas()`
+ * (ver o comentário em `migracoes/001_base.ts`). Rodar isto no boot, como já
+ * acontecia com `garantirColunas()`, evita um passo manual de deploy que
+ * alguém esquece.
+ */
+executarMigracoes(db);
 
 export type StatusPedido =
   | 'aguardando_pagamento'
