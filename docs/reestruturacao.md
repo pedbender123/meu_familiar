@@ -282,44 +282,63 @@ positivo.
 
 ## 6. As fases
 
-### Fase 0 · Rede de segurança
+### Fase 0 · Rede de segurança — ✅ concluída
 *Nada muda pra quem compra. Nada muda na tela.*
 
-- **Migrations numeradas.** Hoje `src/lib/db.ts` roda `CREATE TABLE IF NOT EXISTS`
-  no import, com um `ALTER TABLE` avulso perto da linha 350. O schema vai virar de
-  ponta-cabeça; isso precisa de runner idempotente, tabela `migracoes` e
-  `npm run migrar`. O schema atual vira `001_base.ts` sem mudar nada.
-- **Backup automático** antes de toda migração, com restauração testada.
-- **Interruptores** (`interruptores` no banco + helper), pra disciplina 3.
-- **Ambiente de ensaio** com cópia real do banco.
-- **Teste automatizado do caminho crítico**: pedido → pagamento → webhook →
-  entrega → evento.
+- ✅ **Migrations numeradas** (`src/lib/migracoes/`, runner tolerante a
+  concorrência, `001_base` marca o schema anterior sem mudar nada). `npm run migrar`.
+- ✅ **Backup automático** com restauração testada (`npm run backup`,
+  `src/lib/backup.ts`) — usa a API de backup nativa do SQLite, não cópia de
+  arquivo, pra não perder o que só está no `-wal`.
+- ✅ **Interruptores** (`src/lib/interruptores.ts`, tabela `interruptores`,
+  rollout gradual por balde determinístico).
+- ✅ **Ambiente de ensaio** (`npm run ensaio`, `BRUXARIO_DIR_DADOS`).
+- ✅ **Teste automatizado do caminho crítico** completo:
+  `src/lib/webhook-pagamento.test.ts` cobre pedido → pagamento → webhook →
+  entrega → evento com código real, sem mocks.
+- ✅ *Achado no caminho:* `npm test` rodava contra o banco de **produção**
+  real — corrigido (banco isolado por execução).
 
 *Rollback:* nada foi alterado; basta não usar.
 
 ---
 
-### Fase 1 · Inteligência, administração e Sentinela
+### Fase 1 · Inteligência, administração e Sentinela — ✅ concluída
+*(a parte visual não foi verificada num navegador de verdade — ver nota abaixo)*
 
-**Linha de vida da venda.** Cada pedido com todos os seus marcos em ordem, do
-primeiro clique ao evento que chegou na Meta. Onde parou, há quanto tempo, o que
-foi tentado. O dado já existe espalhado por `visitas`, `marcos`, `toques` e
-`pedidos`; falta ser uma tela.
+- ✅ **Linha de vida da venda** — `/painel/pedidos/[id]`
+  (`src/nucleo/linha-do-tempo.ts` + `LinhaDoTempo.tsx`). Junta marketing
+  (toques), funil (marcos), sistema (eventos), pixel (fila CAPI) e Sentinela
+  (anomalias) numa timeline só, ordenada por data.
+- ✅ **Reconciliação com o Mercado Pago** (`src/nucleo/reconciliacao.ts`,
+  `npm run reconciliar`). Usa `Payment.search` do SDK e reprocessa webhook
+  perdido pelo MESMO caminho do webhook real (`processarNotificacaoDePagamento`)
+  — não existe uma segunda lógica de "marcar pago". Rodou de verdade contra a
+  API do MP em modo teste.
+- ✅ **Fila de eventos com retentativa e dedup** (`src/lib/fila-capi.ts`,
+  `npm run capi`, backoff exponencial até 8 tentativas). *Achado no caminho:*
+  `MarcaCompra.tsx`/`MarcoDoCheckout.tsx` disparavam pro pixel do navegador
+  **sem `event_id`** — ligar a fila teria contado toda venda como duas
+  no Ads Manager sempre que o navegador também disparasse. Corrigido antes de
+  ligar (`src/lib/pixel.ts` ganhou o parâmetro `eventId`).
+- ✅ **Sentinela** (`src/nucleo/sentinela/`) com as invariantes do sistema como
+  ele é hoje: valor cobrado bate com produto+cupom, entrega tem pagamento.
+  Rodou contra produção: achou 1 pedido legado real (investigado, não é
+  fraude) e um bug de deduplicação que faria spam de alarme em cron — corrigido.
+- ✅ **Alarmes por e-mail** (`src/nucleo/alarmes.ts`, `npm run alarmes`) —
+  junta anomalias críticas/altas, pedidos travados e falhas definitivas do
+  CAPI num resumo pro `ADMIN_EMAIL`.
+- 🟡 **Painel reorganizado como centro de comando**: não fechado à parte — o
+  que existia (`central`, `Graficos.tsx`, `FiltroDePeriodo.tsx`) não foi
+  redesenhado; só ganhou a tela nova de detalhe do pedido.
 
-**Reconciliação com o Mercado Pago.** Job comparando o que o MP registrou com o que
-temos. Pagamento aprovado lá e pedido parado aqui = webhook perdido = venda paga e
-não entregue. Provavelmente já aconteceu. O job acha e reprocessa.
-
-**Fila de eventos com retentativa e dedup.** Todo evento de pixel/CAPI vira linha
-numa fila com `event_id`; falhou, reenvia; navegador e servidor mandaram o mesmo, a
-Meta deduplica.
-
-**Sentinela** (seção 5), com as invariantes do sistema como ele é hoje. As das
-fases seguintes chegam junto com elas, pela disciplina 9.
-
-**Painel reorganizado** como centro de comando, sobre o que já existe
-(`painel/central`, `Graficos.tsx`, `GraficosPeriodo.tsx`, `Jornada.tsx`,
-`FiltroDePeriodo.tsx`).
+**Nota sobre verificação visual:** as telas desta fase foram construídas
+seguindo os padrões visuais já existentes (`Shell.tsx`, `GraficosPeriodo.tsx`,
+`Jornada.tsx` — mesmas classes, tokens de cor e estrutura), com build limpo e
+a rota testada por HTTP (sobe, redireciona certo, não quebra) — mas **sem
+abrir num navegador de verdade**, por não haver ferramenta de browser
+disponível na sessão em que foi construída. Conferir visualmente antes de
+considerar a Fase 1 inteiramente fechada.
 
 *Rollback:* tudo é adição — telas, jobs, observação. Nada no caminho da venda muda.
 
