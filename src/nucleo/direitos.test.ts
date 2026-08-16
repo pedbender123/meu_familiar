@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { unirDireitos, SEM_DIREITOS, type Direitos } from './direitos';
 
@@ -46,4 +46,30 @@ test('todos os direitos da Completa somados aos da Revelação dão os da Comple
     narracaoAudio: true,
   });
   assert.deepEqual(unirDireitos([revelacao, completa]), completa);
+});
+
+describe('unirDireitos · alcance do calendário', () => {
+  test('fica com o alcance mais longe, não com o último da lista', () => {
+    const semana = { ...SEM_DIREITOS, alcanceCalendario: 'semana' as const };
+    const ano = { ...SEM_DIREITOS, alcanceCalendario: 'ano' as const };
+    assert.equal(unirDireitos([ano, semana]).alcanceCalendario, 'ano');
+    assert.equal(unirDireitos([semana, ano]).alcanceCalendario, 'ano');
+  });
+
+  test('rolante ganha de todos', () => {
+    const rolante = { ...SEM_DIREITOS, alcanceCalendario: 'rolante' as const };
+    const mes = { ...SEM_DIREITOS, alcanceCalendario: 'mes' as const };
+    assert.equal(unirDireitos([mes, rolante]).alcanceCalendario, 'rolante');
+  });
+
+  test('grátis + pago: a pessoa fica com o do pago em tudo', () => {
+    const gratis = { ...SEM_DIREITOS, tiragemDiaria: true, perguntasOraculo: 3, alcanceCalendario: 'semana' as const };
+    const pago = { ...SEM_DIREITOS, perfilCompleto: true, oraculoNaHora: true, perguntasOraculo: 10, alcanceCalendario: 'mes' as const };
+    const u = unirDireitos([gratis, pago]);
+    assert.equal(u.perguntasOraculo, 10);
+    assert.equal(u.oraculoNaHora, true);
+    assert.equal(u.perfilCompleto, true);
+    assert.equal(u.alcanceCalendario, 'mes');
+    assert.equal(u.tiragemDiaria, true, 'não perde o que o grátis dava');
+  });
 });

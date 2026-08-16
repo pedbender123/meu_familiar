@@ -1,5 +1,5 @@
 import db from '../lib/db';
-import type { Direitos } from './direitos';
+import { SEM_DIREITOS, type Direitos } from './direitos';
 
 export interface Plano {
   id: string;
@@ -24,6 +24,20 @@ export function listarPlanos(): Plano[] {
   return db.prepare('SELECT * FROM planos ORDER BY preco_centavos ASC').all() as Plano[];
 }
 
+/**
+ * Sempre sobre `SEM_DIREITOS`, nunca o JSON cru.
+ *
+ * `direitos_json` é uma linha gravada no passado: um direito criado hoje
+ * simplesmente não existe nas linhas de ontem. Lendo cru, esse campo viria
+ * `undefined` — e `undefined` num `if` é `false` por sorte, não por decisão.
+ * Com o merge, direito novo nasce **negado por padrão** em todo plano antigo,
+ * até alguém dizer o contrário explicitamente numa migração.
+ */
 export function direitosDoPlano(plano: Plano): Direitos {
-  return JSON.parse(plano.direitos_json) as Direitos;
+  try {
+    return { ...SEM_DIREITOS, ...(JSON.parse(plano.direitos_json) as Partial<Direitos>) };
+  } catch {
+    // JSON corrompido não pode virar acesso liberado por acidente.
+    return SEM_DIREITOS;
+  }
 }

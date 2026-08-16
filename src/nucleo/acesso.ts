@@ -43,6 +43,7 @@ function direitosLegados(email: string): Direitos[] {
   return pagos.filter((p) => ehProdutoValido(p.produto)).map((p) => {
     const produto = produtoDe(p.produto);
     return {
+      ...SEM_DIREITOS,
       pdf: produto.pdf,
       imagens: produto.imagens,
       relatorioCompleto: produto.relatorioCompleto,
@@ -51,6 +52,20 @@ function direitosLegados(email: string): Direitos[] {
       tiragemDiaria: produto.tiragemDiaria,
       perguntasOraculo: produto.perguntasOraculo,
       narracaoAudio: produto.narracaoAudio,
+
+      /**
+       * Os três direitos que nasceram com o plano grátis não existem em
+       * `PRODUTOS` — e o padrão deles é negado. Aqui é o único lugar onde
+       * negá-los seria errado: quem comprou no modelo antigo comprou o
+       * familiar exato e os quatro eixos (é literalmente o produto), e
+       * nunca esperou fila. Deixar o padrão valer rebaixaria cliente
+       * pagante a plano grátis no dia em que este código subisse.
+       */
+      perfilCompleto: true,
+      oraculoNaHora: true,
+      // A tiragem diária é o que dá acesso ao calendário; quem não a tem
+      // não perde nada por não ter alcance.
+      alcanceCalendario: produto.tiragemDiaria ? ('mes' as const) : ('nenhum' as const),
     };
   });
 }
