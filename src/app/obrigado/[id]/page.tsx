@@ -50,7 +50,7 @@ export default function Obrigado({ params }: { params: Promise<{ id: string }> }
     } catch {
       // sem storage: melhor arriscar contar de novo do que nunca contar
     }
-    evento('Purchase', { value: (valorCentavos ?? 0) / 100, currency: 'BRL' });
+    evento('Purchase', { value: (valorCentavos ?? 0) / 100, currency: 'BRL' }, `${id}:purchase`);
   }
 
   useEffect(() => {
