@@ -3,15 +3,8 @@ import {
   WebhookSignatureValidator,
   InvalidWebhookSignatureError,
 } from 'mercadopago';
-import {
-  buscarPedido,
-  buscarPedidoPorPagamentoId,
-  atualizarPedido,
-  registrarEvento,
-} from '@/lib/db';
-import { pagamento, segredoDoWebhook, statusLiberaAcesso } from '@/lib/pagamento';
-import { calcularExpiracao, produtoDe } from '@/lib/produtos';
-import { aposPagamento } from '@/lib/processar';
+import { pagamento, segredoDoWebhook } from '@/lib/pagamento';
+import { processarNotificacaoDePagamento } from '@/lib/webhook-pagamento';
 
 /**
  * Webhook do Mercado Pago — **a única fonte de verdade sobre pagamento**
@@ -50,49 +43,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ erro: 'indisponível' }, { status: 500 });
     }
 
-    if (!statusLiberaAcesso(resultado.status)) {
-      registrarEvento(`pagamento_${resultado.status}`);
-      return NextResponse.json({ ok: true });
-    }
-
-    // Casa por `pagamento_id` (gravado na criação) ou pela referência externa,
-    // que é o nosso pedidoId — o segundo cobre a notificação que chega antes
-    // de a resposta síncrona ter sido salva.
-    const pedido =
-      buscarPedidoPorPagamentoId(idPagamento) ??
-      (resultado.referenciaExterna
-        ? buscarPedido(resultado.referenciaExterna)
-        : undefined);
-
-    if (!pedido) {
-      console.warn(`[webhook] pagamento ${idPagamento} sem pedido correspondente`);
-      return NextResponse.json({ ok: true });
-    }
-
-    // Idempotência: o MP reenvia. Só a primeira transição dispara a geração.
-    if (pedido.status !== 'aguardando_pagamento') {
-      return NextResponse.json({ ok: true });
-    }
-
-    // A contagem dos 7 dias começa AGORA, no momento em que o pagamento
-    // confirmou — não quando a geração terminar. Se o pipeline demorar ou
-    // falhar e for reprocessado amanhã, a pessoa não pode perder um dia.
-    const pagoEm = new Date();
-    atualizarPedido(pedido.id, {
-      status: 'pago',
-      pagamento_id: idPagamento,
-      pago_em: pagoEm.toISOString(),
-      expira_em: calcularExpiracao(produtoDe(pedido.produto), pagoEm),
-      // O que o MP diz ter cobrado e repassado. Guardado no momento da
-      // confirmação porque é a única hora em que temos a resposta dele em
-      // mãos — depois exigiria uma consulta nova por pedido.
-      bruto_centavos: resultado.brutoCentavos,
-      taxa_centavos: resultado.taxaCentavos,
-      liquido_centavos: resultado.liquidoCentavos,
-      metodo_pagamento: resultado.metodo,
-    });
-    registrarEvento('pagamento_confirmado', pedido.id);
-    aposPagamento(pedido.id);
+    // O que fazer com o resultado — status, idempotência, atualizar o pedido,
+    // disparar a entrega — mora em webhook-pagamento.ts, testado à parte
+    // (src/lib/webhook-pagamento.test.ts) sem precisar de servidor HTTP.
+    //
+    // O `await` aqui só espera a parte SÍNCRONA (checar status, achar o
+    // pedido, gravar `pago`). A entrega em si (`resultado.entrega`, dentro da
+    // função) roda em segundo plano sem `await` — ignorada de propósito, para
+    // este handler responder rápido ao Mercado Pago em vez de segurar a
+    // resposta pelo tempo que a geração levar.
+    await processarNotificacaoDePagamento(resultado);
 
     return NextResponse.json({ ok: true });
   } catch (erro) {
