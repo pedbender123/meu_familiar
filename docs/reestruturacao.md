@@ -375,29 +375,29 @@ considerar a Fase 1 inteiramente fechada.
 
 ---
 
-### Fase 3 · Checkout como adaptador
-`src/lib/pagamento.ts` vira `src/nucleo/checkouts/mercadopago.ts` atrás de uma
-interface, com **comportamento idêntico** — os testes que já existem
-(`pagamento.test.ts`, `webhook-assinatura.test.ts`, `modo-pagamento.test.ts`) são a
-prova de que nada mudou.
+### Fase 3 · Checkout como adaptador — 🟡 parcial
+- ✅ `src/lib/pagamento.ts` virou `src/nucleo/checkouts/mercadopago.ts` —
+  mudança de endereço, não de lógica. A interface (`ProvedorPagamento`) já
+  existia dentro do arquivo; só faltava morar no lugar certo para o formato
+  de "um arquivo por provedor" que a fase pede. Os 8 arquivos que
+  dependiam dele foram atualizados; os testes que já existiam
+  (`mercadopago.test.ts`, `modo-pagamento.test.ts`, `webhook-pagamento.test.ts`,
+  `reconciliacao.test.ts`) passam sem alteração de asserção — prova de que o
+  comportamento não mudou.
+- ✅ **`contas_checkout`** (migration 006): tabela para credenciais de
+  provedor fora do `.env`, cifradas com AES-256-GCM
+  (`src/nucleo/checkouts/segredo.ts`, chave derivada de `APP_SECRET`).
+  Testada em ensaio e aplicada em produção com backup prévio.
+- ⬜ **Ainda não feito**: nenhum código lê de `contas_checkout` — o caminho
+  de pagamento continua 100% pelo `.env`. Faltam: a tela no painel para
+  cadastrar uma conta de checkout, a lógica de escolher o provedor em
+  runtime (por conta/campanha), e o checkout do marketing como segundo
+  provedor entrando por interruptor com fatia pequena de tráfego. Isso é
+  dinheiro de verdade — cada pedaço merece sua própria etapa testada, não
+  foi enfiado junto da mudança de lugar do arquivo.
 
-```ts
-interface Checkout {
-  criarPagamento(pedido, plano): Promise<{ id, url?, parcelas }>;
-  criarAssinatura?(conta, plano): Promise<{ id, url }>;
-  verificarWebhook(req): Promise<{ valido, evento, referencia }>;
-  consultarStatus(id): Promise<Status>;
-}
-```
-
-Credenciais saem do `.env` pra tabela `contas_checkout`, cifradas com
-`APP_SECRET` — é isso que mata o bloco `MP_HOROSCOPO_*`: duas contas do mesmo
-provedor viram duas linhas, não duas famílias de variável de ambiente.
-
-O checkout do marketing entra **depois**, por interruptor, com fatia pequena de
-tráfego e o painel comparando conversão lado a lado.
-
-*Rollback:* interruptor volta pro caminho antigo, que continua no código.
+*Rollback:* interruptor volta pro caminho antigo, que continua no código
+(hoje o único caminho, então não há o que reverter ainda).
 
 ---
 
