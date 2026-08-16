@@ -71,6 +71,25 @@
   animation: tremular 2.6s ease-in-out infinite;
 }
 
+/* Entrada de cada cena do ritual e das opções, escalonada. */
+.anima-surgir {
+  animation: surgir 0.45s ease both;
+}
+.anima-surgir button {
+  animation: surgir 0.45s ease both;
+}
+
+@keyframes surgir {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* O seletor de data/hora sobre pergaminho precisa do ícone escuro. */
+.entrada-ritual::-webkit-calendar-picker-indicator {
+  filter: sepia(1) saturate(2) hue-rotate(345deg) brightness(0.55);
+  cursor: pointer;
+}
+
 @keyframes tremular {
   0%, 100% { transform: rotate(-1.5deg) scaleY(1); }
   50%      { transform: rotate(1.5deg) scaleY(1.05); }
@@ -92,4 +111,138 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ── área administrativa ───────────────────────────────────────────────────
+
+   O painel é ferramenta de trabalho, não o quarto de vela. Ele reaproveita as
+   MESMAS variáveis do site (`--pergaminho` é sempre "o texto", `--tinta` é
+   sempre "o fundo") e só troca os valores dentro de `.admin`. Assim toda
+   classe já escrita — `text-pergaminho`, `border-pergaminho/12` — vira modo
+   claro sozinha, sem reescrever marcação nenhuma.
+
+   O tema é atributo no container, e não media query: quem trabalha no painel
+   escolhe, e a escolha precisa sobreviver ao sistema estar em outro modo. */
+
+.admin {
+  background: var(--admin-fundo);
+  color: var(--pergaminho);
+  min-height: 100vh;
+}
+
+.admin[data-tema='escuro'] {
+  /* Faz o `color-scheme: light dark` dos inputs de data resolver para o
+     tema certo — sem isto o seletor nativo do navegador sai sempre escuro,
+     inclusive por cima do modo claro. */
+  color-scheme: dark;
+  --admin-fundo: #0C0916;
+  --admin-superficie: #141020;
+  --admin-borda: rgba(234, 224, 204, 0.12);
+}
+
+.admin[data-tema='claro'] {
+  color-scheme: light;
+  /* Os papéis se invertem: o "pergaminho" (texto) escurece, a "tinta"
+     (fundo) clareia. O ouro precisa descer bastante de luminância — o
+     #D9A441 original tem contraste 1,9 sobre branco, ilegível. */
+  --pergaminho: #241E2E;
+  --tinta: #FFFFFF;
+  --vela: #8A6410;
+  --violeta-bruma: #5B4A7A;
+  --admin-fundo: #F6F3EC;
+  --admin-superficie: #FFFFFF;
+  --admin-borda: rgba(36, 30, 46, 0.14);
+}
+
+/* As superfícies (cartões, tabelas, barra lateral) seguem o tema sem
+   depender de opacidade sobre o fundo, que no claro vira cinza sujo. */
+.admin .superficie {
+  background: var(--admin-superficie);
+}
+
+.admin[data-tema='claro'] .superficie {
+  box-shadow: 0 1px 2px rgba(36, 30, 46, 0.06);
+}
+
+/*
+  Apoio do funil longo (`/familiar`).
+
+  `no-scrollbar` some com a barra nas colunas da roda de data: ela é um
+  seletor, não uma lista de leitura, e a barra denuncia que aquilo é um `div`
+  rolável em vez de um disco. `faixa-seletor` é a janela iluminada no centro,
+  que marca qual item está escolhido — sem ela a roda não diz onde ler.
+*/
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+.faixa-seletor {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 48px;
+  transform: translateY(-50%);
+  pointer-events: none;
+  border-top: 1px solid color-mix(in srgb, var(--ouro-velho) 35%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--ouro-velho) 35%, transparent);
+  background: color-mix(in srgb, var(--ouro-velho) 7%, transparent);
+}
+
+/* Cintilação das estrelas. Dessincronizada por item — ver `Constelacao`. */
+@keyframes cintilar {
+  0%, 100% { opacity: var(--brilho, 1); }
+  50%      { opacity: calc(var(--brilho, 1) * 0.45); }
+}
+
+/*
+  Respeitar quem pediu menos movimento vale para TUDO que se move sozinho.
+  Sem esta regra a cintilação continuaria rodando para quem marcou a
+  preferência no sistema — e é exatamente o tipo de animação (piscar contínuo)
+  que a preferência existe para desligar.
+*/
+@media (prefers-reduced-motion: reduce) {
+  [style*="cintilar"] { animation: none !important; }
+  .anima-surgir { animation: none !important; }
+}
+
+/* A onda na superfície do orbe. Ver `MedidorDoVeu`. */
+@keyframes deslizarOnda {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* Leitura da mão: a faixa que varre e as linhas sendo traçadas. */
+@keyframes varrer {
+  0%   { top: 0%; opacity: 0; }
+  15%  { opacity: 1; }
+  85%  { opacity: 1; }
+  100% { top: calc(100% - 6rem); opacity: 0; }
+}
+@keyframes tracarLinha {
+  from { stroke-dashoffset: 120; opacity: 0; }
+  to   { stroke-dashoffset: 0; opacity: 1; }
+}
+
+/* ── Marcação da palma ────────────────────────────────────────────────────
+   O contorno e cada linha se DESENHAM, em vez de aparecerem prontos. É o que
+   faz a marcação ler como medida sendo tomada em vez de figura colada por
+   cima da foto. */
+@keyframes desenharTraco {
+  from { stroke-dashoffset: 600; }
+  to   { stroke-dashoffset: 0; }
+}
+.anima-traco {
+  stroke-dasharray: 600;
+  animation: desenharTraco 0.75s ease-out both;
+}
+.anima-contorno { animation: surgirSuave 0.6s ease both; }
+@keyframes pontaPop {
+  from { opacity: 0; transform: scale(0.4); transform-box: fill-box; transform-origin: center; }
+  to   { opacity: 1; transform: scale(1); transform-box: fill-box; transform-origin: center; }
+}
+.anima-ponta { animation: pontaPop 0.4s ease both; }
+.anima-rotulo { animation: surgirSuave 0.5s ease 0.5s both; }
+@keyframes surgirSuave {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }

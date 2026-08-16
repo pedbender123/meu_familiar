@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { Suspense } from "react";
 import "./globals.css";
+import { Farejador } from "@/components/Farejador";
+import { AudioAmbiente } from "@/components/AudioAmbiente";
+import { MetaPixel } from "@/components/MetaPixel";
 
 const cormorant = localFont({
   src: "../assets/fonts/CormorantGaramond.woff2",
@@ -22,10 +26,33 @@ const pinyon = localFont({
   display: "swap",
 });
 
+const SITE = process.env.BASE_URL || 'https://bruxario.com.br';
+
+/**
+ * Metadados padrão de todo o site.
+ *
+ * `metadataBase` é o que faz as URLs relativas das imagens virarem absolutas —
+ * sem ele, o robô do WhatsApp recebe "/og/inicio.png" e não sabe de onde
+ * baixar, e o card aparece como retângulo cinza.
+ *
+ * Cada página sobrescreve o que precisa; o que não sobrescrever herda daqui.
+ */
 export const metadata: Metadata = {
-  title: "Bruxário — O familiar de bruxa que te escolheu",
+  metadataBase: new URL(SITE),
+  title: 'Bruxário — O familiar de bruxa que te escolheu',
   description:
-    "Toda bruxa tem um familiar. O seu já te escolheu. Você só ainda não sabe qual é.",
+    'Toda bruxa tem um familiar. O seu já te escolheu. Você só ainda não sabe qual é.',
+  openGraph: {
+    type: 'website',
+    siteName: 'Bruxário',
+    locale: 'pt_BR',
+    title: 'Bruxário — O familiar de bruxa que te escolheu',
+    description: 'Cenas revelam qual dos doze caminha ao seu lado. O signo tem peso zero.',
+    images: [{ url: '/og/inicio.png', width: 1200, height: 630 }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+  },
 };
 
 export default function RootLayout({
@@ -38,7 +65,20 @@ export default function RootLayout({
       lang="pt-BR"
       className={`${cormorant.variable} ${sora.variable} ${pinyon.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {/*
+          Suspense obrigatório: Farejador e MetaPixel usam useSearchParams, e
+          sem a fronteira o Next força a página inteira a renderizar no
+          cliente — o que derrubaria a geração estática de /termos e
+          /privacidade.
+        */}
+        <Suspense fallback={null}>
+          <Farejador />
+          <MetaPixel />
+        </Suspense>
+        <AudioAmbiente />
+        {children}
+      </body>
     </html>
   );
 }

@@ -1,59 +1,200 @@
+import Link from 'next/link';
+import { PaginaLegal, Secao, Lista, Destaque } from '@/components/PaginaLegal';
+import { LEGAL } from '@/lib/legal';
+import { PRODUTOS, precoFormatado } from '@/lib/produtos';
+import { TOTAL_DE_ITENS } from '@/lib/quiz/itens';
+
 export const metadata = {
-  robots: { index: false, follow: false },
+  title: 'Termos de uso — Bruxário',
+  description: 'O que o Bruxário é, o que você leva, e como cancelar.',
 };
 
+/**
+ * Termos de Uso.
+ *
+ * Duas decisões de redação que são jurídicas, não estilísticas:
+ *
+ * 1. **A natureza do serviço vem primeiro, em destaque.** Se alguém alegar que
+ *    entendeu como serviço psicológico, a defesa é ter dito na primeira linha,
+ *    de forma legível — não numa cláusula 14 em cinza claro.
+ * 2. **O arrependimento de 7 dias é escrito como benefício.** É exigência do
+ *    CDC (art. 49) de qualquer forma; escondê-lo em letra miúda só perde a
+ *    chance de parecer confiável sem custo nenhum.
+ *
+ * E o que NÃO tem aqui: cláusula excluindo responsabilidade. Em relação de
+ * consumo ela é nula (CDC art. 51) e só serve para dar má impressão e perder
+ * na primeira reclamação.
+ */
 export default function Termos() {
   return (
-    <main className="flex-1 flex flex-col items-center px-6 py-16">
-      <div className="max-w-lg font-corpo font-light text-pergaminho/90 leading-relaxed flex flex-col gap-6">
-        <h1 className="font-display italic text-3xl text-pergaminho mb-2">
-          Termos e Privacidade
-        </h1>
+    <PaginaLegal
+      titulo="Termos de uso"
+      resumo="O que o Bruxário é, o que você leva em cada plano, e como desistir."
+    >
+      <Secao titulo="O que o Bruxário é — e o que não é">
+        <Destaque>
+          O Bruxário é <strong className="font-medium">entretenimento e
+          autoconhecimento simbólico</strong>. Não é serviço psicológico, médico,
+          jurídico ou financeiro, e não substitui nenhum deles.
+        </Destaque>
+        <p>
+          As perguntas se inspiram em modelos de personalidade estudados, mas o
+          resultado <strong className="font-medium">não é um teste psicológico
+          validado</strong> e não é diagnóstico de coisa nenhuma. Nada aqui
+          prevê o futuro, cura, garante dinheiro, traz alguém de volta ou diz
+          resultado de exame.
+        </p>
+        <p>
+          Se você está passando por algo sério, procure ajuda de verdade. O CVV
+          atende no <strong className="font-medium">188</strong>, de graça, 24
+          horas.
+        </p>
+      </Secao>
 
-        <section>
-          <h2 className="font-corpo font-medium text-pergaminho mb-1">O que fazemos</h2>
-          <p>
-            O Bruxário é um produto de entretenimento e autoconhecimento simbólico.
-            As leituras são geradas com auxílio de inteligência artificial e não
-            substituem orientação profissional de nenhuma natureza — médica,
-            psicológica, financeira, legal ou de qualquer outra ordem. Não
-            prometemos previsões literais de futuro, saúde, dinheiro ou relações.
-          </p>
-        </section>
+      <Secao titulo="Quem pode usar">
+        <p>
+          {`Maiores de ${LEGAL.idadeMinima} anos.`} Ao usar o Bruxário você
+          declara ter essa idade e que as informações que der são suas e
+          verdadeiras.
+        </p>
+      </Secao>
 
-        <section>
-          <h2 className="font-corpo font-medium text-pergaminho mb-1">Dados que coletamos</h2>
-          <p>
-            Para gerar e entregar sua revelação, coletamos nome, e-mail, data e
-            hora de nascimento (opcional) e as respostas do ritual. O CPF é
-            pedido separadamente pelo processador de pagamento, na hora do
-            checkout. Esses dados são usados apenas para calcular seu
-            familiar, gerar a leitura e as artes, processar o pagamento e,
-            eventualmente, enviar comunicações sobre o seu registro.
-          </p>
-        </section>
+      <Secao titulo="O que você leva">
+        <p>
+          O ritual tem {TOTAL_DE_ITENS} cenas e é gratuito. No fim dele você
+          escolhe um plano:
+        </p>
+        <Lista
+          itens={[
+            <>
+              <strong className="font-medium">
+                {`${PRODUTOS.revelacao.nome} — R$ ${precoFormatado(PRODUTOS.revelacao)}`}
+              </strong>
+              : seu familiar, a leitura, a carta, o PDF e as imagens. A revelação
+              fica guardada na sua conta para sempre; o link público, que
+              permite outra pessoa abrir, dura{' '}
+              {PRODUTOS.revelacao.diasDeLinkPublico} dias.
+            </>,
+            <>
+              <strong className="font-medium">
+                {`${PRODUTOS.completa.nome} — R$ ${precoFormatado(PRODUTOS.completa)}`}
+              </strong>
+              : tudo acima, com leitura longa, os gráficos do seu perfil, link
+              público permanente e {PRODUTOS.completa.perguntasOraculo} consultas
+              ao Oráculo guardadas para quando ele abrir.
+            </>,
+            <>
+              <strong className="font-medium">
+                {`${PRODUTOS.link_permanente.nome} — R$ ${precoFormatado(PRODUTOS.link_permanente)}`}
+              </strong>
+              : deixa o link público da sua Revelação aberto para sempre. Não
+              inclui a leitura longa nem os gráficos.
+            </>,
+          ]}
+        />
+        <Destaque>
+          O Oráculo <strong className="font-medium">ainda não existe</strong>. As
+          consultas da Completa ficam guardadas na sua conta e serão liberadas
+          quando ele abrir. Não prometemos data. Se é isso que te faria comprar a
+          Completa, saiba disso antes.
+        </Destaque>
+      </Secao>
 
-        <section>
-          <h2 className="font-corpo font-medium text-pergaminho mb-1">Seus direitos (LGPD)</h2>
-          <p>
-            Você pode solicitar a exclusão dos seus dados a qualquer momento
-            escrevendo para{' '}
-            <a href="mailto:ola@bruxario.com.br" className="underline text-violeta">
-              ola@bruxario.com.br
-            </a>
-            . O link da sua revelação é permanente e privado — não é indexado por
-            buscadores.
-          </p>
-        </section>
+      <Secao titulo="Pagamento">
+        <p>
+          É compra única — não existe assinatura nem cobrança recorrente. O
+          processamento é feito pelo Mercado Pago; nenhum dado de cartão passa
+          pelos nossos servidores.
+        </p>
+        <p>
+          A entrega acontece depois da confirmação do pagamento. Pix costuma
+          confirmar na hora; boleto pode levar até três dias úteis.
+        </p>
+      </Secao>
 
-        <section>
-          <h2 className="font-corpo font-medium text-pergaminho mb-1">Pagamento</h2>
-          <p>
-            Os pagamentos são processados por instituição regulada pelo Banco
-            Central. Nenhum dado de cartão passa pelos nossos servidores.
-          </p>
-        </section>
-      </div>
-    </main>
+      <Secao titulo="Desistir nos primeiros 7 dias">
+        <Destaque>
+          Compra feita pela internet dá direito a desistir em até{' '}
+          {LEGAL.diasDeArrependimento} dias, com devolução integral, sem precisar
+          explicar por quê. É o art. 49 do Código de Defesa do Consumidor, e aqui
+          vale mesmo que você já tenha lido tudo.
+        </Destaque>
+        <p>
+          Peça pelo{' '}
+          <Link
+            href={LEGAL.canalDeContato}
+            className="text-ouro-profundo underline underline-offset-2"
+          >
+            contato
+          </Link>
+          , escolhendo &ldquo;Quero reembolso&rdquo;. Não tem formulário
+          escondido, não tem ligação, não tem tela de retenção. O estorno volta
+          pelo mesmo meio do pagamento e o prazo depende do banco.
+        </p>
+      </Secao>
+
+      <Secao titulo="Depois dos 7 dias">
+        <p>
+          Fora da janela de arrependimento não há reembolso automático — o
+          produto é entregue na hora e não tem como ser devolvido. Mas se algo
+          deu errado de verdade, escreva: problema de entrega, cobrança em
+          duplicidade ou leitura que não chegou a gente resolve.
+        </p>
+      </Secao>
+
+      <Secao titulo="Conteúdo gerado por inteligência artificial">
+        <p>
+          A leitura é escrita por IA a partir das suas escolhas. Ela pode conter
+          imprecisões e não deve ser tratada como verdade sobre você — trate como
+          espelho, não como veredito. Quem decide o que fazer com o que leu é
+          você.
+        </p>
+      </Secao>
+
+      <Secao titulo="Do que é de quem">
+        <p>
+          As ilustrações dos doze familiares, os textos do site, a marca e o
+          desenho do teste são nossos. Você pode compartilhar livremente a sua
+          revelação, as imagens e o PDF que recebeu — inclusive nas suas redes. O
+          que não pode é revender, redistribuir como se fosse seu ou usar nossas
+          ilustrações em outro produto.
+        </p>
+        <p>
+          O que <strong className="font-medium">você</strong> escreve continua
+          sendo seu. Se deixar um comentário, você nos autoriza a mostrá-lo no
+          mural junto da sua revelação — e pode pedir para tirar quando quiser.
+        </p>
+      </Secao>
+
+      <Secao titulo="O que não pode">
+        <p>
+          Automatizar acesso, raspar o site, tentar burlar o pagamento, revender
+          o serviço, ou usar o canal de contato para enviar conteúdo ilegal.
+          Nessas situações podemos suspender o acesso — avisando por e-mail e
+          devolvendo o que for devido.
+        </p>
+      </Secao>
+
+      <Secao titulo="Responsabilidade">
+        <p>
+          Fazemos o possível para o site funcionar e as entregas acontecerem, mas
+          não garantimos disponibilidade ininterrupta — servidor cai, fornecedor
+          falha, internet oscila. Se a entrega não acontecer, reprocessamos ou
+          devolvemos o dinheiro.
+        </p>
+        <p>
+          O que não assumimos é responsabilidade por decisões que você tomar a
+          partir de uma leitura simbólica. É para isso que a primeira seção desta
+          página existe.
+        </p>
+      </Secao>
+
+      <Secao titulo="Lei e foro">
+        <p>
+          Valem as leis brasileiras. Sendo relação de consumo, você pode
+          processar no foro do seu domicílio, como o CDC garante.
+        </p>
+      </Secao>
+    </PaginaLegal>
   );
 }
