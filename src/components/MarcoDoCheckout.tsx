@@ -16,14 +16,25 @@ import { evento } from '@/lib/pixel';
  * O mesmo instante alimenta o `InitiateCheckout` do Pixel, com o valor real
  * já com cupom aplicado — é o que deixa o Ads Manager otimizar por valor, não
  * só por contagem de evento.
+ *
+ * `eventId` segue a convenção de `scripts/backfill-pixel.ts`
+ * (`${pedidoId}:checkout`) — é o que permite este disparo do navegador e um
+ * futuro envio via Conversions API do MESMO evento serem deduplicados pela
+ * Meta em vez de contados duas vezes (ver o comentário em `lib/pixel.ts`).
  */
-export function MarcoDoCheckout({ valorEmReais }: { valorEmReais?: number }) {
+export function MarcoDoCheckout({
+  pedidoId,
+  valorEmReais,
+}: {
+  pedidoId: string;
+  valorEmReais?: number;
+}) {
   const marcou = useRef(false);
   useEffect(() => {
     if (marcou.current) return;
     marcou.current = true;
     marcar('checkout_aberto');
-    evento('InitiateCheckout', { value: valorEmReais, currency: 'BRL' });
-  }, [valorEmReais]);
+    evento('InitiateCheckout', { value: valorEmReais, currency: 'BRL' }, `${pedidoId}:checkout`);
+  }, [pedidoId, valorEmReais]);
   return null;
 }

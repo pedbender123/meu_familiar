@@ -12,6 +12,11 @@ import { evento } from '@/lib/pixel';
  * inclusive dias depois, para reler ou mostrar para alguém. Sem uma trava que
  * sobrevive a um recarregamento de página, cada visita reportaria uma nova
  * compra para o Ads Manager e inflaria o valor de conversão real.
+ *
+ * `eventId: ${pedidoId}:purchase` bate com o que `src/lib/fila-capi.ts` manda
+ * pro Conversions API no instante em que o webhook confirma o pagamento —
+ * sem ele, quem visita esta página LOGADA logo depois de pagar faria a Meta
+ * contar a mesma compra duas vezes (navegador + servidor).
  */
 export function MarcaCompra({
   pedidoId,
@@ -34,7 +39,7 @@ export function MarcaCompra({
       // que nunca contar a compra.
     }
 
-    evento('Purchase', { value: valorEmReais, currency: 'BRL' });
+    evento('Purchase', { value: valorEmReais, currency: 'BRL' }, `${pedidoId}:purchase`);
   }, [pedidoId, valorEmReais]);
 
   return null;

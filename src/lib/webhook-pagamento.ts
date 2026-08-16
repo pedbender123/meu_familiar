@@ -9,6 +9,7 @@ import { calcularExpiracao, produtoDe } from './produtos';
 import { aposPagamento } from './processar';
 import { checarEmLinha } from '../nucleo/sentinela/emLinha';
 import { checarValorCobrado } from '../nucleo/sentinela/invariantes/financeiro';
+import { enfileirarEventoCapi } from './fila-capi';
 
 export type DesfechoNotificacao =
   | 'nao_libera_acesso'
@@ -91,6 +92,31 @@ export async function processarNotificacaoDePagamento(
   // se o valor bate com produto e cupom (docs/reestruturacao.md §5). Falha
   // aberto — nunca atrasa nem derruba a entrega.
   checarEmLinha('valor_cobrado', () => checarValorCobrado(buscarPedido(pedido.id)!));
+
+  /**
+   * Disciplina 6: "o pixel nunca depende do navegador". Enfileira aqui — não
+   * manda direto — porque enfileirar é uma escrita local rápida (nunca toca
+   * a Meta) e este handler precisa responder rápido ao Mercado Pago; quem
+   * fala com a rede é `processarFilaCapi()`, à parte (`npm run capi`).
+   *
+   * `eventId: ${pedido.id}:purchase` é a MESMA chave que `MarcaCompra.tsx`
+   * manda pro pixel do navegador — é o que deixa a Meta deduplicar os dois
+   * em vez de contar a venda duas vezes.
+   *
+   * Só enfileira com o pixel configurado: sem `NEXT_PUBLIC_META_PIXEL_ID` (dev,
+   * ou enquanto a chave não chega) a fila acumularia eventos que nunca vão
+   * sair e a Sentinela acabaria gritando falso alarme de "falhou definitivo".
+   */
+  if (process.env.NEXT_PUBLIC_META_PIXEL_ID) {
+    enfileirarEventoCapi({
+      pedidoId: pedido.id,
+      nome: 'Purchase',
+      quando: pagoEm,
+      email: pedido.email || undefined,
+      valorEmReais: resultado.brutoCentavos !== null ? resultado.brutoCentavos / 100 : undefined,
+      eventId: `${pedido.id}:purchase`,
+    });
+  }
 
   // Sem `await` de propósito — ver o comentário em `ResultadoNotificacao.entrega`.
   const entrega = aposPagamento(pedido.id);

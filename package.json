@@ -19,7 +19,8 @@
     "backup": "tsx scripts/backup.ts",
     "migrar": "tsx scripts/migrar.ts",
     "ensaio": "tsx scripts/ensaio.ts",
-    "sentinela": "tsx scripts/sentinela.ts"
+    "sentinela": "tsx scripts/sentinela.ts",
+    "capi": "tsx scripts/processar-fila-capi.ts"
   },
   "dependencies": {
     "@google/genai": "^2.16.0",

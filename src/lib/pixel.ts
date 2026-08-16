@@ -21,11 +21,29 @@ declare global {
  * Sem `NEXT_PUBLIC_META_PIXEL_ID` configurado (dev, ou enquanto a chave não
  * chega), o script base nunca é injetado — chamar `fbq` quebraria a página
  * para todo mundo em vez de só deixar de contar um evento.
+ *
+ * ── `eventId` e a dedupe com o Conversions API ────────────────────────────
+ *
+ * `src/lib/capi.ts` manda o MESMO evento de servidor pra servidor, com
+ * `event_id` no formato `${pedidoId}:purchase` / `${pedidoId}:checkout`
+ * (mesma convenção usada por `scripts/backfill-pixel.ts`) — e a Meta só
+ * deduplica quando o `eventID` do navegador bate com o `event_id` do CAPI.
+ * Chamar `evento()` sem passar `eventId` nos eventos que também passam pelo
+ * CAPI conta a MESMA compra duas vezes no Ads Manager. `Lead`, que não tem
+ * contraparte no CAPI hoje, pode continuar sem.
  */
-export function evento(nome: string, params?: Record<string, unknown>): void {
+export function evento(
+  nome: string,
+  params?: Record<string, unknown>,
+  eventId?: string
+): void {
   if (typeof window === 'undefined' || typeof window.fbq !== 'function') return;
   try {
-    window.fbq('track', nome, params);
+    if (eventId) {
+      window.fbq('track', nome, params, { eventID: eventId });
+    } else {
+      window.fbq('track', nome, params);
+    }
   } catch {
     /* telemetria nunca quebra a página */
   }
