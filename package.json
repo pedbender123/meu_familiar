@@ -17,7 +17,8 @@
     "aether": "tsx scripts/aether.ts",
     "backfill-pixel": "tsx scripts/backfill-pixel.ts",
     "backup": "tsx scripts/backup.ts",
-    "migrar": "tsx scripts/migrar.ts"
+    "migrar": "tsx scripts/migrar.ts",
+    "ensaio": "tsx scripts/ensaio.ts"
   },
   "dependencies": {
     "@google/genai": "^2.16.0",

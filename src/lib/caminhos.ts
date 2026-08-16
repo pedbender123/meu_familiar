@@ -19,7 +19,15 @@ export const FONTES = path.join(ASSETS, 'fonts');
 export const FAMILIARES_PNG = path.join(ASSETS, 'familiares');
 export const LUAS_PNG = path.join(ASSETS, 'luas');
 
-export const DADOS = path.join(RAIZ, 'var', 'data');
+/**
+ * `BRUXARIO_DIR_DADOS` deixa apontar `var/data` para uma cópia isolada — é o
+ * que faz `npm run ensaio` (docs/reestruturacao.md, Fase 0) funcionar: sobe
+ * o mesmo código, mesmas migrações, lendo de um banco que é uma cópia, nunca
+ * o de produção. Ausente, cai no caminho de sempre.
+ */
+export const DADOS = process.env.BRUXARIO_DIR_DADOS
+  ? path.resolve(process.env.BRUXARIO_DIR_DADOS)
+  : path.join(RAIZ, 'var', 'data');
 export const BANCO = path.join(DADOS, 'bruxario.db');
 export const PEDIDOS = path.join(RAIZ, 'var', 'storage', 'orders');
 export const BACKUPS = path.join(RAIZ, 'var', 'backups');
