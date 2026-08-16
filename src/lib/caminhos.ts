@@ -22,6 +22,7 @@ export const LUAS_PNG = path.join(ASSETS, 'luas');
 export const DADOS = path.join(RAIZ, 'var', 'data');
 export const BANCO = path.join(DADOS, 'bruxario.db');
 export const PEDIDOS = path.join(RAIZ, 'var', 'storage', 'orders');
+export const BACKUPS = path.join(RAIZ, 'var', 'backups');
 
 export const CONTEUDO = path.join(RAIZ, 'conteudo');
 export const ENV = path.join(RAIZ, '.env');
