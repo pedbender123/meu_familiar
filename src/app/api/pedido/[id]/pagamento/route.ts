@@ -5,7 +5,7 @@ import {
   pagamentoEhFake,
   statusLiberaAcesso,
   type FormDataBrick,
-} from '@/lib/pagamento';
+} from '@/nucleo/checkouts/mercadopago';
 import { calcularExpiracao, produtoDe } from '@/lib/produtos';
 import { aposPagamento } from '@/lib/processar';
 import { excedeuLimite, LIMITES } from '@/lib/rate-limit';

@@ -1,7 +1,7 @@
 import { MercadoPagoConfig, Payment, PaymentRefund } from 'mercadopago';
 import { randomUUID } from 'crypto';
-import { type Produto } from './produtos';
-import { precoComDesconto } from './cupons';
+import { type Produto } from '../../lib/produtos';
+import { precoComDesconto } from '../../lib/cupons';
 
 /**
  * Mercado Pago via **Payment Brick** (SPEC 0.5 e 10.1, travado).

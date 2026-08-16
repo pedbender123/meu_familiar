@@ -1,6 +1,6 @@
 import { notFound, redirect } from 'next/navigation';
 import { buscarPedido } from '@/lib/db';
-import { chavePublica, modoAtual, pagamentoEhFake } from '@/lib/pagamento';
+import { chavePublica, modoAtual, pagamentoEhFake } from '@/nucleo/checkouts/mercadopago';
 import { produtoDe } from '@/lib/produtos';
 import { precoDoPedido } from '@/lib/cupons';
 import { CheckoutMercadoPago } from '@/components/CheckoutMercadoPago';

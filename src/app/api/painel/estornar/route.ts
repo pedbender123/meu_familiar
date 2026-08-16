@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { buscarPedido, atualizarPedido, registrarEvento } from '@/lib/db';
-import { pagamento } from '@/lib/pagamento';
+import { pagamento } from '@/nucleo/checkouts/mercadopago';
 import { sessaoAtual } from '@/lib/sessao-servidor';
 
 /**

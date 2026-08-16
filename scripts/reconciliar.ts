@@ -12,7 +12,7 @@ import { carregarEnv } from '../src/lib/carregar-env';
 carregarEnv();
 
 import { reconciliarPeriodo } from '../src/nucleo/reconciliacao';
-import { modoAtual } from '../src/lib/pagamento';
+import { modoAtual } from '../src/nucleo/checkouts/mercadopago';
 
 const argHoras = process.argv.find((a) => a.startsWith('--horas='))?.split('=')[1];
 const horas = argHoras ? Number(argHoras) : 48;

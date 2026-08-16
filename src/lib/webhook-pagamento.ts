@@ -4,7 +4,7 @@ import {
   atualizarPedido,
   registrarEvento,
 } from './db';
-import { statusLiberaAcesso, type ResultadoPagamento } from './pagamento';
+import { statusLiberaAcesso, type ResultadoPagamento } from '../nucleo/checkouts/mercadopago';
 import { calcularExpiracao, produtoDe } from './produtos';
 import { aposPagamento } from './processar';
 import { checarEmLinha } from '../nucleo/sentinela/emLinha';

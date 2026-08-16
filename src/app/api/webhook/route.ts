@@ -3,7 +3,7 @@ import {
   WebhookSignatureValidator,
   InvalidWebhookSignatureError,
 } from 'mercadopago';
-import { pagamento, segredoDoWebhook } from '@/lib/pagamento';
+import { pagamento, segredoDoWebhook } from '@/nucleo/checkouts/mercadopago';
 import { processarNotificacaoDePagamento } from '@/lib/webhook-pagamento';
 
 /**

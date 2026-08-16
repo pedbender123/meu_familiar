@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { montarCorpo } from './pagamento';
-import { PRODUTOS } from './produtos';
+import { montarCorpo } from './mercadopago';
+import { PRODUTOS } from '../../lib/produtos';
 
 /**
  * O corpo que sai para o Mercado Pago.

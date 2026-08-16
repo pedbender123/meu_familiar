@@ -4,7 +4,7 @@ import { randomUUID } from 'crypto';
 import db, { criarPedido, buscarPedido, atualizarPedido } from '../lib/db';
 import { reconciliarPeriodo } from './reconciliacao';
 import { anomaliasAbertas } from './sentinela/registrar';
-import type { PagamentoResumido, ResultadoPagamento } from '../lib/pagamento';
+import type { PagamentoResumido, ResultadoPagamento } from './checkouts/mercadopago';
 
 function novoPedido(): string {
   const id = randomUUID();

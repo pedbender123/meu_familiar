@@ -1,5 +1,5 @@
 import { buscarPedido, buscarPedidoPorPagamentoId } from '../lib/db';
-import { pagamento } from '../lib/pagamento';
+import { pagamento } from './checkouts/mercadopago';
 import { processarNotificacaoDePagamento } from '../lib/webhook-pagamento';
 import { checarEmLinha } from './sentinela/emLinha';
 

@@ -7,7 +7,7 @@ import {
   segredoDoWebhook,
   pagamentoEhFake,
   conferirCoerencia,
-} from './pagamento';
+} from './mercadopago';
 
 /**
  * A troca entre teste e produção é a lógica onde um erro custa dinheiro nos

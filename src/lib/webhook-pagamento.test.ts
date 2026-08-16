@@ -4,7 +4,7 @@ import { randomUUID } from 'crypto';
 import db, { criarPedido, buscarPedido, atualizarPedido } from './db';
 import { processarPedido } from './processar';
 import { processarNotificacaoDePagamento } from './webhook-pagamento';
-import type { ResultadoPagamento } from './pagamento';
+import type { ResultadoPagamento } from '../nucleo/checkouts/mercadopago';
 import type { ProdutoId } from './produtos';
 import { anomaliasAbertas } from '../nucleo/sentinela/registrar';
 
