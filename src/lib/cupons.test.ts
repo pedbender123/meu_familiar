@@ -1,7 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PISO_COBRAVEL_CENTAVOS, normalizarCodigo, precoComDesconto } from './cupons';
-import { PRODUTOS } from './produtos';
+import { PRODUTOS, type Produto } from './produtos';
+
+/**
+ * Um produto de preço FIXO só para estes testes.
+ *
+ * Usar `DE_980` acoplava a matemática do desconto ao preço
+ * comercial — quando a Revelação virou grátis (agosto/2026), meia dúzia de
+ * testes de arredondamento quebrou sem que nada de arredondamento tivesse
+ * mudado. O que se testa aqui é a CONTA, não a tabela de preços.
+ */
+const DE_980: Produto = { ...PRODUTOS.completa, precoCentavos: 980 };
 
 /**
  * Estes testes protegem a única coisa aqui que é irreversível: o valor
@@ -23,7 +33,7 @@ test('normalizar não deixa passar código vazio disfarçado', () => {
 
 test('20% da Revelação arredonda a favor de quem compra', () => {
   // 980 × 0,8 = 784 exato. Um caso sem ambiguidade, para ancorar.
-  const p = precoComDesconto(PRODUTOS.revelacao, 20);
+  const p = precoComDesconto(DE_980, 20);
   assert.equal(p.finalCentavos, 784);
   assert.equal(p.gratis, false);
 });
@@ -57,7 +67,7 @@ test('100% é grátis em todos os produtos', () => {
 test('valor abaixo do piso vira grátis em vez de cobrança recusada', () => {
   // O gateway recusa centavos soltos. Se este comportamento sumir, a pessoa vê
   // uma tela de erro no lugar do produto — que é pior que dar de graça.
-  const p = precoComDesconto(PRODUTOS.revelacao, 95); // 980 → 49
+  const p = precoComDesconto(DE_980, 95); // 980 → 49
   assert.ok(49 < PISO_COBRAVEL_CENTAVOS);
   assert.equal(p.gratis, true);
   assert.equal(p.finalCentavos, 0);
@@ -78,14 +88,20 @@ test('nunca existe cobrança entre zero e o piso', () => {
 test('percentual fora da faixa é contido, não explode nem inverte o preço', () => {
   // Um valor negativo vindo de dado corrompido não pode virar acréscimo, e um
   // acima de 100 não pode virar preço negativo.
-  assert.equal(precoComDesconto(PRODUTOS.revelacao, -50).finalCentavos, 980);
-  assert.equal(precoComDesconto(PRODUTOS.revelacao, 999).finalCentavos, 0);
-  assert.equal(precoComDesconto(PRODUTOS.revelacao, 0).finalCentavos, 980);
+  assert.equal(precoComDesconto(DE_980, -50).finalCentavos, 980);
+  assert.equal(precoComDesconto(DE_980, 999).finalCentavos, 0);
+  assert.equal(precoComDesconto(DE_980, 0).finalCentavos, 980);
 });
 
 test('sem cupom, o preço é exatamente o de tabela', () => {
   for (const produto of Object.values(PRODUTOS)) {
     assert.equal(precoComDesconto(produto).finalCentavos, produto.precoCentavos);
-    assert.equal(precoComDesconto(produto).gratis, false);
+    // `gratis` acompanha o preço, e desde que a Revelação virou grátis
+    // (agosto/2026) há produto de tabela com preço zero — ele TEM que sair
+    // marcado como grátis, senão iria parar no gateway, que recusa R$ 0,00.
+    assert.equal(
+      precoComDesconto(produto).gratis,
+      produto.precoCentavos < PISO_COBRAVEL_CENTAVOS
+    );
   }
 });

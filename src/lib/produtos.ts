@@ -86,7 +86,19 @@ export const PRODUTOS: Record<ProdutoId, Produto> = {
   revelacao: {
     id: 'revelacao',
     nome: 'Revelação',
-    precoCentavos: 980,
+    /**
+     * **Zero, desde agosto/2026.** A Revelação deixou de ser o produto e
+     * virou a porta: quem faz o ritual descobre o familiar de graça, cria
+     * conta, e o que se vende passa a ser a plataforma (Oráculo, Calendário,
+     * relatório completo) por assinatura.
+     *
+     * O caminho de preço zero já existia para o cupom de 100% — ver
+     * `api/pedido/[id]/escolher`: preço zero não passa pelo gateway, porque
+     * mandar R$ 0,00 ao Mercado Pago não é "grátis", é uma cobrança recusada.
+     * Quem já pagou os R$ 9,80 não perde nada: `direitosLegados` lê as flags
+     * do produto, nunca o preço.
+     */
+    precoCentavos: 0,
     descricao: 'Revelação do seu familiar, em PDF e imagens',
     tipo: 'principal',
     diasDeLinkPublico: DIAS_DE_LINK_PUBLICO,

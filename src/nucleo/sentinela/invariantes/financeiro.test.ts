@@ -14,7 +14,7 @@ function pedido(sobrescreve: Partial<Pedido> = {}): Pedido {
     lua: 'cheia',
     signo_sol: null,
     signo_lua: null,
-    produto: 'revelacao',
+    produto: 'completa',
     perfil_json: null,
     desempatado_pela_pessoa: 0,
     expira_em: null,
@@ -69,8 +69,8 @@ test('checarValorCobrado: valor batendo com o preço de tabela, sem cupom, passa
   const p = pedido({
     pago_em: '2026-01-01T00:00:00.000Z',
     status: 'pago',
-    produto: 'revelacao',
-    bruto_centavos: 980, // preço de tabela da Revelação
+    produto: 'completa',
+    bruto_centavos: 1890, // preço de tabela da Completa
   });
   assert.equal(checarValorCobrado(p), null);
 });
@@ -79,10 +79,10 @@ test('checarValorCobrado: valor batendo com desconto de cupom aplicado, passa', 
   const p = pedido({
     pago_em: '2026-01-01T00:00:00.000Z',
     status: 'pago',
-    produto: 'revelacao',
+    produto: 'completa',
     cupom: 'AMIGA20',
     desconto_percentual: 20,
-    bruto_centavos: 784, // 980 * 0.8
+    bruto_centavos: 1512, // 1890 * 0.8
   });
   assert.equal(checarValorCobrado(p), null);
 });
@@ -121,7 +121,7 @@ test('checarValorCobrado: cupom de 100% dispensa o gateway — bruto null é o E
   const p = pedido({
     pago_em: '2026-01-01T00:00:00.000Z',
     status: 'pago',
-    produto: 'revelacao',
+    produto: 'completa',
     cupom: 'GRATIS100',
     desconto_percentual: 100,
     bruto_centavos: null,
@@ -133,10 +133,10 @@ test('checarValorCobrado: pedido "grátis" que MESMO ASSIM foi cobrado é anomal
   const p = pedido({
     pago_em: '2026-01-01T00:00:00.000Z',
     status: 'pago',
-    produto: 'revelacao',
+    produto: 'completa',
     cupom: 'GRATIS100',
     desconto_percentual: 100,
-    bruto_centavos: 980, // cobrou o preço cheio de um pedido que devia ser grátis
+    bruto_centavos: 1890, // cobrou o preço cheio de um pedido que devia ser grátis
   });
   const anomalia = checarValorCobrado(p);
   assert.ok(anomalia, 'cobrar de um pedido marcado como 100% de desconto é anomalia');

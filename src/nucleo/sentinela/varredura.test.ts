@@ -16,7 +16,7 @@ function novoPedido(): string {
     lua: 'cheia',
     signo_sol: 'Touro',
     signo_lua: 'Touro',
-    produto: 'revelacao',
+    produto: 'completa',
   });
   return id;
 }
@@ -31,7 +31,7 @@ test('varredura não acusa nada num banco saudável', () => {
   atualizarPedido(id, {
     status: 'pago',
     pago_em: new Date().toISOString(),
-    bruto_centavos: 980,
+    bruto_centavos: 1890,
   });
 
   const { verificados } = varrerPedidos();

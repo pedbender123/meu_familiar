@@ -21,8 +21,7 @@ import { ITENS } from './quiz/itens';
 import { produtoDe } from './produtos';
 import { DESCRICAO_DOS_EIXOS, type Eixo } from './quiz/eixos';
 import { FAMILIARES as TODOS } from './familiares';
-import { interruptorLigado } from './interruptores';
-import { criarAssinatura } from '../nucleo/assinaturas';
+import { criarAssinatura, assinaturasAtivasDaConta } from '../nucleo/assinaturas';
 
 /**
  * Traduz o perfil numérico para PALAVRAS antes de mandar ao Gemini.
@@ -318,28 +317,32 @@ export async function processarPedido(pedidoId: string): Promise<void> {
       registrarEvento(contaNova ? 'conta_criada' : 'conta_acesso_enviado', pedidoId);
 
       /**
-       * Fase 2 de docs/reestruturacao.md: escrita dupla, atrás de
-       * interruptor DESLIGADO por padrão (disciplina 3) — sem ninguém ligar
-       * `assinaturas_escrita_dupla` no banco, esta chamada não faz nada.
-       * Cria a assinatura equivalente ao pedido, pro núcleo novo (acesso.ts)
-       * poder ser comparado em sombra contra produtos.ts sem decidir nada
-       * ainda. Nunca pode atrapalhar a entrega: falha aqui só loga.
+       * **Todo mundo que entra ganha o plano gratuito.**
+       *
+       * Desde que a Revelação virou grátis (agosto/2026), completar o ritual
+       * é a porta de entrada da plataforma, não uma compra. A assinatura
+       * `gratuito` é o que liga a tiragem do dia, a semana do calendário e a
+       * primeira leitura do Oráculo — sem ela a pessoa entraria numa casa de
+       * cômodos todos trancados.
+       *
+       * `assinaturasAtivasDaConta` antes de criar: quem já assina não pode
+       * ser rebaixado por refazer o ritual, e o webhook pode repetir. Falha
+       * aqui só loga — nunca pode atrapalhar a entrega.
        */
-      if (interruptorLigado('assinaturas_escrita_dupla', conta.id)) {
-        try {
+      try {
+        if (assinaturasAtivasDaConta(conta.id).length === 0) {
           criarAssinatura({
             contaId: conta.id,
-            planoId: produto.id,
+            planoId: 'gratuito',
             pedidoId,
             inicio: new Date(),
-            fim: null, // hoje o acesso da dona nunca expira — ver produtos.ts
           });
-        } catch (erroAssinatura) {
-          console.error(
-            `[processarPedido] escrita dupla de assinatura falhou no ${pedidoId}:`,
-            erroAssinatura
-          );
         }
+      } catch (erroAssinatura) {
+        console.error(
+          `[processarPedido] assinatura gratuita falhou no ${pedidoId}:`,
+          erroAssinatura
+        );
       }
     } catch (erroConta) {
       console.error(`[processarPedido] conta falhou no pedido ${pedidoId}:`, erroConta);
