@@ -498,6 +498,9 @@ O direito controla o alcance: `"mes"` mostra o mês e borra o resto, `"ano"` abr
 
 ---
 
+> **Fases 8 e 9 têm documento próprio: `docs/oraculo.md`** — espetáculos,
+> resposta estruturada, variações de dia de ouro e ordem de construção.
+
 ### Fase 8 · Oráculo — dúvida rápida
 O chat liga, com cota de duas travas valendo. Barato de propósito: mede uso real e
 calibra a cota do conselho antes do caro existir.
