@@ -65,6 +65,17 @@ export interface Direitos {
    */
   perguntasOraculoPorDia: number;
 
+  /**
+   * As **leituras** — o ritual longo, com espetáculos (ver `docs/oraculo.md`).
+   *
+   * Moeda separada de `perguntasOraculo` de propósito: são dois produtos
+   * diferentes com dois custos diferentes. A mensagem é barata e diária; a
+   * leitura é rara, cerimoniosa e é o que justifica o preço. Se as duas
+   * dividissem a mesma cota, a pessoa gastaria tudo em mensagem e nunca
+   * veria o que o plano tem de melhor.
+   */
+  leiturasPorMes: number;
+
   /** Conselho todo dia (Acompanhamento) contra semanal (o resto). */
   conselhoDiario: boolean;
 
@@ -91,6 +102,7 @@ export const SEM_DIREITOS: Direitos = {
   oraculoNaHora: false,
   alcanceCalendario: 'nenhum',
   perguntasOraculoPorDia: 0,
+  leiturasPorMes: 0,
   conselhoDiario: false,
   guiaPorEmail: false,
 };
@@ -123,6 +135,7 @@ export function unirDireitos(varios: Direitos[]): Direitos {
         ? acc.alcanceCalendario
         : d.alcanceCalendario,
     perguntasOraculoPorDia: Math.max(acc.perguntasOraculoPorDia, d.perguntasOraculoPorDia),
+    leiturasPorMes: Math.max(acc.leiturasPorMes, d.leiturasPorMes),
     conselhoDiario: acc.conselhoDiario || d.conselhoDiario,
     guiaPorEmail: acc.guiaPorEmail || d.guiaPorEmail,
   }));
