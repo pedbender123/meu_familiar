@@ -14,10 +14,11 @@ import m012 from './012_cortesia_para_quem_comprou';
 import m013 from './013_hora_aproximada';
 import m014 from './014_consumo';
 import m015 from './015_cotas_de_leitura';
+import m016 from './016_leituras';
 
 /**
  * A ordem de execução. Só se acrescenta ao fim — nunca reordena, nunca edita
  * uma migração já aplicada em produção. Uma migração errada se corrige com
  * uma migração nova que desfaz o efeito, não editando a antiga.
  */
-export const MIGRACOES: Migracao[] = [m001, m002, m003, m004, m005, m006, m007, m008, m009, m010, m011, m012, m013, m014, m015];
+export const MIGRACOES: Migracao[] = [m001, m002, m003, m004, m005, m006, m007, m008, m009, m010, m011, m012, m013, m014, m015, m016];

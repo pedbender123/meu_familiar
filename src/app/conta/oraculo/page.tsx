@@ -1,29 +1,24 @@
 import db from '@/lib/db';
 import { sessaoAtual } from '@/lib/sessao-servidor';
 import { buscarConta } from '@/lib/autenticacao';
-import { direitosEfetivos } from '@/nucleo/acesso';
+import { estadoDaCota } from '@/nucleo/consumo';
+import { voltaDoDia, voltaDoMes } from '@/nucleo/reset-da-cota';
 import { FAMILIARES, type FamiliarId } from '@/lib/familiares';
 import { ConversaDoOraculo } from '@/plataforma/ConversaDoOraculo';
+import type { Cota } from '@/plataforma/oraculo/PainelDeCotas';
 
 /**
- * O Oráculo — a casca de pé (Fase 5), o cérebro ainda não (Fase 8).
+ * O Oráculo.
  *
- * SPEC 0.5.1: nenhum "em breve", nenhum cadeado, nenhum campo desabilitado.
- * A pessoa escreve de verdade; quem responde que ainda não é hora é o próprio
- * familiar, na voz dele. Ver `ConversaDoOraculo`.
+ * As cotas são lidas aqui e descem prontas: a tela precisa delas para decidir
+ * o que fica clicável antes de qualquer requisição — botão que só descobre
+ * que não tem cota depois de clicar é o jeito de fazer a pessoa bater no
+ * limite em vez de administrar ele.
  */
 export default async function Oraculo() {
   const sessao = await sessaoAtual();
-
-  /**
-   * O layout já barra quem não tem sessão, mas em Next 16 layout e página
-   * renderizam **em paralelo** — o `redirect()` de lá acontece, e mesmo assim
-   * o corpo daqui executa uma vez com `sessao` nula. Sem esta saída, todo
-   * acesso deslogado lança `Cannot read properties of null` no servidor:
-   * a pessoa é redirecionada do mesmo jeito, mas o log enche de erro e um
-   * problema de verdade passa despercebido no meio.
-   */
   if (!sessao) return null;
+
   const conta = buscarConta(sessao.email);
 
   const ultima = db
@@ -39,14 +34,36 @@ export default async function Oraculo() {
     ? JSON.parse(ultima.leitura_json).nome_secreto
     : null;
 
-  const cota = conta
-    ? direitosEfetivos(conta.id, sessao.email).perguntasOraculo
-    : 0;
+  const dia = voltaDoDia();
+  const mes = voltaDoMes();
+
+  function montar(recurso: 'mensagem' | 'leitura'): Cota {
+    const vazia: Cota = {
+      disponivel: 0,
+      tetoMensal: 0,
+      restanteNoMes: 0,
+      restanteHoje: 0,
+      voltaDoDia: dia.texto,
+      voltaDoMes: mes.texto,
+    };
+    if (!conta) return vazia;
+
+    const estado = estadoDaCota(conta.id, sessao!.email, recurso);
+    return {
+      disponivel: estado.disponivel,
+      tetoMensal: estado.tetoMensal,
+      restanteNoMes: estado.restanteNoMes,
+      restanteHoje: estado.restanteHoje,
+      voltaDoDia: dia.texto,
+      voltaDoMes: mes.texto,
+    };
+  }
 
   return (
     <ConversaDoOraculo
       nomeDoFamiliar={nomeSecreto ?? familiar?.nome ?? 'Seu familiar'}
-      cota={cota}
+      cotaDeMensagens={montar('mensagem')}
+      cotaDeLeituras={montar('leitura')}
     />
   );
 }
