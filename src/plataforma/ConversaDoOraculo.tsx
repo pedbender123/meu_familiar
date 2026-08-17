@@ -59,19 +59,20 @@ export function ConversaDoOraculo({
   }
 
   return (
-    <div className="w-full max-w-2xl flex flex-col flex-1 min-h-0">
-      <div className="flex-1 flex flex-col gap-5 overflow-y-auto py-6">
+    <div className="w-full max-w-xl flex flex-col flex-1 min-h-0">
+      <div className="flex-1 flex flex-col gap-6 overflow-y-auto py-2">
         {falas.length === 0 && (
-          <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center px-6">
-            <p className="font-corpo text-[0.62rem] tracking-[0.24em] uppercase text-pergaminho/35">
-              O Oráculo
+          <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center px-2">
+            <p className="font-corpo text-[0.62rem] tracking-[0.26em] uppercase text-escrita-fraca">
+              Capítulo III · Oráculo
             </p>
-            <p className="font-display italic text-xl sm:text-2xl leading-relaxed text-pergaminho/80 max-w-[30ch]">
+            <p className="font-display italic text-xl sm:text-2xl leading-relaxed text-escrita max-w-[28ch]">
               {nomeDoFamiliar} está escutando.
             </p>
-            <p className="font-corpo font-light text-sm text-pergaminho/45 max-w-[34ch] leading-relaxed">
+            <hr className="w-24 h-px border-0 bg-gradient-to-r from-transparent via-escrita/30 to-transparent" />
+            <p className="font-corpo font-light text-sm text-escrita-fraca max-w-[32ch] leading-relaxed">
               {cota > 0
-                ? `Você tem ${cota} consulta${cota > 1 ? 's' : ''} guardada${cota > 1 ? 's' : ''} aqui.`
+                ? `Você tem ${cota} consulta${cota > 1 ? 's' : ''} guardada${cota > 1 ? 's' : ''} nesta página.`
                 : 'Pergunte o que quiser. Ele guarda tudo que você trouxer.'}
             </p>
           </div>
@@ -79,18 +80,23 @@ export function ConversaDoOraculo({
 
         {falas.map((fala, i) =>
           fala.de === 'pessoa' ? (
+            /*
+              A pergunta é a letra de quem escreve NO livro — anotação à mão na
+              margem, alinhada à direita e sublinhada pelo traço de tinta. Balão
+              de chat aqui quebraria a ilusão na hora.
+            */
             <p
               key={i}
-              className="self-end max-w-[80%] font-corpo font-light text-sm leading-relaxed text-pergaminho/85 bg-pergaminho/[0.07] rounded-2xl rounded-br-md px-4 py-3"
+              className="self-end max-w-[82%] text-right font-ritual text-2xl leading-snug text-ouro-profundo/90 border-b border-ouro-velho/25 pb-2"
             >
               {fala.texto}
             </p>
           ) : (
-            <div key={i} className="self-start max-w-[85%] flex flex-col gap-1.5">
-              <span className="font-corpo text-[0.58rem] tracking-[0.2em] uppercase text-violeta/70">
+            <div key={i} className="self-start max-w-[92%] flex flex-col gap-1.5">
+              <span className="font-corpo text-[0.55rem] tracking-[0.22em] uppercase text-escrita-fraca">
                 {nomeDoFamiliar}
               </span>
-              <TextoEscrito className="font-display italic text-lg leading-relaxed text-pergaminho/75">
+              <TextoEscrito className="font-display italic text-lg leading-relaxed text-escrita">
                 {fala.texto}
               </TextoEscrito>
             </div>
@@ -100,13 +106,17 @@ export function ConversaDoOraculo({
       </div>
 
       {/*
-        O composer é fixo no fim da coluna, não `position: fixed` — barra fixa
-        briga com o teclado do iOS e com a barra do Safari, e o resultado é
-        campo escondido na hora exata de digitar.
+        O composer é sticky no fim da coluna, não `position: fixed` — barra
+        fixa briga com o teclado do iOS e com a barra do Safari, e o resultado
+        é campo escondido na hora exata de digitar.
       */}
       <form
         onSubmit={enviar}
-        className="sticky bottom-0 flex items-end gap-2 py-3 bg-gradient-to-t from-quarto via-quarto to-transparent"
+        className="sticky bottom-0 flex items-end gap-2 py-3"
+        style={{
+          background:
+            'linear-gradient(to top, var(--folha) 62%, rgba(231,220,196,0))',
+        }}
       >
         <textarea
           value={rascunho}
@@ -118,17 +128,17 @@ export function ConversaDoOraculo({
             }
           }}
           rows={1}
-          placeholder="Pergunte alguma coisa..."
+          placeholder="Escreva sua pergunta..."
           aria-label="Sua pergunta ao Oráculo"
-          className="flex-1 resize-none bg-pergaminho/[0.05] border border-pergaminho/15 rounded-2xl px-4 py-3 font-corpo font-light text-sm text-pergaminho placeholder:text-pergaminho/30 focus:outline-none focus:border-vela/40 transition-colors max-h-32"
+          className="flex-1 resize-none bg-transparent border-b border-escrita/25 px-1 py-2 font-ritual text-2xl text-ouro-profundo placeholder:text-escrita-fraca/50 placeholder:font-corpo placeholder:text-sm focus:outline-none focus:border-ouro-velho/60 transition-colors max-h-32"
         />
         <button
           type="submit"
           disabled={!rascunho.trim()}
           aria-label="Enviar"
-          className="shrink-0 w-11 h-11 rounded-full border border-vela/40 text-vela flex items-center justify-center hover:bg-vela/10 disabled:opacity-25 disabled:hover:bg-transparent transition-all"
+          className="shrink-0 w-10 h-10 rounded-full border border-ouro-velho/45 text-ouro-profundo flex items-center justify-center hover:bg-ouro-velho/10 disabled:opacity-25 disabled:hover:bg-transparent transition-all"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M5 12h14M13 6l6 6-6 6" />
           </svg>
         </button>

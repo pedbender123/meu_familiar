@@ -30,35 +30,46 @@ export default async function InicioDaConta() {
   const leitura = ultima?.leitura_json ? JSON.parse(ultima.leitura_json) : null;
 
   return (
-    <section className="w-full max-w-xl flex flex-col items-center gap-7 pt-8 sm:pt-16 text-center">
+    <section className="w-full max-w-lg flex flex-col items-center gap-7 pt-6 sm:pt-10 text-center">
+      <p className="font-corpo text-[0.62rem] tracking-[0.26em] uppercase text-escrita-fraca">
+        Capítulo I · Abertura
+      </p>
+
       {familiar ? (
         <>
-          <SigiloFamiliar sigilo={familiar.sigilo} tamanho={150} variante="quarto" />
+          <SigiloFamiliar sigilo={familiar.sigilo} tamanho={140} />
 
-          <div className="flex flex-col gap-2">
-            <h1 className="font-display italic text-3xl sm:text-4xl text-pergaminho text-balance">
+          <div className="flex flex-col gap-1.5">
+            <h1 className="font-display italic text-3xl sm:text-4xl text-escrita text-balance leading-tight">
               {familiar.nome}
-              {leitura?.nome_secreto && (
-                <span className="text-vela"> · {leitura.nome_secreto}</span>
-              )}
             </h1>
-            <p className="font-corpo font-light text-sm text-pergaminho/55">
+            {leitura?.nome_secreto && (
+              <p className="font-ritual text-3xl text-ouro-profundo leading-none">
+                {leitura.nome_secreto}
+              </p>
+            )}
+            <p className="font-corpo font-light text-sm text-escrita-fraca pt-1">
               está com você
             </p>
           </div>
 
-          <p className="font-display italic text-lg leading-relaxed text-pergaminho/70 max-w-[34ch]">
+          <hr className="w-24 h-px border-0 bg-gradient-to-r from-transparent via-escrita/30 to-transparent" />
+
+          <p className="font-display italic text-lg leading-relaxed text-escrita-corpo max-w-[32ch]">
             &ldquo;{leitura?.sussurro_final ?? 'Eu fico por aqui. Volte quando precisar.'}&rdquo;
           </p>
         </>
       ) : (
         <>
-          <h1 className="font-display italic text-3xl text-pergaminho text-balance max-w-[24ch]">
+          <h1 className="font-display italic text-3xl text-escrita text-balance max-w-[22ch] leading-tight">
             Seu Bruxário está aberto, mas ainda vazio.
           </h1>
+          <p className="font-corpo font-light text-sm text-escrita-fraca max-w-[32ch] leading-relaxed">
+            Nenhuma página foi escrita ainda. O ritual escreve a primeira.
+          </p>
           <Link
             href="/ritual"
-            className="bg-vela text-tinta font-corpo font-medium px-7 py-3.5 rounded-full hover:brightness-110 transition"
+            className="font-corpo text-sm px-7 py-3 rounded-full border border-ouro-velho/45 text-ouro-profundo hover:bg-ouro-velho/10 transition-colors"
           >
             Começar o ritual
           </Link>
