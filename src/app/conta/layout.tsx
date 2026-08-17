@@ -61,6 +61,12 @@ export default async function LayoutDaConta({
       liberado: direitos.tiragemDiaria,
       icone: 'horoscopo',
     },
+    /**
+     * Planos fica SEMPRE liberado, inclusive pra quem já assina: é por aqui
+     * que se renova (Pix não cobra sozinho) e que se sobe de plano. Item de
+     * upgrade escondido de assinante é renovação perdida.
+     */
+    { rotulo: 'Planos', rota: '/planos', liberado: true, icone: 'perfil' },
   ];
 
   return (

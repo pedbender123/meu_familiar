@@ -4,12 +4,6 @@ import { FolhaPergaminho } from '@/components/FolhaPergaminho';
 import { SigiloFamiliar } from '@/components/SigiloFamiliar';
 import { RodapeLegal } from '@/components/RodapeLegal';
 import { FAMILIARES, type FamiliarId } from '@/lib/familiares';
-import {
-  PRODUTOS,
-  PRODUTOS_PRINCIPAIS,
-  precoFormatado,
-  type Produto,
-} from '@/lib/produtos';
 import { TOTAL_DE_ITENS } from '@/lib/quiz/itens';
 import { DESCRICAO_DOS_EIXOS } from '@/lib/quiz/eixos';
 
@@ -246,97 +240,90 @@ function OQueAcontece() {
 /* ── os produtos ──────────────────────────────────────────────────────── */
 
 /**
- * SPEC 0.3: "o dobro do preço precisa ser legível na tela".
+ * O que é grátis e o que se paga.
  *
- * A tabela é gerada de `lib/produtos.ts`, então não existe o caso de a tela
- * prometer o que o backend não libera — se alguém tirar a roda dos 12 da
- * Completa no código, ela some daqui junto.
+ * ── Por que a tabela comparativa saiu ─────────────────────────────────────
+ *
+ * Ela comparava Revelação (R$ 9,80) com Completa (R$ 18,90) — duas compras
+ * avulsas. Desde agosto/2026 a Revelação é grátis e o que se vende é
+ * assinatura, então a tabela passou a comparar coisas que não existem mais.
+ *
+ * O que entra no lugar é mais simples de ler e mais honesto de vender: o que
+ * você leva sem pagar, e o que a assinatura abre. Os preços NÃO são
+ * repetidos aqui — quem quer valor vai em /planos, onde eles saem dos
+ * direitos reais dos planos. Preço escrito à mão em dois lugares é preço que
+ * um dia diverge.
  */
-const LINHAS: { rotulo: string; de: (p: Produto) => boolean | string }[] = [
-  { rotulo: 'Seu familiar e a leitura', de: () => true },
-  { rotulo: 'PDF e imagens pra compartilhar', de: (p) => p.pdf && p.imagens },
-  {
-    // O que expira é o link PÚBLICO, não o acesso da dona (ver produtos.ts):
-    // ela continua lendo o dela pela conta, para sempre.
-    rotulo: 'Quanto tempo o link público dura',
-    de: (p) =>
-      p.diasDeLinkPublico === null
-        ? 'para sempre'
-        : `${p.diasDeLinkPublico} dias`,
-  },
-  { rotulo: 'Leitura que vai mais fundo', de: (p) => p.relatorioCompleto },
-  { rotulo: 'Leitura narrada em áudio', de: (p) => p.narracaoAudio },
-  { rotulo: 'Gráficos do seu perfil', de: (p) => p.graficos },
-  { rotulo: 'Perfil público com link próprio', de: (p) => p.perfilPublico },
-  { rotulo: 'Tiragem diária', de: (p) => p.tiragemDiaria },
-  {
-    rotulo: 'Consultas ao Oráculo no lançamento',
-    de: (p) => (p.perguntasOraculo > 0 ? `${p.perguntasOraculo}` : false),
-  },
-];
-
 function OsProdutos() {
-  const lista = PRODUTOS_PRINCIPAIS;
-
   return (
-    <section className="w-full max-w-2xl flex flex-col items-center gap-6">
-      <h2 className="font-display italic text-2xl sm:text-3xl text-pergaminho text-center">
-        O que você leva
+    <section className="w-full max-w-2xl flex flex-col items-center gap-8">
+      <h2 className="font-display italic text-2xl sm:text-3xl text-pergaminho text-center text-balance">
+        O ritual é de graça.
       </h2>
 
-      <div className="w-full overflow-x-auto">
-        <table className="w-full border-collapse font-corpo text-sm min-w-[22rem]">
-          <thead>
-            <tr>
-              <th className="w-1/2" />
-              {lista.map((p) => (
-                <th key={p.id} className="pb-4 px-2 text-center align-bottom">
-                  <span className="block font-display italic text-lg text-pergaminho font-normal">
-                    {p.nome}
-                  </span>
-                  <span className="block font-corpo text-vela text-base mt-0.5 tabular-nums">
-                    {/* nó de texto único: `R$ {valor}` viraria dois nós com um
-                        comentário do React no meio, o que atrapalha seleção e
-                        leitores de tela */}
-                    {`R$ ${precoFormatado(p)}`}
-                  </span>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {LINHAS.map(({ rotulo, de }) => (
-              <tr key={rotulo} className="border-t border-pergaminho/10">
-                <td className="py-3 pr-3 font-light text-pergaminho/75">{rotulo}</td>
-                {lista.map((p) => {
-                  const valor = de(p);
-                  return (
-                    <td key={p.id} className="py-3 px-2 text-center tabular-nums">
-                      {valor === true ? (
-                        <span className="text-vela" aria-label="incluído">
-                          ✦
-                        </span>
-                      ) : valor === false ? (
-                        <span className="text-pergaminho/25" aria-label="não incluído">
-                          —
-                        </span>
-                      ) : (
-                        <span className="text-pergaminho/85">{valor}</span>
-                      )}
-                    </td>
-                  );
-                })}
-              </tr>
+      <div className="w-full grid gap-4 sm:grid-cols-2">
+        <div className="flex flex-col gap-3 p-5 rounded-2xl border border-pergaminho/12">
+          <p className="font-corpo text-[0.58rem] tracking-[0.22em] uppercase text-pergaminho/35">
+            sem pagar nada
+          </p>
+          <ul className="flex flex-col gap-2">
+            {[
+              'O seu familiar, revelado',
+              'A leitura em PDF e as imagens',
+              'Sua conta no Bruxário, para sempre',
+              'Uma leitura do Oráculo por mês',
+              'O calendário da sua semana',
+            ].map((item) => (
+              <li
+                key={item}
+                className="font-corpo font-light text-sm text-pergaminho/70 leading-snug"
+              >
+                {item}
+              </li>
             ))}
-          </tbody>
-        </table>
+          </ul>
+        </div>
+
+        <div
+          className="flex flex-col gap-3 p-5 rounded-2xl border"
+          style={{
+            borderColor: 'rgba(217,164,65,0.4)',
+            background: 'linear-gradient(165deg, rgba(217,164,65,0.08), transparent)',
+          }}
+        >
+          <p className="font-corpo text-[0.58rem] tracking-[0.22em] uppercase text-vela">
+            com assinatura
+          </p>
+          <ul className="flex flex-col gap-2">
+            {[
+              'O Oráculo respondendo todo dia',
+              'Leituras completas, com as cartas e o céu',
+              'O calendário do mês e do ano inteiro',
+              'O retrato completo de quem você é',
+              'Sua leitura narrada em áudio',
+            ].map((item) => (
+              <li
+                key={item}
+                className="font-corpo font-light text-sm text-pergaminho/80 leading-snug"
+              >
+                {item}
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
 
-      <p className="font-corpo font-light text-xs text-pergaminho/50 text-center max-w-[42ch]">
-        Você escolhe o plano depois de conhecer seu familiar. Quem levar a
-        Revelação e quiser guardar o link para sempre pode fazer isso depois,
-        por {`R$ ${precoFormatado(PRODUTOS.link_permanente)}`}.
+      <p className="font-corpo font-light text-xs text-pergaminho/45 text-center max-w-[42ch] leading-relaxed">
+        Você conhece o seu familiar primeiro. Só decide se quer o resto
+        depois — e o que já é seu continua seu de qualquer jeito.
       </p>
+
+      <Link
+        href="/planos"
+        className="font-corpo text-sm text-vela hover:brightness-125 transition"
+      >
+        ver os planos →
+      </Link>
     </section>
   );
 }
