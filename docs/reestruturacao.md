@@ -458,7 +458,33 @@ Reaproveita `conta/layout.tsx`, `MenuDaConta.tsx`, `RelatorioCompleto.tsx`,
 
 ---
 
-### Fase 6 · Preços novos e acesso por tempo
+### Fase 6 · Preços novos e acesso por tempo — ✅ concluída
+
+**A virada aconteceu em 17/08/2026, e foi mais longe do que esta seção previa:
+a Revelação não mudou de preço, ficou GRÁTIS.**
+
+- ✅ Planos de assinatura (`revelacao_mensal/anual`,
+  `acompanhamento_mensal/anual`) + `gratuito`
+- ✅ Ciclo de vida: `fim` calculado do plano, expiração, aviso de renovação 7
+  dias antes do fim de CADA assinatura (não em data fixa — elas vencem em
+  datas rolantes)
+- ✅ Cortesia de 30 dias a quem já tinha comprado, com convite por e-mail
+- ✅ Vitrine (`/planos`), `cobrancas` e checkout de assinatura reaproveitando
+  o mesmo componente do funil
+- ✅ Revelação a R$ 0 — o caminho de preço zero já existia (cupom de 100%),
+  então não precisou de fluxo novo
+- ⬜ **Não foi feito o A/B contra o preço antigo** que esta fase pedia. A
+  decisão foi do dono e é de modelo de negócio, não de otimização de preço:
+  testar "grátis contra R$ 9,80" mediria conversão de funil, não o que se
+  quer saber, que é quanto do tráfego grátis vira assinante. Isso a Fase 11
+  mede melhor.
+
+*Rollback:* devolver `precoCentavos` da Revelação e tirar os planos de
+`publico`. Ninguém perde acesso — direitos são unidos, nunca substituídos.
+
+---
+
+### Fase 6 (desenho original) · Preços novos e acesso por tempo
 **A fase de maior risco de receita, e por isso vem só aqui** — com o painel
 medindo, a Sentinela vigiando e o núcleo provado.
 
