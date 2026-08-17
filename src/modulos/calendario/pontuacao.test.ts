@@ -1,8 +1,16 @@
 import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { pontuarDia, destaqueDo, classificar, DOMINIOS } from './pontuacao';
+import {
+  pontuarDia,
+  destaqueDo,
+  classificar,
+  ehDiaDeOuro,
+  agregar,
+  DOMINIOS,
+} from './pontuacao';
 import { mapaNatal, separacao, aspectoEntre } from './transitos';
-import { calcularCalendario, calendarioDaConta, diasDoAlcance, diasDeOuro } from './calendario';
+import { calcularMes, mapaDaConta, mesesNavegaveis, diasDeOuro } from './calendario';
+import { fraseDoDia, fraseDoDominio } from './frases';
 
 /** Um mapa fixo, pra tudo aqui ser reproduzível. */
 const NATAL = mapaNatal({
@@ -99,46 +107,158 @@ describe('destaqueDo', () => {
   });
 });
 
-describe('alcance do plano decide o tamanho — e o custo', () => {
-  test('nenhum devolve null: plano sem calendário não gasta CPU nenhuma', () => {
-    assert.equal(diasDoAlcance('nenhum'), 0);
-    assert.equal(calcularCalendario(NATAL, 'nenhum'), null);
+describe('alcance do plano decide o que é calculado — e o custo', () => {
+  const hoje = new Date(2026, 2, 10);
+
+  test('nenhum: o mês vem inteiro de cadeados, nada é calculado', () => {
+    const mes = calcularMes(NATAL, 'nenhum', 2026, 2, hoje);
+    assert.equal(mes.dias.length, 31, 'a grade existe mesmo sem direito');
+    assert.ok(mes.dias.every((d) => !d.liberado));
+    assert.equal(mes.resumo, null);
+    assert.equal(mes.temDiaLiberado, false);
   });
 
-  test('semana dá 7 dias', () => {
-    assert.equal(calcularCalendario(NATAL, 'semana', new Date(2026, 2, 10))!.length, 7);
+  test('semana: 7 dias liberados a partir de hoje, o resto do mês trancado', () => {
+    const mes = calcularMes(NATAL, 'semana', 2026, 2, hoje);
+    const liberados = mes.dias.filter((d) => d.liberado);
+    assert.equal(liberados.length, 7);
+    assert.equal(liberados[0].diaDoMes, 10, 'começa hoje');
+    assert.equal(liberados[6].diaDoMes, 16);
+    assert.ok(mes.dias.filter((d) => !d.liberado).length > 20, 'o resto fica com cadeado');
   });
 
-  test('mes cobre o mês inteiro a partir do dia 1', () => {
-    const c = calcularCalendario(NATAL, 'mes', new Date(2026, 2, 10))!;
-    assert.equal(c.length, 31, 'março tem 31 dias');
-    assert.equal(c[0].diaDoMes, 1, 'mês começa no dia 1, não em hoje');
+  test('semana não enxerga o passado do mês', () => {
+    const mes = calcularMes(NATAL, 'semana', 2026, 2, hoje);
+    assert.ok(mes.dias.slice(0, 9).every((d) => !d.liberado));
   });
 
-  test('mes respeita meses curtos', () => {
-    assert.equal(calcularCalendario(NATAL, 'mes', new Date(2026, 1, 10))!.length, 28);
+  test('mes: o mês corrente inteiro, inclusive os dias já passados', () => {
+    const mes = calcularMes(NATAL, 'mes', 2026, 2, hoje);
+    assert.ok(mes.dias.every((d) => d.liberado), 'mês corrente todo aberto');
+    assert.equal(mes.dias[0].diaDoMes, 1);
   });
 
-  test('ano dá 365 dias começando em hoje', () => {
-    const c = calcularCalendario(NATAL, 'ano', new Date(2026, 2, 10))!;
-    assert.equal(c.length, 365);
-    assert.equal(c[0].data, '2026-03-10');
+  test('ano: um mês distante ainda vem liberado', () => {
+    const mes = calcularMes(NATAL, 'ano', 2026, 8, hoje);
+    assert.ok(mes.dias.every((d) => d.liberado));
+    assert.ok(mes.resumo);
   });
 
-  test('um ano inteiro calcula rápido — é CPU local, não rede', () => {
+  test('grátis navegando pro mês que vem: tudo trancado, custo zero', () => {
+    const mes = calcularMes(NATAL, 'semana', 2026, 5, hoje);
+    assert.ok(mes.dias.every((d) => !d.liberado));
+    assert.equal(mes.semanas.length, 0, 'sem dia calculado não há semana pra resumir');
+  });
+
+  test('um ano de meses calcula rápido — é CPU local, não rede', () => {
     const inicio = Date.now();
-    calcularCalendario(NATAL, 'ano', new Date(2026, 0, 1));
+    for (const { ano, mes } of mesesNavegaveis(hoje)) {
+      calcularMes(NATAL, 'ano', ano, mes, hoje);
+    }
     const levou = Date.now() - inicio;
-    assert.ok(levou < 3000, `365 dias levaram ${levou}ms`);
+    assert.ok(levou < 4000, `12 meses levaram ${levou}ms`);
   });
 
-  test('as datas não repetem nem pulam', () => {
-    const c = calcularCalendario(NATAL, 'ano', new Date(2026, 2, 10))!;
-    assert.equal(new Set(c.map((d) => d.data)).size, 365);
+  test('as datas do mês não repetem nem pulam', () => {
+    const mes = calcularMes(NATAL, 'mes', 2026, 1, hoje);
+    assert.equal(mes.dias.length, 28, 'fevereiro de 2026');
+    assert.equal(new Set(mes.dias.map((d) => d.data)).size, 28);
+  });
+
+  test('diaDaSemana bate com o calendário real', () => {
+    const mes = calcularMes(NATAL, 'mes', 2026, 2, hoje);
+    assert.equal(mes.dias[0].diaDaSemana, new Date(2026, 2, 1).getDay());
   });
 });
 
-describe('calendarioDaConta', () => {
+describe('dia de ouro é sorte em TUDO', () => {
+  test('não marca ouro um dia ótimo em um domínio e ruim no resto', () => {
+    assert.equal(ehDiaDeOuro({ amor: 95, carreira: 30, viagens: 30, fortuna: 30 }), false);
+  });
+
+  test('marca ouro quando as quatro portas estão abertas', () => {
+    assert.equal(ehDiaDeOuro({ amor: 70, carreira: 68, viagens: 66, fortuna: 72 }), true);
+  });
+
+  test('um domínio baixo já tira o ouro, por melhor que seja o resto', () => {
+    assert.equal(ehDiaDeOuro({ amor: 90, carreira: 90, viagens: 90, fortuna: 50 }), false);
+  });
+
+  test('dia de ouro é raro no ano inteiro (senão a cor não destaca nada)', () => {
+    let ouro = 0;
+    let total = 0;
+    for (const { ano, mes } of mesesNavegaveis(new Date(2026, 0, 1))) {
+      for (const dia of calcularMes(NATAL, 'ano', ano, mes, new Date(2026, 0, 1)).dias) {
+        total++;
+        if (dia.ouro) ouro++;
+      }
+    }
+    const proporcao = ouro / total;
+    assert.ok(proporcao < 0.25, `${Math.round(proporcao * 100)}% de dias de ouro é demais`);
+  });
+});
+
+describe('resumos de período', () => {
+  const hoje = new Date(2026, 2, 10);
+
+  test('o mês tem nota geral e frase', () => {
+    const mes = calcularMes(NATAL, 'mes', 2026, 2, hoje);
+    assert.ok(mes.resumo!.geral >= 0 && mes.resumo!.geral <= 100);
+    assert.ok(mes.resumo!.frase.length > 10);
+  });
+
+  test('cada semana com dia liberado ganha resumo', () => {
+    const mes = calcularMes(NATAL, 'mes', 2026, 2, hoje);
+    assert.ok(mes.semanas.length >= 4);
+    for (const semana of mes.semanas) {
+      assert.ok(semana.resumo.frase.length > 10);
+      assert.ok(semana.resumo.geral >= 0 && semana.resumo.geral <= 100);
+    }
+  });
+
+  test('agregar tira a média por domínio', () => {
+    const r = agregar([
+      { amor: 60, carreira: 40, viagens: 50, fortuna: 80 },
+      { amor: 80, carreira: 60, viagens: 50, fortuna: 60 },
+    ]);
+    assert.equal(r.porDominio.amor, 70);
+    assert.equal(r.porDominio.carreira, 50);
+    assert.equal(r.geral, 60);
+  });
+});
+
+describe('frases', () => {
+  test('a mesma data devolve sempre a mesma frase', () => {
+    const a = fraseDoDia('2026-03-15', 'amor', 'bom', false, false);
+    const b = fraseDoDia('2026-03-15', 'amor', 'bom', false, false);
+    assert.equal(a, b);
+  });
+
+  test('datas diferentes variam as frases', () => {
+    const frases = new Set(
+      Array.from({ length: 20 }, (_, i) =>
+        fraseDoDia(`2026-03-${String(i + 1).padStart(2, '0')}`, 'amor', 'bom', false, false)
+      )
+    );
+    assert.ok(frases.size > 1);
+  });
+
+  test('dia de ouro tem frase própria, não a do domínio', () => {
+    const ouro = fraseDoDia('2026-03-15', 'amor', 'ouro', true, false);
+    const comum = fraseDoDia('2026-03-15', 'amor', 'ouro', false, false);
+    assert.notEqual(ouro, comum);
+  });
+
+  test('toda combinação de domínio e classe tem frase', () => {
+    for (const dominio of DOMINIOS) {
+      for (const classe of ['ouro', 'bom', 'neutro', 'recolher'] as const) {
+        assert.ok(fraseDoDominio('2026-03-15', dominio, classe).length > 10);
+      }
+    }
+  });
+});
+
+describe('mapaDaConta', () => {
   const dados = {
     data: '1994-11-08',
     hora: '03:20',
@@ -147,36 +267,33 @@ describe('calendarioDaConta', () => {
     horaAproximada: false,
   };
 
-  test('sem direito, null — mesmo com todos os dados', () => {
-    assert.equal(calendarioDaConta(dados, 'nenhum'), null);
-  });
-
-  test('sem data de nascimento, null — mesmo com direito', () => {
-    assert.equal(calendarioDaConta({ ...dados, data: null }, 'ano'), null);
+  test('sem data de nascimento, null', () => {
+    assert.equal(mapaDaConta({ ...dados, data: null }), null);
   });
 
   test('sem coordenada, null', () => {
-    assert.equal(calendarioDaConta({ ...dados, lat: null }, 'ano'), null);
+    assert.equal(mapaDaConta({ ...dados, lat: null }), null);
   });
 
-  test('com direito e dados, devolve o calendário', () => {
-    const c = calendarioDaConta(dados, 'semana', new Date(2026, 2, 10));
-    assert.equal(c?.length, 7);
+  test('com tudo, devolve o mapa', () => {
+    const m = mapaDaConta(dados);
+    assert.ok(m);
+    assert.ok(Number.isFinite(m!.sol));
+    assert.ok(m!.ascendente !== null);
   });
 
-  test('hora aproximada não impede — só perde o ascendente', () => {
-    const c = calendarioDaConta({ ...dados, horaAproximada: true }, 'semana');
-    assert.equal(c?.length, 7);
+  test('hora aproximada zera o ascendente em vez de chutá-lo', () => {
+    assert.equal(mapaDaConta({ ...dados, horaAproximada: true })!.ascendente, null);
   });
 });
 
-test('diasDeOuro devolve só os classificados como ouro, do melhor pro pior', () => {
-  const c = calcularCalendario(NATAL, 'ano', new Date(2026, 0, 1))!;
-  const ouro = diasDeOuro(c, 5);
+test('diasDeOuro devolve só os dias bons em tudo, do melhor pro pior', () => {
+  const mes = calcularMes(NATAL, 'ano', 2026, 5, new Date(2026, 0, 1));
+  const ouro = diasDeOuro(mes, 5);
 
   assert.ok(ouro.length <= 5);
-  assert.ok(ouro.every((d) => d.classe === 'ouro'));
+  assert.ok(ouro.every((d) => d.ouro));
   for (let i = 1; i < ouro.length; i++) {
-    assert.ok(ouro[i - 1].destaque.nota >= ouro[i].destaque.nota);
+    assert.ok(ouro[i - 1].destaque!.nota >= ouro[i].destaque!.nota);
   }
 });

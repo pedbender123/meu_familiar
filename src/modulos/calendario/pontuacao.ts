@@ -103,17 +103,57 @@ export function destaqueDo(pontuacao: PontuacaoDoDia): { dominio: Dominio; nota:
   return { dominio: melhor, nota: pontuacao[melhor] };
 }
 
+export type Classe = 'ouro' | 'bom' | 'neutro' | 'recolher';
+
 /**
- * Acima de 70 é dia de ouro; abaixo de 35, dia de recolher.
+ * Acima de 70 é ouro; abaixo de 35, recolher.
  *
  * Os cortes não são simétricos de propósito: dizer "hoje é ruim" é uma
  * afirmação mais cara que dizer "hoje é bom", porque a pessoa pode deixar de
  * fazer algo por causa dela. O produto prefere errar para o lado de não
  * alarmar.
  */
-export function classificar(nota: number): 'ouro' | 'bom' | 'neutro' | 'recolher' {
+export function classificar(nota: number): Classe {
   if (nota >= 70) return 'ouro';
   if (nota >= 58) return 'bom';
   if (nota >= 35) return 'neutro';
   return 'recolher';
+}
+
+/**
+ * **Dia de ouro é sorte em TUDO**, não num assunto só.
+ *
+ * A primeira versão marcava como ouro qualquer dia cujo domínio mais forte
+ * passasse de 70 — e isso pintava de dourado um dia que era ótimo no amor e
+ * péssimo no resto, o que é uma promessa que o dia não cumpre. Ouro passa a
+ * exigir as quatro portas abertas ao mesmo tempo: nenhum domínio abaixo de
+ * 58, e a média alta.
+ *
+ * Isso torna o dia de ouro **raro**, que é o ponto — cor de destaque que
+ * aparece toda semana deixa de destacar.
+ */
+export function ehDiaDeOuro(pontuacao: PontuacaoDoDia): boolean {
+  const notas = DOMINIOS.map((d) => pontuacao[d]);
+  return Math.min(...notas) >= 58 && media(notas) >= 66;
+}
+
+/** O oposto: todas as portas fechadas. */
+export function ehDiaFechado(pontuacao: PontuacaoDoDia): boolean {
+  return Math.max(...DOMINIOS.map((d) => pontuacao[d])) < 40;
+}
+
+export function media(numeros: number[]): number {
+  if (numeros.length === 0) return 50;
+  return Math.round(numeros.reduce((a, b) => a + b, 0) / numeros.length);
+}
+
+/** A nota agregada de um período, por domínio + a geral. */
+export function agregar(
+  pontuacoes: PontuacaoDoDia[]
+): { porDominio: PontuacaoDoDia; geral: number } {
+  const porDominio = {} as PontuacaoDoDia;
+  for (const dominio of DOMINIOS) {
+    porDominio[dominio] = media(pontuacoes.map((p) => p[dominio]));
+  }
+  return { porDominio, geral: media(DOMINIOS.map((d) => porDominio[d])) };
 }
