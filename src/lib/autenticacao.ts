@@ -54,7 +54,9 @@ db.exec(`
     nascimento_lat REAL,
     nascimento_lon REAL,
     nascimento_preenchido_em TEXT,
-    nascimento_pedido_em TEXT
+    nascimento_pedido_em TEXT,
+    -- 1 = a pessoa não sabia a hora e usamos meio-dia (ver migração 013)
+    nascimento_hora_aproximada INTEGER NOT NULL DEFAULT 0
   );
 
   CREATE TABLE IF NOT EXISTS tokens_magicos (

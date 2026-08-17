@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ESTADOS, coordenadaDoEstado } from '@/lib/coordenadas';
+import { HORA_PADRAO } from '@/lib/nascimento';
 
 /**
  * O pedido dos dados que faltam para o mapa natal.
@@ -36,6 +37,8 @@ export function CompletarNascimento({
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [dispensado, setDispensado] = useState(false);
+  /** Marcado = a pessoa não sabe a hora; usamos meio-dia e registramos isso. */
+  const [horaDesconhecida, setHoraDesconhecida] = useState(false);
 
   if (dispensado) return null;
 
@@ -56,7 +59,8 @@ export function CompletarNascimento({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           data,
-          hora,
+          hora: horaDesconhecida ? HORA_PADRAO : hora,
+          horaAproximada: horaDesconhecida,
           cidade: cidade.trim() || estado,
           lat: coord.lat,
           lon: coord.lon,
@@ -111,18 +115,46 @@ export function CompletarNascimento({
       )}
 
       {!horaInicial && (
-        <label className="flex flex-col gap-1.5">
-          <span className="font-corpo text-[0.62rem] tracking-[0.18em] uppercase text-pergaminho/45">
-            Hora (aproximada serve)
-          </span>
-          <input
-            type="time"
-            required
-            value={hora}
-            onChange={(e) => setHora(e.target.value)}
-            className="bg-pergaminho/[0.06] border border-pergaminho/15 rounded-lg px-3 py-2.5 font-corpo text-sm text-pergaminho focus:outline-none focus:border-vela/45"
-          />
-        </label>
+        <div className="flex flex-col gap-2">
+          <label className="flex flex-col gap-1.5">
+            <span className="font-corpo text-[0.62rem] tracking-[0.18em] uppercase text-pergaminho/45">
+              Hora de nascimento
+            </span>
+            <input
+              type="time"
+              required={!horaDesconhecida}
+              disabled={horaDesconhecida}
+              value={horaDesconhecida ? HORA_PADRAO : hora}
+              onChange={(e) => setHora(e.target.value)}
+              className="bg-pergaminho/[0.06] border border-pergaminho/15 rounded-lg px-3 py-2.5 font-corpo text-sm text-pergaminho focus:outline-none focus:border-vela/45 disabled:opacity-40"
+            />
+          </label>
+
+          {/*
+            Muita gente simplesmente não sabe a hora em que nasceu, e exigir
+            o dado trancaria essas pessoas fora do calendário por uma
+            informação que elas não têm como obter.
+          */}
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={horaDesconhecida}
+              onChange={(e) => setHoraDesconhecida(e.target.checked)}
+              className="accent-vela w-4 h-4"
+            />
+            <span className="font-corpo text-sm text-pergaminho/55">
+              Não sei a hora que nasci
+            </span>
+          </label>
+
+          {horaDesconhecida && (
+            <p className="font-corpo text-xs text-pergaminho/40 leading-relaxed pl-6">
+              Sem problema — uso meio-dia. Seu Sol, sua Lua e o calendário
+              funcionam normalmente; só o ascendente fica de fora até você
+              descobrir a hora.
+            </p>
+          )}
+        </div>
       )}
 
       <div className="grid grid-cols-[5.5rem_1fr] gap-2">

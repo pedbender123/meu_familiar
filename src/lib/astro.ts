@@ -17,7 +17,8 @@ const SIGNOS = [
 
 export type Signo = (typeof SIGNOS)[number];
 
-function longitudeParaSigno(elon: number): Signo {
+/** Longitude eclíptica → signo. Exportada para o céu do dia usar a MESMA conta do mapa natal. */
+export function longitudeParaSigno(elon: number): Signo {
   const normalizado = ((elon % 360) + 360) % 360;
   const indice = Math.floor(normalizado / 30);
   return SIGNOS[indice];

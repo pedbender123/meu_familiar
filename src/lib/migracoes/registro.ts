@@ -11,10 +11,11 @@ import m009 from './009_planos_assinatura';
 import m010 from './010_teto_diario_nos_planos_antigos';
 import m011 from './011_dados_de_nascimento';
 import m012 from './012_cortesia_para_quem_comprou';
+import m013 from './013_hora_aproximada';
 
 /**
  * A ordem de execução. Só se acrescenta ao fim — nunca reordena, nunca edita
  * uma migração já aplicada em produção. Uma migração errada se corrige com
  * uma migração nova que desfaz o efeito, não editando a antiga.
  */
-export const MIGRACOES: Migracao[] = [m001, m002, m003, m004, m005, m006, m007, m008, m009, m010, m011, m012];
+export const MIGRACOES: Migracao[] = [m001, m002, m003, m004, m005, m006, m007, m008, m009, m010, m011, m012, m013];

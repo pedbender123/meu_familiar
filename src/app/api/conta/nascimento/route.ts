@@ -27,6 +27,7 @@ export async function POST(req: NextRequest) {
     cidade?: string;
     lat?: number;
     lon?: number;
+    horaAproximada?: boolean;
   };
   try {
     corpo = await req.json();
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ erro: 'corpo inválido' }, { status: 400 });
   }
 
-  const { data, hora, cidade, lat, lon } = corpo;
+  const { data, hora, cidade, lat, lon, horaAproximada } = corpo;
 
   if (!data || !/^\d{4}-\d{2}-\d{2}$/.test(data)) {
     return NextResponse.json({ erro: 'data de nascimento inválida' }, { status: 400 });
@@ -62,6 +63,7 @@ export async function POST(req: NextRequest) {
   salvarDadosDeNascimento(conta.id, {
     data,
     hora,
+    horaAproximada: horaAproximada === true,
     cidade: (cidade ?? '').trim().slice(0, 120),
     lat,
     lon,

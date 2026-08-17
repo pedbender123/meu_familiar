@@ -12,9 +12,16 @@ import db from '../lib/db';
  * na primeira visita e, se a pessoa pular, por e-mail. É a diferença entre
  * "recurso pela metade pra todo mundo" e "recurso inteiro, um passo depois".
  */
+// Reexportado por conveniência de quem já lida com perfil astral no
+// servidor; a definição mora em `lib/nascimento.ts` porque o formulário é
+// componente de cliente e não pode importar este módulo (que puxa o banco).
+export { HORA_PADRAO } from '../lib/nascimento';
+
 export interface DadosDeNascimento {
   data: string | null;
   hora: string | null;
+  /** `true` = chutamos meio-dia. Sol e Lua valem; ascendente e casas, não. */
+  horaAproximada: boolean;
   cidade: string | null;
   lat: number | null;
   lon: number | null;
@@ -31,6 +38,7 @@ export interface EstadoDoPerfilAstral {
 interface LinhaConta {
   nascimento_data: string | null;
   nascimento_hora: string | null;
+  nascimento_hora_aproximada: number | null;
   nascimento_cidade: string | null;
   nascimento_lat: number | null;
   nascimento_lon: number | null;
@@ -40,8 +48,9 @@ interface LinhaConta {
 export function perfilAstralDaConta(contaId: string): EstadoDoPerfilAstral {
   const linha = db
     .prepare(
-      `SELECT nascimento_data, nascimento_hora, nascimento_cidade,
-              nascimento_lat, nascimento_lon, nascimento_preenchido_em
+      `SELECT nascimento_data, nascimento_hora, nascimento_hora_aproximada,
+              nascimento_cidade, nascimento_lat, nascimento_lon,
+              nascimento_preenchido_em
        FROM contas WHERE id = ?`
     )
     .get(contaId) as LinhaConta | undefined;
@@ -49,6 +58,7 @@ export function perfilAstralDaConta(contaId: string): EstadoDoPerfilAstral {
   const dados: DadosDeNascimento = {
     data: linha?.nascimento_data ?? null,
     hora: linha?.nascimento_hora ?? null,
+    horaAproximada: !!linha?.nascimento_hora_aproximada,
     cidade: linha?.nascimento_cidade ?? null,
     lat: linha?.nascimento_lat ?? null,
     lon: linha?.nascimento_lon ?? null,
@@ -57,7 +67,10 @@ export function perfilAstralDaConta(contaId: string): EstadoDoPerfilAstral {
 
   const faltando: string[] = [];
   if (!dados.data) faltando.push('a data de nascimento');
-  if (!dados.hora) faltando.push('a hora');
+  // A hora NÃO entra em `faltando`: quem não sabe a hora recebe meio-dia e
+  // segue. Exigi-la trancaria fora do Calendário quem simplesmente não tem
+  // como descobrir — ver HORA_PADRAO.
+  if (!dados.hora) faltando.push('a hora (ou pule, se não souber)');
   // Lat/lon é o que o cálculo usa; cidade é só o rótulo que a pessoa
   // reconhece. Faltando as coordenadas, não há casas nem ascendente.
   if (dados.lat === null || dados.lon === null) faltando.push('a cidade onde nasceu');
@@ -67,15 +80,28 @@ export function perfilAstralDaConta(contaId: string): EstadoDoPerfilAstral {
 
 export function salvarDadosDeNascimento(
   contaId: string,
-  dados: { data: string; hora: string; cidade: string; lat: number; lon: number }
+  dados: {
+    data: string;
+    hora: string;
+    cidade: string;
+    lat: number;
+    lon: number;
+    horaAproximada?: boolean;
+  }
 ): void {
   db.prepare(
     `UPDATE contas SET
        nascimento_data = @data, nascimento_hora = @hora,
+       nascimento_hora_aproximada = @horaAproximada,
        nascimento_cidade = @cidade, nascimento_lat = @lat, nascimento_lon = @lon,
        nascimento_preenchido_em = @agora
      WHERE id = @contaId`
-  ).run({ ...dados, contaId, agora: new Date().toISOString() });
+  ).run({
+    ...dados,
+    horaAproximada: dados.horaAproximada ? 1 : 0,
+    contaId,
+    agora: new Date().toISOString(),
+  });
 }
 
 /**
