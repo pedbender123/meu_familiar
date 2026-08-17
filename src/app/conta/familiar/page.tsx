@@ -34,13 +34,23 @@ interface Linha {
 export default async function FamiliarDaConta() {
   const sessao = await sessaoAtual();
 
+  /**
+   * O layout já barra quem não tem sessão, mas em Next 16 layout e página
+   * renderizam **em paralelo** — o `redirect()` de lá acontece, e mesmo assim
+   * o corpo daqui executa uma vez com `sessao` nula. Sem esta saída, todo
+   * acesso deslogado lança `Cannot read properties of null` no servidor:
+   * a pessoa é redirecionada do mesmo jeito, mas o log enche de erro e um
+   * problema de verdade passa despercebido no meio.
+   */
+  if (!sessao) return null;
+
   const revelacoes = db
     .prepare(
       `SELECT id, familiar, lua, leitura_json, criado_em FROM pedidos
        WHERE lower(email) = ? AND status = 'entregue'
        ORDER BY criado_em DESC`
     )
-    .all(sessao!.email) as Linha[];
+    .all(sessao.email) as Linha[];
 
   if (revelacoes.length === 0) {
     return (

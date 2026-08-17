@@ -27,13 +27,23 @@ interface Linha {
 export default async function Perfil() {
   const sessao = await sessaoAtual();
 
+  /**
+   * O layout já barra quem não tem sessão, mas em Next 16 layout e página
+   * renderizam **em paralelo** — o `redirect()` de lá acontece, e mesmo assim
+   * o corpo daqui executa uma vez com `sessao` nula. Sem esta saída, todo
+   * acesso deslogado lança `Cannot read properties of null` no servidor:
+   * a pessoa é redirecionada do mesmo jeito, mas o log enche de erro e um
+   * problema de verdade passa despercebido no meio.
+   */
+  if (!sessao) return null;
+
   const revelacoes = db
     .prepare(
       `SELECT id, familiar, produto, expira_em, criado_em, leitura_json
        FROM pedidos WHERE lower(email) = ? AND status = 'entregue'
        ORDER BY criado_em DESC`
     )
-    .all(sessao!.email) as Linha[];
+    .all(sessao.email) as Linha[];
 
   return (
     <section className="w-full max-w-2xl flex flex-col items-center gap-7 pt-4 sm:pt-8">
@@ -42,7 +52,7 @@ export default async function Perfil() {
           Seu perfil
         </p>
         <p className="font-corpo text-base text-escrita text-center break-all">
-          {sessao!.email}
+          {sessao.email}
         </p>
         <p className="font-corpo font-light text-xs text-escrita-fraca text-center">
           Sem senha para lembrar — o acesso é sempre por link no seu e-mail.

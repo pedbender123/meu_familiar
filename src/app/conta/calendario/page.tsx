@@ -35,9 +35,19 @@ export default async function Calendario({
 }) {
   const { mes: mesPedido } = await searchParams;
   const sessao = await sessaoAtual();
-  const conta = buscarConta(sessao!.email);
 
-  const direitos = conta ? direitosEfetivos(conta.id, sessao!.email) : SEM_DIREITOS;
+  /**
+   * O layout já barra quem não tem sessão, mas em Next 16 layout e página
+   * renderizam **em paralelo** — o `redirect()` de lá acontece, e mesmo assim
+   * o corpo daqui executa uma vez com `sessao` nula. Sem esta saída, todo
+   * acesso deslogado lança `Cannot read properties of null` no servidor:
+   * a pessoa é redirecionada do mesmo jeito, mas o log enche de erro e um
+   * problema de verdade passa despercebido no meio.
+   */
+  if (!sessao) return null;
+  const conta = buscarConta(sessao.email);
+
+  const direitos = conta ? direitosEfetivos(conta.id, sessao.email) : SEM_DIREITOS;
   const perfil = conta ? perfilAstralDaConta(conta.id) : null;
 
   /* ── Sem direito ───────────────────────────────────────────────────── */
