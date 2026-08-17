@@ -22,7 +22,9 @@
     "sentinela": "tsx scripts/sentinela.ts",
     "capi": "tsx scripts/processar-fila-capi.ts",
     "reconciliar": "tsx scripts/reconciliar.ts",
-    "alarmes": "tsx scripts/alarmes.ts"
+    "alarmes": "tsx scripts/alarmes.ts",
+    "assinaturas": "tsx scripts/assinaturas.ts",
+    "convite-planos": "tsx scripts/convite-dos-planos.ts"
   },
   "dependencies": {
     "@google/genai": "^2.16.0",

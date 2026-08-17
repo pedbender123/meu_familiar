@@ -1,6 +1,24 @@
 import { randomUUID } from 'crypto';
 import db from '../lib/db';
 
+const UM_DIA_MS = 86_400_000;
+
+/**
+ * A data em que a assinatura vence, pelo prazo declarado no plano.
+ *
+ * Plano inexistente devolve `null` (pra sempre) de propósito: entre trancar
+ * alguém que pagou por causa de um `plano_id` escrito errado e deixar acesso
+ * demais, o erro barato é o segundo — e a Sentinela pega o plano órfão.
+ */
+function fimPeloPlano(planoId: string, inicio: Date): string | null {
+  const plano = db
+    .prepare('SELECT duracao_dias FROM planos WHERE id = ?')
+    .get(planoId) as { duracao_dias: number | null } | undefined;
+
+  if (!plano?.duracao_dias) return null;
+  return new Date(inicio.getTime() + plano.duracao_dias * UM_DIA_MS).toISOString();
+}
+
 export type StatusAssinatura = 'ativa' | 'expirada' | 'cancelada';
 
 export interface Assinatura {
@@ -24,16 +42,30 @@ export interface Assinatura {
  * direitos por nada (embora `unirDireitos` já seja imune a duplicata — é
  * ainda assim a coisa errada de deixar acontecer, uma linha órfã por
  * reenvio).
+ *
+ * **`fim` sai do plano quando não vem escrito.** `duracao_dias` do plano é
+ * quanto ele dura; quem chama não deveria ter que recalcular isso toda vez —
+ * e cada lugar que recalculasse seria um lugar a mais pra errar a conta e
+ * dar (ou tirar) tempo de alguém. `duracao_dias: null` continua significando
+ * "pra sempre", que é o caso dos avulsos antigos.
+ *
+ * Passar `fim` explicitamente vence o plano: é o que a migração de cortesia
+ * usa pra dar 30 dias de um plano anual, por exemplo.
  */
 export function criarAssinatura(dados: {
   contaId: string;
   planoId: string;
   pedidoId?: string | null;
   inicio?: Date;
+  /** Ausente = calcula do `duracao_dias` do plano. `null` = força "pra sempre". */
   fim?: string | null;
 }): Assinatura | null {
   const agora = new Date().toISOString();
   const id = randomUUID();
+  const inicio = dados.inicio ?? new Date();
+
+  const fim =
+    dados.fim !== undefined ? dados.fim : fimPeloPlano(dados.planoId, inicio);
 
   const info = db
     .prepare(
@@ -48,8 +80,8 @@ export function criarAssinatura(dados: {
       id,
       conta_id: dados.contaId,
       plano_id: dados.planoId,
-      inicio: (dados.inicio ?? new Date()).toISOString(),
-      fim: dados.fim ?? null,
+      inicio: inicio.toISOString(),
+      fim,
       pedido_id: dados.pedidoId ?? null,
       agora,
     });

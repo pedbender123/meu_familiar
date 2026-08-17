@@ -3,6 +3,9 @@ import db from '@/lib/db';
 import { sessaoAtual } from '@/lib/sessao-servidor';
 import { FAMILIARES, type FamiliarId } from '@/lib/familiares';
 import { SigiloFamiliar } from '@/components/SigiloFamiliar';
+import { buscarConta } from '@/lib/autenticacao';
+import { perfilAstralDaConta, herdarNascimentoDosPedidos } from '@/nucleo/perfil-astral';
+import { CompletarNascimento } from '@/plataforma/CompletarNascimento';
 
 /**
  * O início do Bruxário da pessoa.
@@ -28,6 +31,15 @@ export default async function InicioDaConta() {
 
   const familiar = ultima ? FAMILIARES[ultima.familiar as FamiliarId] : null;
   const leitura = ultima?.leitura_json ? JSON.parse(ultima.leitura_json) : null;
+
+  /**
+   * Aproveita data e hora que a pessoa já deu no ritual antes de perguntar
+   * qualquer coisa — pedir de novo o que ela já digitou é o jeito mais rápido
+   * de fazer alguém desistir do formulário.
+   */
+  const conta = buscarConta(sessao!.email);
+  if (conta) herdarNascimentoDosPedidos(conta.id, sessao!.email);
+  const perfilAstral = conta ? perfilAstralDaConta(conta.id) : null;
 
   return (
     <section className="w-full max-w-xl flex flex-col items-center gap-7 pt-8 sm:pt-16 text-center">
@@ -63,6 +75,13 @@ export default async function InicioDaConta() {
             Começar o ritual
           </Link>
         </>
+      )}
+      {perfilAstral && !perfilAstral.completo && (
+        <CompletarNascimento
+          faltando={perfilAstral.faltando}
+          dataInicial={perfilAstral.dados.data}
+          horaInicial={perfilAstral.dados.hora}
+        />
       )}
     </section>
   );

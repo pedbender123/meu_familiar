@@ -43,7 +43,18 @@ db.exec(`
     id TEXT PRIMARY KEY,
     email TEXT NOT NULL UNIQUE,
     criado_em TEXT NOT NULL,
-    ultimo_acesso_em TEXT
+    ultimo_acesso_em TEXT,
+    -- Mapa natal (ver src/nucleo/perfil-astral.ts). Banco que já existia
+    -- recebe estas colunas pela migração 011; banco novo nasce com elas
+    -- aqui, porque esta tabela é criada DEPOIS das migrações rodarem e a
+    -- 011 não teria o que alterar.
+    nascimento_data TEXT,
+    nascimento_hora TEXT,
+    nascimento_cidade TEXT,
+    nascimento_lat REAL,
+    nascimento_lon REAL,
+    nascimento_preenchido_em TEXT,
+    nascimento_pedido_em TEXT
   );
 
   CREATE TABLE IF NOT EXISTS tokens_magicos (
@@ -147,8 +158,19 @@ export function garantirConta(email: string): Conta {
 /**
  * Gera um token de uso único. Devolve o token **em claro** — é a única vez em
  * que ele existe fora do e-mail; o banco só vê o hash.
+ *
+ * `minutosDeValidade` é opcional e existe para o caso específico do convite:
+ * um e-mail que anuncia uma novidade não é lido em vinte minutos como um
+ * "quero entrar agora" é — ele é aberto no fim de semana, no ônibus, dias
+ * depois. Link curto ali significa a pessoa clicar, ver "expirado" e nunca
+ * mais voltar. **O uso único continua valendo em todos os casos**: prazo
+ * longo com uso único é bem diferente de link permanente.
  */
-export function criarTokenMagico(email: string, tipo: TipoDeAcesso): string {
+export function criarTokenMagico(
+  email: string,
+  tipo: TipoDeAcesso,
+  minutosDeValidade = VALIDADE_DO_LINK_MIN
+): string {
   const token = randomBytes(32).toString('base64url');
   const normalizado = email.trim().toLowerCase();
 
@@ -159,13 +181,16 @@ export function criarTokenMagico(email: string, tipo: TipoDeAcesso): string {
     hashDe(token),
     normalizado,
     tipo,
-    emMinutos(VALIDADE_DO_LINK_MIN),
+    emMinutos(minutosDeValidade),
     agora().toISOString()
   );
 
   limparExpirados();
   return token;
 }
+
+/** Sete dias, em minutos — o prazo do convite da mudança de planos. */
+export const VALIDADE_DO_CONVITE_MIN = 7 * 24 * 60;
 
 export interface TokenValidado {
   email: string;

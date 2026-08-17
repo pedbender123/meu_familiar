@@ -716,3 +716,164 @@ export async function enviarResumoDeAlarmes(params: {
     texto,
   });
 }
+
+/**
+ * O convite: os planos mudaram, e você já está dentro.
+ *
+ * ── O que este e-mail NÃO pode parecer ────────────────────────────────────
+ *
+ * "Mudamos nossos termos" é o assunto que ninguém abre. Aqui a notícia é o
+ * contrário de um aviso legal: a pessoa **ganhou** coisas, sem pagar nada e
+ * sem pedir. Então o e-mail abre pelo presente e deixa o mecanismo por
+ * último — e nunca insinua que ela vai perder o que já comprou, porque não
+ * vai (`direitosEfetivos` mantém o acesso antigo pra sempre, ver
+ * `012_cortesia_para_quem_comprou`).
+ *
+ * O link vale sete dias em vez de vinte minutos: e-mail de novidade é lido
+ * no fim de semana, no ônibus, dias depois — não é um "quero entrar agora".
+ */
+export async function enviarConviteDosPlanos(params: {
+  nome: string;
+  email: string;
+  url: string;
+  diasDeCortesia: number;
+  novidades: string[];
+}): Promise<void> {
+  const { nome, email, url, diasDeCortesia, novidades } = params;
+
+  const lista = novidades
+    .map(
+      (n) =>
+        `<li style="margin:0 0 8px;font-size:15px;line-height:1.6;">${n}</li>`
+    )
+    .join('');
+
+  const html = moldura(`
+    <p style="margin:0 0 18px;font-size:24px;font-style:italic;color:#2E2438;">
+      ${nome}, o seu Bruxário cresceu.
+    </p>
+    <p style="margin:0 0 22px;font-size:15px;line-height:1.7;">
+      Você comprou aqui quando isto era uma revelação e pronto. Virou outra
+      coisa — e como você chegou antes, os próximos ${diasDeCortesia} dias
+      estão abertos para você sem custo nenhum.
+    </p>
+    <ul style="margin:0 0 22px;padding-left:20px;color:#3A2F44;">${lista}</ul>
+    <p style="margin:0 0 22px;">${botao(url, 'Ver o que abriu')}</p>
+    <p style="margin:0;font-family:Arial,sans-serif;font-size:12px;line-height:1.6;color:#6B5F72;">
+      O que você já tinha comprado continua seu, para sempre, com ou sem
+      assinatura — isso não muda. Este link vale 7 dias e funciona uma vez só.
+    </p>
+  `);
+
+  await enviar({
+    para: email,
+    assunto: `${nome}, abrimos mais um pedaço do seu Bruxário`,
+    html,
+    texto: [
+      `${nome}, o Bruxário virou outra coisa — e como você chegou antes, os próximos ${diasDeCortesia} dias estão abertos para você sem custo.`,
+      novidades.map((n) => `- ${n}`).join('\n'),
+      `Ver o que abriu: ${url}`,
+      'O que você já comprou continua seu para sempre, com ou sem assinatura. Este link vale 7 dias e funciona uma vez só.',
+    ].join('\n\n'),
+  });
+}
+
+/**
+ * O aviso de renovação, mandado alguns dias antes de a assinatura vencer.
+ *
+ * Existe porque **Pix não faz cobrança recorrente** — nenhum provedor faz,
+ * Pix é sempre pagamento avulso. Então, para quem não pagou no cartão, este
+ * e-mail não é um lembrete gentil: ele é literalmente o mecanismo de
+ * renovação. Se ele não sair, a assinatura acaba.
+ *
+ * Por isso o tom evita ameaça ("você vai perder") e usa o que é verdade: o
+ * que ela comprou continua dela, o que acaba é o que a assinatura abriu.
+ */
+export async function enviarAvisoDeRenovacao(params: {
+  nome: string;
+  email: string;
+  url: string;
+  nomeDoPlano: string;
+  diasRestantes: number;
+}): Promise<void> {
+  const { nome, email, url, nomeDoPlano, diasRestantes } = params;
+  const prazo =
+    diasRestantes <= 1 ? 'amanhã' : `em ${diasRestantes} dias`;
+
+  const html = moldura(`
+    <p style="margin:0 0 18px;font-size:24px;font-style:italic;color:#2E2438;">
+      ${nome}, sua assinatura vence ${prazo}.
+    </p>
+    <p style="margin:0 0 22px;font-size:15px;line-height:1.7;">
+      É o plano ${nomeDoPlano}. Renovando, nada muda: o Oráculo continua
+      respondendo e o calendário continua aberto.
+    </p>
+    <p style="margin:0 0 22px;">${botao(url, 'Renovar minha assinatura')}</p>
+    <p style="margin:0;font-family:Arial,sans-serif;font-size:12px;line-height:1.6;color:#6B5F72;">
+      Se preferir não renovar, tudo bem — sua revelação e seu familiar
+      continuam guardados na sua conta, como sempre estiveram.
+    </p>
+  `);
+
+  await enviar({
+    para: email,
+    assunto: `${nome}, sua assinatura vence ${prazo}`,
+    html,
+    texto: [
+      `${nome}, sua assinatura do plano ${nomeDoPlano} vence ${prazo}.`,
+      `Renovar: ${url}`,
+      'Se preferir não renovar, sua revelação e seu familiar continuam guardados na sua conta.',
+    ].join('\n\n'),
+  });
+}
+
+/**
+ * "Complete sua conta" — o pedido dos dados de nascimento.
+ *
+ * Mapa natal precisa de data, hora e LUGAR, e o lugar nunca foi perguntado a
+ * ninguém no funil. Em vez de o Calendário nascer capenga pra todo mundo, ele
+ * nasce inteiro e a conta pede o que falta.
+ *
+ * O pedido é enquadrado como desbloqueio, não como pendência burocrática:
+ * "falta preencher seu cadastro" é trabalho, "isso abre o seu calendário" é
+ * troca.
+ */
+export async function enviarPedidoDeNascimento(params: {
+  nome: string;
+  email: string;
+  url: string;
+  faltando: string[];
+}): Promise<void> {
+  const { nome, email, url, faltando } = params;
+  const oQueFalta =
+    faltando.length === 1
+      ? faltando[0]
+      : `${faltando.slice(0, -1).join(', ')} e ${faltando[faltando.length - 1]}`;
+
+  const html = moldura(`
+    <p style="margin:0 0 18px;font-size:24px;font-style:italic;color:#2E2438;">
+      ${nome}, falta uma coisa para o céu abrir.
+    </p>
+    <p style="margin:0 0 22px;font-size:15px;line-height:1.7;">
+      Para desenhar o seu calendário — seus dias de amor, carreira, viagem e
+      fortuna — eu preciso saber ${oQueFalta}. Sem isso, consigo ler o seu
+      signo, mas não o seu mapa.
+    </p>
+    <p style="margin:0 0 22px;">${botao(url, 'Completar meu mapa')}</p>
+    <p style="margin:0;font-family:Arial,sans-serif;font-size:12px;line-height:1.6;color:#6B5F72;">
+      Leva menos de um minuto, e é uma vez só — depois disso o calendário se
+      desenha sozinho.
+    </p>
+  `);
+
+  await enviar({
+    para: email,
+    assunto: `${nome}, falta uma coisa para o seu calendário`,
+    html,
+    texto: [
+      `${nome}, para desenhar o seu calendário eu preciso saber ${oQueFalta}.`,
+      `Completar: ${url}`,
+      'Leva menos de um minuto, e é uma vez só.',
+    ].join('\n\n'),
+  });
+}
