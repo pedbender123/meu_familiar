@@ -21,6 +21,15 @@ export interface CeuDoDia {
   /** Onde a Lua está hoje — o que muda mais rápido e o que mais se sente. */
   luaEm: Signo;
   faseDaLua: 'nova' | 'crescente' | 'cheia' | 'minguante';
+  /**
+   * A elongação em graus (0 nova, 90 quarto crescente, 180 cheia, 270
+   * minguante). Fica exposta porque o desenho da lua precisa do valor
+   * contínuo — quatro nomes de fase desenhariam quatro luas, e a de verdade
+   * muda um pouco todo dia.
+   */
+  grausDaFase: number;
+  /** Fração iluminada, 0–1 — é o que o desenho usa direto. */
+  iluminacao: number;
   /** Nome da fase, como se fala. */
   faseNome: string;
   /** Uma linha sobre o clima do dia, derivada da fase. */
@@ -68,6 +77,9 @@ export function ceuDoDia(quando: Date = new Date(), luaNatal?: Signo | null): Ce
   return {
     luaEm,
     faseDaLua,
+    grausDaFase: graus,
+    // A fase varia como (1 - cos) / 2: nova = 0, cheia = 1.
+    iluminacao: (1 - Math.cos((graus * Math.PI) / 180)) / 2,
     faseNome: NOME_DA_FASE[faseDaLua],
     clima: CLIMA_DA_FASE[faseDaLua],
     // O retorno lunar acontece ~1 vez por mês e é o trânsito mais fácil de

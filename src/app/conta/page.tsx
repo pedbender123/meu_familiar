@@ -9,8 +9,18 @@ import { perfilAstralDaConta, herdarNascimentoDosPedidos } from '@/nucleo/perfil
 import { direitosEfetivos } from '@/nucleo/acesso';
 import { SEM_DIREITOS } from '@/nucleo/direitos';
 import { ceuDoDia } from '@/nucleo/ceu-do-dia';
+import { mapaDaConta } from '@/modulos/calendario/calendario';
+import {
+  pontuarDia,
+  destaqueDo,
+  classificar,
+  ehDiaDeOuro,
+  ehDiaFechado,
+} from '@/modulos/calendario/pontuacao';
+import { fraseDoDia } from '@/modulos/calendario/frases';
 import { CompletarNascimento } from '@/plataforma/CompletarNascimento';
 import { RetratoDaPersonalidade } from '@/plataforma/RetratoDaPersonalidade';
+import { CeuDeHoje } from '@/plataforma/CeuDeHoje';
 
 interface Linha {
   id: string;
@@ -65,6 +75,32 @@ export default async function InicioDaConta() {
     timeZone: 'America/Sao_Paulo',
   }).format(agora);
 
+  /**
+   * A leitura de HOJE — um dia só, não o mês.
+   *
+   * São 7 leituras de efeméride: barato o bastante para rodar na inicial de
+   * quem tem o direito, e não roda para quem não tem. Reaproveita exatamente
+   * o mesmo cálculo do Calendário, então as duas telas nunca discordam sobre
+   * o mesmo dia.
+   */
+  const natal =
+    perfilAstral && direitos.alcanceCalendario !== 'nenhum'
+      ? mapaDaConta(perfilAstral.dados)
+      : null;
+
+  const pontuacaoDeHoje = natal ? pontuarDia(natal, agora) : null;
+  const chaveDeHoje = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}-${String(agora.getDate()).padStart(2, '0')}`;
+  const ouroHoje = pontuacaoDeHoje ? ehDiaDeOuro(pontuacaoDeHoje) : false;
+  const fraseDeHoje = pontuacaoDeHoje
+    ? fraseDoDia(
+        chaveDeHoje,
+        destaqueDo(pontuacaoDeHoje).dominio,
+        classificar(destaqueDo(pontuacaoDeHoje).nota),
+        ouroHoje,
+        ehDiaFechado(pontuacaoDeHoje)
+      )
+    : null;
+
   if (!familiar) {
     return (
       <section className="w-full max-w-xl flex flex-col items-center gap-7 pt-8 sm:pt-16 text-center">
@@ -111,36 +147,14 @@ export default async function InicioDaConta() {
       )}
 
       {/* ── O céu de hoje: o motivo de voltar amanhã ──────────────────── */}
-      <div className="flex flex-col gap-3 p-5 rounded-2xl border border-pergaminho/10 bg-pergaminho/[0.03]">
-        <div className="flex items-baseline justify-between gap-3">
-          <p className="font-corpo text-[0.6rem] tracking-[0.24em] uppercase text-pergaminho/35">
-            Hoje <span className="text-pergaminho/25">· {hoje}</span>
-          </p>
-          <p className="font-corpo text-xs text-pergaminho/45">
-            {ceu.faseNome} em {ceu.luaEm}
-          </p>
-        </div>
-
-        <p className="font-display italic text-lg leading-relaxed text-pergaminho/80">
-          {ceu.clima}
-        </p>
-
-        {ceu.luaEmCasa && (
-          <p className="font-corpo text-xs text-vela/90 leading-relaxed">
-            A Lua voltou para o signo onde ela estava quando você nasceu — isso
-            acontece uma vez por mês, e costuma ser o dia em que tudo pesa mais.
-          </p>
-        )}
-
-        {direitos.alcanceCalendario !== 'nenhum' && (
-          <Link
-            href="/conta/calendario"
-            className="font-corpo text-sm text-vela hover:brightness-125 transition self-start"
-          >
-            Ver o calendário →
-          </Link>
-        )}
-      </div>
+      <CeuDeHoje
+        ceu={ceu}
+        data={hoje}
+        pontuacao={pontuacaoDeHoje}
+        frase={fraseDeHoje}
+        ouro={ouroHoje}
+        temCalendario={direitos.alcanceCalendario !== 'nenhum'}
+      />
 
       {/* ── O retrato ─────────────────────────────────────────────────── */}
       {perfil?.eixos && (
