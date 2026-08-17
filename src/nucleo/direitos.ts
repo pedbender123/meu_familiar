@@ -55,6 +55,27 @@ export interface Direitos {
 
   /** Quanto do calendário astrológico abre. Free vê a semana; o pago, o prazo que comprou. */
   alcanceCalendario: AlcanceCalendario;
+
+  /**
+   * O teto do dia, ao lado do teto do mês (`perguntasOraculo`).
+   *
+   * *"10 por mês, até 5 no mesmo dia"* são **dois** limites, não um. O mensal
+   * é o que foi vendido; o diário impede alguém queimar o mês inteiro numa
+   * madrugada de ansiedade e sumir. Protege a margem e protege a pessoa.
+   */
+  perguntasOraculoPorDia: number;
+
+  /** Conselho todo dia (Acompanhamento) contra semanal (o resto). */
+  conselhoDiario: boolean;
+
+  /**
+   * O guia vai por e-mail, ou só existe dentro da plataforma?
+   *
+   * É a diferença que faz o plano pago valer sem tornar o grátis inútil: o
+   * grátis entrega o mesmo conteúdo, mas só para quem entra; o pago vai
+   * atrás da pessoa. Recurso idêntico, alcance diferente.
+   */
+  guiaPorEmail: boolean;
 }
 
 export const SEM_DIREITOS: Direitos = {
@@ -69,6 +90,9 @@ export const SEM_DIREITOS: Direitos = {
   perfilCompleto: false,
   oraculoNaHora: false,
   alcanceCalendario: 'nenhum',
+  perguntasOraculoPorDia: 0,
+  conselhoDiario: false,
+  guiaPorEmail: false,
 };
 
 /**
@@ -98,5 +122,8 @@ export function unirDireitos(varios: Direitos[]): Direitos {
       FORCA_DO_ALCANCE[acc.alcanceCalendario] >= FORCA_DO_ALCANCE[d.alcanceCalendario]
         ? acc.alcanceCalendario
         : d.alcanceCalendario,
+    perguntasOraculoPorDia: Math.max(acc.perguntasOraculoPorDia, d.perguntasOraculoPorDia),
+    conselhoDiario: acc.conselhoDiario || d.conselhoDiario,
+    guiaPorEmail: acc.guiaPorEmail || d.guiaPorEmail,
   }));
 }

@@ -46,8 +46,46 @@ test('plano nunca semeado devolve undefined, não lança', () => {
   assert.equal(buscarPlano('nao-existe'), undefined);
 });
 
-test('todo plano tem acesso pra sempre hoje (duracao_dias null) — Fase 6 muda isso, não a Fase 2', () => {
+/**
+ * Este teste dizia "todo plano tem acesso pra sempre (`duracao_dias` null) —
+ * Fase 6 muda isso". A Fase 6 chegou: existem planos de assinatura com prazo.
+ * O que ele passa a travar é a fronteira entre os dois modelos, que é o que
+ * de fato não pode quebrar sem alguém decidir.
+ */
+test('avulso antigo é pra sempre; assinatura tem prazo — e ninguém perde o que pagou', () => {
   for (const plano of listarPlanos()) {
-    assert.equal(plano.duracao_dias, null);
+    if (plano.recorrente) {
+      assert.ok(
+        plano.duracao_dias && plano.duracao_dias > 0,
+        `${plano.id} é recorrente, então precisa de prazo`
+      );
+    } else {
+      assert.equal(
+        plano.duracao_dias,
+        null,
+        `${plano.id} não é recorrente — dar prazo a ele tiraria acesso de quem já comprou`
+      );
+    }
+  }
+});
+
+test('os avulsos saíram da vitrine mas continuam válidos', () => {
+  for (const id of ['revelacao', 'completa']) {
+    const plano = buscarPlano(id);
+    assert.ok(plano, `${id} não pode ser apagado — há assinatura apontando pra ele`);
+    assert.equal(plano!.publico, 0, `${id} não deve mais aparecer na vitrine`);
+    assert.equal(plano!.ativo, 1, `${id} tem que continuar ativo pra quem já tem`);
+  }
+});
+
+test('quem tem cota mensal tem cota diária — senão a cota mensal é inalcançável', () => {
+  for (const plano of listarPlanos()) {
+    const direitos = direitosDoPlano(plano);
+    if (direitos.perguntasOraculo > 0) {
+      assert.ok(
+        direitos.perguntasOraculoPorDia > 0,
+        `${plano.id} dá ${direitos.perguntasOraculo} perguntas no mês e 0 no dia — ninguém consegue usar`
+      );
+    }
   }
 });

@@ -66,6 +66,18 @@ function direitosLegados(email: string): Direitos[] {
       // A tiragem diária é o que dá acesso ao calendário; quem não a tem
       // não perde nada por não ter alcance.
       alcanceCalendario: produto.tiragemDiaria ? ('mes' as const) : ('nenhum' as const),
+
+      /**
+       * O teto diário precisa acompanhar o mensal, senão a conta trava:
+       * `SEM_DIREITOS` traz `perguntasOraculoPorDia: 0`, e quem tem 10 no mês
+       * mas 0 por dia não consegue perguntar **nenhuma vez** — o mesmo tipo
+       * de erro silencioso que `direitosLegados` existe pra evitar.
+       */
+      perguntasOraculoPorDia: produto.perguntasOraculo > 0 ? 5 : 0,
+      conselhoDiario: false,
+      // Quem comprou avulso nunca assinou nada recorrente: mandar guia
+      // semanal por e-mail seria começar a enviar o que ninguém pediu.
+      guiaPorEmail: false,
     };
   });
 }
