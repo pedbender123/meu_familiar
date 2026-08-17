@@ -5,6 +5,11 @@ import {
   registrarEvento,
 } from './db';
 import { statusLiberaAcesso, type ResultadoPagamento } from '../nucleo/checkouts/mercadopago';
+import {
+  buscarCobranca,
+  buscarCobrancaPorPagamento,
+  confirmarPagamento,
+} from '../nucleo/cobrancas';
 import { calcularExpiracao, produtoDe } from './produtos';
 import { aposPagamento } from './processar';
 import { checarEmLinha } from '../nucleo/sentinela/emLinha';
@@ -15,7 +20,9 @@ export type DesfechoNotificacao =
   | 'nao_libera_acesso'
   | 'sem_pedido'
   | 'ja_processado'
-  | 'processado';
+  | 'processado'
+  /** Pagamento de PLANO (tabela `cobrancas`), não de ritual. */
+  | 'assinatura_confirmada';
 
 export interface ResultadoNotificacao {
   desfecho: DesfechoNotificacao;
@@ -50,6 +57,30 @@ export async function processarNotificacaoDePagamento(
   if (!statusLiberaAcesso(resultado.status)) {
     registrarEvento(`pagamento_${resultado.status}`);
     return { desfecho: 'nao_libera_acesso' };
+  }
+
+  /**
+   * **Cobrança de plano vem antes**, e por um motivo prático: ela e o pedido
+   * de ritual vivem em tabelas diferentes, e o mesmo webhook atende os dois.
+   * Se a busca por pedido rodasse primeiro, uma cobrança de assinatura cairia
+   * no `sem_pedido` e o pagamento ficaria órfão — a pessoa pagaria e não
+   * ganharia plano nenhum.
+   */
+  const cobranca =
+    buscarCobrancaPorPagamento(resultado.idExterno) ??
+    (resultado.referenciaExterna ? buscarCobranca(resultado.referenciaExterna) : undefined);
+
+  if (cobranca) {
+    const confirmada = confirmarPagamento(cobranca.id, {
+      metodo: resultado.metodo,
+      brutoCentavos: resultado.brutoCentavos,
+      taxaCentavos: resultado.taxaCentavos,
+      liquidoCentavos: resultado.liquidoCentavos,
+    });
+    registrarEvento(
+      confirmada?.assinatura ? 'assinatura_confirmada' : 'assinatura_ja_confirmada'
+    );
+    return { desfecho: 'assinatura_confirmada' };
   }
 
   // Casa por `pagamento_id` (gravado na criação) ou pela referência externa,

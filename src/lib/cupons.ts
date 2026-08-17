@@ -114,7 +114,12 @@ export interface PrecoComDesconto {
  * caso clássico de a vitrine mostrar um valor e a cobrança sair outro.
  */
 export function precoComDesconto(
-  produto: Produto,
+  /**
+   * Só o preço importa aqui. Pedir um `Produto` inteiro obrigava quem vende
+   * um PLANO a fabricar um produto de mentira, com `pdf`, `imagens` e
+   * `diasDeLinkPublico` que não significam nada numa conta de desconto.
+   */
+  produto: { precoCentavos: number },
   descontoPercentual = 0
 ): PrecoComDesconto {
   const pct = Math.max(0, Math.min(100, Math.round(descontoPercentual)));

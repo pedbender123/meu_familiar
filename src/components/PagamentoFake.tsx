@@ -10,7 +10,14 @@ import { Flame } from 'lucide-react';
  * de existir credencial de pagamento — e continua sendo o jeito de testar o
  * fluxo completo sem cobrar ninguém.
  */
-export function PagamentoFake({ pedidoId }: { pedidoId: string }) {
+export function PagamentoFake({
+  pedidoId,
+  /** `pedido` = funil do ritual; `cobranca` = assinatura. Ver CheckoutMercadoPago. */
+  base = 'pedido',
+}: {
+  pedidoId: string;
+  base?: 'pedido' | 'cobranca';
+}) {
   // Já começa "enviando": a confirmação dispara sozinha ao montar, então esse
   // é o estado real na primeira renderização. Setar isso dentro do efeito
   // causaria uma renderização em cascata sem necessidade.
@@ -19,7 +26,7 @@ export function PagamentoFake({ pedidoId }: { pedidoId: string }) {
 
   const confirmar = useCallback(async () => {
     try {
-      const resposta = await fetch(`/api/pedido/${pedidoId}/pagamento`, {
+      const resposta = await fetch(`/api/${base}/${pedidoId}/pagamento`, {
         method: 'POST',
       });
       const dados = await resposta.json();

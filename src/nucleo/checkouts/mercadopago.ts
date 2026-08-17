@@ -4,6 +4,22 @@ import { type Produto } from '../../lib/produtos';
 import { precoComDesconto } from '../../lib/cupons';
 
 /**
+ * O mínimo que o gateway precisa saber para cobrar.
+ *
+ * `Produto` satisfaz isto, e `Plano` também — que é o ponto. Quando os planos
+ * de assinatura passaram a ser vendáveis, a alternativa era converter cada
+ * plano num `Produto` de mentira só pra caber na assinatura da função, com
+ * campos (`pdf`, `imagens`, `diasDeLinkPublico`...) que não significam nada
+ * numa cobrança. Estreitar o tipo aqui é o inverso disso: o adaptador de
+ * pagamento passa a pedir só o que de fato usa.
+ */
+export interface Cobravel {
+  id: string;
+  descricao: string;
+  precoCentavos: number;
+}
+
+/**
  * Mercado Pago via **Payment Brick** (SPEC 0.5 e 10.1, travado).
  *
  * A diferença estrutural em relação ao Asaas que isto substituiu: o Asaas usava
@@ -79,7 +95,7 @@ export interface ResultadoPagamento {
  */
 export function montarCorpo(
   form: FormDataBrick,
-  produto: Produto,
+  produto: Cobravel,
   pedidoId: string,
   emailDoPedido: string,
   descontoPercentual: number
@@ -130,7 +146,7 @@ export function montarCorpo(
 
 export interface DadosCriacao {
   form: FormDataBrick;
-  produto: Produto;
+  produto: Cobravel;
   pedidoId: string;
   emailDoPedido: string;
   /**

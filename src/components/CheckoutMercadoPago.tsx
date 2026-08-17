@@ -68,6 +68,18 @@ export function CheckoutMercadoPago({
   modo,
   generoDoFamiliar,
   itens,
+  /**
+   * Onde cobrar e para onde ir depois.
+   *
+   * Nasceu tudo apontando para `/api/pedido/...` porque só existia o funil do
+   * ritual. Quando os planos passaram a ser vendáveis, a alternativa era um
+   * segundo componente de checkout — mesma integração com o Brick, mesmo
+   * tratamento de recusa, mesma espera do Pix, duplicados. Um checkout que
+   * diverge do outro é o tipo de coisa que só se descobre quando um dos dois
+   * para de cobrar direito.
+   */
+  base = 'pedido',
+  destino,
 }: {
   pedidoId: string;
   chavePublica: string;
@@ -79,6 +91,10 @@ export function CheckoutMercadoPago({
   itens?: string[];
   /** Presente só quando o pedido nasceu com cupom. */
   cupom?: { codigo: string; descontoPercentual: number; cheioEmReais: number };
+  /** `pedido` = funil do ritual; `cobranca` = assinatura de plano. */
+  base?: 'pedido' | 'cobranca';
+  /** Para onde ir quando confirmar. Padrão: a tela de obrigado do pedido. */
+  destino?: string;
   /** Quando não é `producao`, a tela precisa dizer isso em voz alta. */
   modo?: 'fake' | 'teste' | 'producao';
 }) {
@@ -162,7 +178,7 @@ export function CheckoutMercadoPago({
               // Estava declarado em MARCOS e nunca disparava. É o degrau
               // "apertou pagar" — distinto de "abriu o checkout".
               marcar('pagamento_tentado');
-              const resposta = await fetch(`/api/pedido/${pedidoId}/pagamento`, {
+              const resposta = await fetch(`/api/${base}/${pedidoId}/pagamento`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ formData }),
@@ -207,8 +223,8 @@ export function CheckoutMercadoPago({
     };
   }, [pedidoId, chavePublica, valorEmReais]);
 
-  if (pix) return <TelaPix pix={pix} pedidoId={pedidoId} />;
-  if (emAnalise) return <TelaEmAnalise pedidoId={pedidoId} />;
+  if (pix) return <TelaPix pix={pix} pedidoId={pedidoId} base={base} destino={destino} />;
+  if (emAnalise) return <TelaEmAnalise pedidoId={pedidoId} base={base} destino={destino} />;
 
   return (
     <div className="w-full max-w-md flex flex-col gap-6">
@@ -323,8 +339,16 @@ function FaixaDeModo({ modo }: { modo: 'fake' | 'teste' }) {
  * tela antiga mostrava "está em análise" e parava ali — a pessoa tinha o
  * dinheiro reservado no cartão e nenhuma indicação de que algo ia acontecer.
  */
-function TelaEmAnalise({ pedidoId }: { pedidoId: string }) {
-  const pronto = useEsperaDoPagamento(pedidoId);
+function TelaEmAnalise({
+  pedidoId,
+  base,
+  destino,
+}: {
+  pedidoId: string;
+  base: 'pedido' | 'cobranca';
+  destino?: string;
+}) {
+  const pronto = useEsperaDoPagamento(pedidoId, base, destino);
 
   if (pronto) return <TelaConfirmado />;
 
@@ -367,7 +391,11 @@ function TelaConfirmado() {
  * Quem confirma o pagamento é o webhook do Mercado Pago (SPEC 10.6); isto
  * aqui só observa o resultado. Devolve `true` uma vez e para de perguntar.
  */
-function useEsperaDoPagamento(pedidoId: string): boolean {
+function useEsperaDoPagamento(
+  pedidoId: string,
+  base: 'pedido' | 'cobranca',
+  destino?: string
+): boolean {
   const [pronto, setPronto] = useState(false);
 
   useEffect(() => {
@@ -377,13 +405,14 @@ function useEsperaDoPagamento(pedidoId: string): boolean {
     const conferir = async () => {
       if (!vivo || Date.now() - comecou > 15 * 60_000) return;
       try {
-        const r = await fetch(`/api/pedido/${pedidoId}`, { cache: 'no-store' });
+        const r = await fetch(`/api/${base}/${pedidoId}`, { cache: 'no-store' });
         const d = await r.json();
         if (!vivo) return;
         if (d.status && d.status !== 'aguardando_pagamento') {
           setPronto(true);
           // Um respiro para a pessoa VER que confirmou antes de a tela trocar.
-          setTimeout(() => window.location.assign(`/obrigado/${pedidoId}`), 1200);
+          const paraOnde = destino ?? `/obrigado/${pedidoId}`;
+          setTimeout(() => window.location.assign(paraOnde), 1200);
           return;
         }
       } catch {
@@ -397,7 +426,7 @@ function useEsperaDoPagamento(pedidoId: string): boolean {
       vivo = false;
       clearTimeout(t);
     };
-  }, [pedidoId]);
+  }, [pedidoId, base, destino]);
 
   return pronto;
 }
@@ -424,9 +453,19 @@ function useEsperaDoPagamento(pedidoId: string): boolean {
  * pagar — continuar perguntando seria bater no servidor à toa, e o e-mail de
  * entrega cobre quem pagar mais tarde.
  */
-function TelaPix({ pix, pedidoId }: { pix: Pix; pedidoId: string }) {
+function TelaPix({
+  pix,
+  pedidoId,
+  base,
+  destino,
+}: {
+  pix: Pix;
+  pedidoId: string;
+  base: 'pedido' | 'cobranca';
+  destino?: string;
+}) {
   const [copiado, setCopiado] = useState(false);
-  const pronto = useEsperaDoPagamento(pedidoId);
+  const pronto = useEsperaDoPagamento(pedidoId, base, destino);
 
   if (pronto) return <TelaConfirmado />;
 
