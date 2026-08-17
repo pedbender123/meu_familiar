@@ -55,7 +55,15 @@ export default async function InicioDaConta() {
   const perfilAstral = conta ? perfilAstralDaConta(conta.id) : null;
   const direitos = conta ? direitosEfetivos(conta.id, sessao!.email) : SEM_DIREITOS;
 
-  const ceu = ceuDoDia(new Date(), (ultima?.signo_lua as Signo) ?? null);
+  const agora = new Date();
+  const ceu = ceuDoDia(agora, (ultima?.signo_lua as Signo) ?? null);
+  // `pt-BR` no servidor: a data é a mesma pra todo mundo (o produto é
+  // brasileiro), e formatar no cliente causaria o texto piscar na hidratação.
+  const hoje = new Intl.DateTimeFormat('pt-BR', {
+    day: 'numeric',
+    month: 'long',
+    timeZone: 'America/Sao_Paulo',
+  }).format(agora);
 
   if (!familiar) {
     return (
@@ -106,7 +114,7 @@ export default async function InicioDaConta() {
       <div className="flex flex-col gap-3 p-5 rounded-2xl border border-pergaminho/10 bg-pergaminho/[0.03]">
         <div className="flex items-baseline justify-between gap-3">
           <p className="font-corpo text-[0.6rem] tracking-[0.24em] uppercase text-pergaminho/35">
-            Hoje
+            Hoje <span className="text-pergaminho/25">· {hoje}</span>
           </p>
           <p className="font-corpo text-xs text-pergaminho/45">
             {ceu.faseNome} em {ceu.luaEm}
