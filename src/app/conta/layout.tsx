@@ -3,7 +3,11 @@ import { sessaoAtual } from '@/lib/sessao-servidor';
 import { buscarConta } from '@/lib/autenticacao';
 import { direitosEfetivos } from '@/nucleo/acesso';
 import { SEM_DIREITOS } from '@/nucleo/direitos';
-import { LivroAberto, type ItemDoSumario } from '@/plataforma/LivroAberto';
+import { PoeiraNaLuz } from '@/components/PoeiraNaLuz';
+import {
+  NavegacaoDaPlataforma,
+  type ItemDeNavegacao,
+} from '@/plataforma/NavegacaoDaPlataforma';
 
 export const metadata = {
   title: 'Seu Bruxário',
@@ -11,15 +15,18 @@ export const metadata = {
 };
 
 /**
- * A moldura da área logada — o grimório aberto (Fase 5).
+ * A moldura da área logada — a casca da plataforma (Fase 5).
  *
  * O layout guarda o acesso **uma vez só**, aqui, em vez de cada página
  * repetir a checagem — assim não existe a página nova que alguém esquece de
  * proteger.
  *
- * Os direitos são lidos aqui e viram o sumário: é o único lugar que decide o
- * que a pessoa vê listado. Capítulo sem direito continua no índice, mais
- * apagado — ver `LivroAberto`.
+ * Os direitos são lidos aqui e viram o menu: é o único lugar que decide o que
+ * a pessoa vê listado. Item sem direito continua aparecendo, apagado — ver
+ * `NavegacaoDaPlataforma`.
+ *
+ * Segue a regra da estética: isto é o QUARTO. A navegação é interface e fica
+ * no escuro; o conteúdo de cada página é que sobe no pergaminho.
  */
 export default async function LayoutDaConta({
   children,
@@ -34,33 +41,42 @@ export default async function LayoutDaConta({
     ? direitosEfetivos(conta.id, sessao.email)
     : SEM_DIREITOS;
 
-  // Numeração de capítulo em romano: é o que um grimório usaria, e dá ao
-  // sumário um ritmo que "1. 2. 3." não dá.
-  const itens: ItemDoSumario[] = [
-    { numero: 'I', rotulo: 'Início', rota: '/conta', liberado: true },
+  const itens: ItemDeNavegacao[] = [
+    { rotulo: 'Início', rota: '/conta', liberado: true, icone: 'inicio' },
     {
-      numero: 'II',
       rotulo: 'Familiar',
       rota: '/conta/familiar',
-      liberado: direitos.pdf || direitos.perfilCompleto,
+      liberado: direitos.pdf,
+      icone: 'familiar',
     },
     {
-      numero: 'III',
       rotulo: 'Oráculo',
       rota: '/conta/oraculo',
       liberado: direitos.perguntasOraculo > 0,
+      icone: 'oraculo',
     },
     {
-      numero: 'IV',
       rotulo: 'Calendário',
       rota: '/conta/calendario',
-      liberado: direitos.alcanceCalendario !== 'nenhum' || direitos.tiragemDiaria,
+      liberado: direitos.tiragemDiaria,
+      icone: 'horoscopo',
     },
   ];
 
   return (
-    <LivroAberto itens={itens} email={sessao.email}>
-      {children}
-    </LivroAberto>
+    <>
+      <PoeiraNaLuz />
+      <div className="quarto-de-vela relative z-10 flex-1 flex flex-col lg:pl-56">
+        <NavegacaoDaPlataforma itens={itens} email={sessao.email} />
+        {/*
+          `pb-24` no celular abre espaço para a barra inferior fixa não cobrir
+          o fim do conteúdo — sem isso o último parágrafo de toda página fica
+          escondido atrás dela.
+        */}
+        <main className="w-full flex-1 flex flex-col items-center px-5 pb-24 lg:pb-16 lg:pt-8">
+          {children}
+        </main>
+      </div>
+    </>
   );
 }

@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, type ReactNode } from 'react';
-import { gerarGrao } from '@/lib/grao';
 
 /**
  * A folha de pergaminho: uma superfície apoiada no quarto escuro, não o fundo
@@ -29,6 +28,35 @@ const BORDA_RASGADA = `polygon(
   74% 100%, 49% 99.1%, 26% 100%, 0.6% 99.4%,
   0% 76%, 0.8% 49%, 0% 23%
 )`;
+
+/**
+ * Grão do papel gerado em Canvas e reaproveitado por toda a aplicação.
+ *
+ * Ruído concentrado no claro, não no escuro: papel tem fibra, não sujeira. Um
+ * tile de 128px repetido custa alguns kB de data URL em vez de uma imagem que
+ * o CSP do navegador teria que buscar.
+ */
+let graoEmCache: string | null = null;
+
+function gerarGrao(): string {
+  if (graoEmCache) return graoEmCache;
+
+  const lado = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = lado;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return '';
+
+  const img = ctx.createImageData(lado, lado);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const v = 200 + Math.random() * 55;
+    img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+    img.data[i + 3] = 26 + Math.random() * 26;
+  }
+  ctx.putImageData(img, 0, 0);
+  graoEmCache = canvas.toDataURL();
+  return graoEmCache;
+}
 
 export function FolhaPergaminho({
   children,

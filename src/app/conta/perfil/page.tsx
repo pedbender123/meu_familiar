@@ -3,6 +3,7 @@ import db from '@/lib/db';
 import { sessaoAtual } from '@/lib/sessao-servidor';
 import { FAMILIARES, type FamiliarId } from '@/lib/familiares';
 import { produtoDe, linkPublicoExpirou, diasRestantes } from '@/lib/produtos';
+import { FolhaPergaminho } from '@/components/FolhaPergaminho';
 import { SigiloFamiliar } from '@/components/SigiloFamiliar';
 import { BotaoSair } from '@/components/BotaoSair';
 
@@ -36,7 +37,7 @@ export default async function Perfil() {
 
   return (
     <section className="w-full max-w-2xl flex flex-col items-center gap-7 pt-4 sm:pt-8">
-      <div className="w-full flex flex-col items-center gap-6">
+      <FolhaPergaminho>
         <p className="font-corpo text-[0.68rem] tracking-[0.24em] uppercase text-escrita-fraca">
           Seu perfil
         </p>
@@ -122,7 +123,7 @@ export default async function Perfil() {
             })}
           </ul>
         )}
-      </div>
+      </FolhaPergaminho>
 
       <BotaoSair />
     </section>
