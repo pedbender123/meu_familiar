@@ -56,7 +56,7 @@ export function aoMudarMudo(ouvinte: (mudo: boolean) => void): () => void {
   return () => window.removeEventListener(EVENTO_MUDO, handler);
 }
 
-type Efeito = 'clique' | 'avancar' | 'revelar';
+type Efeito = 'clique' | 'avancar' | 'revelar' | 'carta' | 'ouro' | 'ceu';
 
 interface Perfil {
   /** Uma frequência = tique simples; várias = pequeno arpejo. */
@@ -73,6 +73,22 @@ const PERFIS: Record<Efeito, Perfil> = {
   avancar: { frequencias: [520, 780], duracao: 0.14, ganho: 0.28, tipo: 'sine' },
   // Ritual selado / mensagem revelada: arpejo mais quente e longo.
   revelar: { frequencias: [440, 660, 880], duracao: 0.55, ganho: 0.34, tipo: 'triangle' },
+
+  /* ── O ritual do Oráculo ──────────────────────────────────────────────
+   *
+   * Sintetizados como o resto, e não em arquivo de áudio, pelo mesmo motivo
+   * dos outros: um tique de 80ms em MP3 custa mais em requisição do que em
+   * som, e o navegador já sabe fazer isto. Arquivo gravado só se pagaria em
+   * textura que oscilador não alcança — e aí é uma troca consciente, não o
+   * padrão.
+   */
+
+  // Carta batendo na mesa: nota grave e MUITO curta, com corpo de triângulo.
+  carta: { frequencias: [180, 140], duracao: 0.09, ganho: 0.3, tipo: 'triangle' },
+  // O plim do dia de ouro: terça maior subindo, brilhante e mais longo.
+  ouro: { frequencias: [880, 1320, 1760], duracao: 0.9, ganho: 0.3, tipo: 'sine' },
+  // O céu abrindo: grave e lento, quase um zumbido.
+  ceu: { frequencias: [110, 165], duracao: 1.1, ganho: 0.2, tipo: 'sine' },
 };
 
 /** Toca um efeito sintetizado. Silencioso se o navegador não suportar áudio. */

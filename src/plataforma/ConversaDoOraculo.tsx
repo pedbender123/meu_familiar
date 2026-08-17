@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import Link from 'next/link';
 import { TextoEscrito } from '@/components/TextoEscrito';
 import { Sugestoes, type Sugestao } from './oraculo/Sugestoes';
 import { PainelDeCotas, type Cota } from './oraculo/PainelDeCotas';
+import { Ritual } from './oraculo/Ritual';
 import type { ResultadoDoEspetaculo } from '@/modulos/oraculo/espetaculos';
 import type { LeituraDoOraculo } from '@/modulos/oraculo/leitura';
 
@@ -37,6 +39,16 @@ export function ConversaDoOraculo({
   const [falas, setFalas] = useState<Fala[]>([]);
   const [rascunho, setRascunho] = useState('');
   const [ocupado, setOcupado] = useState<'mensagem' | 'leitura' | null>(null);
+  /**
+   * A leitura que já chegou do servidor mas ainda NÃO pode aparecer: o ritual
+   * está rodando. Sem esta gaveta, a resposta surgiria no meio das cartas
+   * virando e estragaria as duas coisas — o teatro e o texto.
+   */
+  const [aguardandoRitual, setAguardandoRitual] = useState<Fala | null>(null);
+  const [ritual, setRitual] = useState<{
+    espetaculos: ResultadoDoEspetaculo[];
+    diaDeOuro: boolean;
+  } | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [mensagens, setMensagens] = useState(cotaDeMensagens);
   const [leituras, setLeituras] = useState(cotaDeLeituras);
@@ -74,17 +86,19 @@ export function ConversaDoOraculo({
         return;
       }
 
-      setFalas((antes) => [
-        ...antes,
-        tipo === 'leitura'
-          ? {
-              de: 'oraculo',
-              leitura: corpo.leitura,
-              espetaculos: corpo.espetaculos,
-              diaDeOuro: corpo.diaDeOuro,
-            }
-          : { de: 'oraculo', texto: corpo.resposta },
-      ]);
+      if (tipo === 'leitura') {
+        // O teatro começa AGORA, com os símbolos que vieram junto; o texto
+        // fica guardado até ele acabar.
+        setRitual({ espetaculos: corpo.espetaculos, diaDeOuro: corpo.diaDeOuro });
+        setAguardandoRitual({
+          de: 'oraculo',
+          leitura: corpo.leitura,
+          espetaculos: corpo.espetaculos,
+          diaDeOuro: corpo.diaDeOuro,
+        });
+      } else {
+        setFalas((antes) => [...antes, { de: 'oraculo', texto: corpo.resposta }]);
+      }
 
       const atualizar = (c: Cota): Cota => ({
         ...c,
@@ -143,7 +157,21 @@ export function ConversaDoOraculo({
           )
         )}
 
-        {ocupado && <Esperando tipo={ocupado} nomeDoFamiliar={nomeDoFamiliar} />}
+        {ritual && (
+          <Ritual
+            espetaculos={ritual.espetaculos}
+            diaDeOuro={ritual.diaDeOuro}
+            aoTerminar={() => {
+              setFalas((antes) =>
+                aguardandoRitual ? [...antes, aguardandoRitual] : antes
+              );
+              setAguardandoRitual(null);
+              setRitual(null);
+            }}
+          />
+        )}
+
+        {ocupado && !ritual && <Esperando tipo={ocupado} nomeDoFamiliar={nomeDoFamiliar} />}
         <div ref={fim} />
       </div>
 
@@ -154,6 +182,13 @@ export function ConversaDoOraculo({
       )}
 
       <PainelDeCotas mensagens={mensagens} leituras={leituras} />
+
+      <Link
+        href="/conta/oraculo/historico"
+        className="self-center font-corpo text-xs text-pergaminho/35 hover:text-pergaminho/70 transition-colors"
+      >
+        ver tudo que já foi dito →
+      </Link>
 
       {!vazio && (
         <Sugestoes
@@ -268,7 +303,7 @@ function Esperando({
             key={i}
             className="w-1.5 h-1.5 rounded-full bg-vela/60"
             style={{
-              animation: 'pulse 1.4s ease-in-out infinite',
+              animation: 'cintilar 1.4s ease-in-out infinite',
               animationDelay: `${i * 0.2}s`,
             }}
           />
