@@ -10,7 +10,7 @@ import { gerarNarracao, textoDaLeituraParaNarrar } from './narracao';
 import { pastaDoPedido } from './caminhos';
 import { centavosDeNarracao } from './custos';
 import { registrarUsoDeCupom } from './cupons';
-import { enviarRevelacao, enviarContaCriada, enviarCompraConfirmada } from './email';
+import { enviarContaCriada, enviarCompraConfirmada } from './email';
 import {
   garantirConta,
   buscarConta,
@@ -276,20 +276,21 @@ export async function processarPedido(pedidoId: string): Promise<void> {
       return;
     }
 
-    try {
-      await enviarRevelacao({
-        nome: pedido.nome,
-        email: pedido.email,
-        pedidoId,
-        produtoId: pedido.produto,
-        nomeFamiliar: familiar.nome,
-        nomeSecreto: leitura.nome_secreto,
-        expiraEm: pedido.expira_em,
-      });
-    } catch (erroEmail) {
-      console.error(`[processarPedido] e-mail falhou no pedido ${pedidoId}:`, erroEmail);
-      registrarEvento('email_falhou', pedidoId);
-    }
+    /**
+     * **O familiar NÃO vai mais por e-mail.**
+     *
+     * Ele ia: um e-mail com o nome do familiar, o PDF anexo e um link para a
+     * revelação. Isso resolvia a entrega e matava tudo o mais — a pessoa
+     * baixava o PDF, fechava a caixa de entrada e nunca via que existe um
+     * Oráculo, um calendário e um perfil esperando por ela.
+     *
+     * Desde que a Revelação virou grátis (agosto/2026), o e-mail deixa de ser
+     * a entrega e passa a ser a CHAVE: ele diz que o familiar chegou e leva
+     * para dentro. O PDF continua sendo dela e baixa lá de dentro, ao lado do
+     * resto — que é justamente o que ela precisa ver para querer assinar.
+     *
+     * Ver `enviarContaCriada`, logo abaixo, que virou esse e-mail.
+     */
 
     /**
      * **Todo comprador ganha conta**, não só a Completa.
@@ -313,6 +314,10 @@ export async function processarPedido(pedidoId: string): Promise<void> {
         url: `${base}/entrar/verificar?t=${encodeURIComponent(token)}&e=lg`,
         minutosDeValidade: VALIDADE_DO_LINK_MIN,
         contaNova,
+        // O familiar vai no e-mail como NOTÍCIA, não como entrega: é o que
+        // faz a pessoa clicar. O que ela vem buscar está dentro.
+        nomeFamiliar: familiar.nome,
+        nomeSecreto: leitura.nome_secreto,
       });
       registrarEvento(contaNova ? 'conta_criada' : 'conta_acesso_enviado', pedidoId);
 

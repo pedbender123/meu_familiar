@@ -361,27 +361,76 @@ export async function enviarLembreteDeCarrinho(params: {
  * "você tem um lugar onde ele mora". Juntá-las faria a segunda desaparecer
  * dentro da primeira, e é a segunda que a pessoa vai precisar daqui a um mês.
  */
+/**
+ * **O e-mail da chegada** — o único que sai depois do ritual.
+ *
+ * ── O que ele substituiu, e por quê ───────────────────────────────────────
+ *
+ * Antes saíam dois: um com o familiar (nome, PDF anexo, link da revelação) e
+ * outro com o acesso à conta. O primeiro resolvia a entrega e matava tudo o
+ * mais — a pessoa baixava o PDF, fechava a caixa de entrada, e nunca ficava
+ * sabendo que existe um Oráculo, um calendário e um retrato esperando por
+ * ela. O e-mail entregava o produto e enterrava a plataforma.
+ *
+ * Agora ele é a **chave**, não a entrega: anuncia quem atravessou e leva
+ * para dentro. O PDF continua sendo dela e baixa lá, ao lado do resto — que
+ * é justamente o que ela precisa ver.
+ *
+ * ── A regra de redação ────────────────────────────────────────────────────
+ *
+ * O nome do familiar aparece, e o nome secreto também. Segurá-los para
+ * "forçar o clique" seria um truque barato, e desses a pessoa desconfia. O
+ * que faz clicar é o contrário: dar o suficiente para a notícia ser boa, e
+ * deixar claro que o resto é grande demais para caber num e-mail.
+ */
 export async function enviarContaCriada(params: {
   nome: string;
   email: string;
   url: string;
   minutosDeValidade: number;
   contaNova: boolean;
+  nomeFamiliar?: string;
+  nomeSecreto?: string;
 }): Promise<void> {
-  const { nome, email, url, minutosDeValidade, contaNova } = params;
+  const { nome, email, url, minutosDeValidade, contaNova, nomeFamiliar, nomeSecreto } =
+    params;
+
+  const chegou = !!nomeFamiliar;
 
   const html = moldura(`
     <p style="margin:0 0 18px;font-size:24px;font-style:italic;color:#2E2438;">
-      ${contaNova ? `${nome}, seu Bruxário está aberto.` : `${nome}, sua revelação já está no seu Bruxário.`}
+      ${chegou ? `${nome}, ${nomeFamiliar} atravessou.` : `${nome}, seu Bruxário está aberto.`}
     </p>
-    <p style="margin:0 0 22px;font-size:15px;line-height:1.7;">
-      ${
-        contaNova
-          ? 'Criamos uma conta para você com este mesmo e-mail. Sua revelação fica guardada nela — sem prazo, sem senha para inventar.'
-          : 'Ela se juntou às outras que já estavam lá.'
-      }
-    </p>
-    <p style="margin:0 0 22px;">${botao(url, 'Entrar no meu Bruxário')}</p>
+
+    ${
+      chegou && nomeSecreto
+        ? `<p style="margin:0 0 22px;font-size:15px;line-height:1.7;">
+             O nome secreto dele é <strong>${nomeSecreto}</strong>. A leitura
+             inteira — e o PDF para guardar — está esperando dentro do seu
+             Bruxário.
+           </p>`
+        : `<p style="margin:0 0 22px;font-size:15px;line-height:1.7;">
+             ${
+               contaNova
+                 ? 'Criamos uma conta para você com este mesmo e-mail. O que é seu fica guardado nela — sem prazo, sem senha para inventar.'
+                 : 'Ela se juntou às outras que já estavam lá.'
+             }
+           </p>`
+    }
+
+    <p style="margin:0 0 22px;">${botao(url, 'Abrir o meu Bruxário')}</p>
+
+    ${
+      chegou
+        ? `<p style="margin:0 0 22px;font-family:Arial,sans-serif;font-size:14px;line-height:1.7;color:#3A2F44;">
+             Lá dentro você também encontra:<br>
+             · o <strong>Oráculo</strong>, para perguntar o que quiser<br>
+             · o <strong>calendário dos seus dias</strong>, lido do seu mapa<br>
+             · o seu <strong>retrato</strong>, do que o teste mediu
+           </p>`
+        : ''
+    }
+
     <p style="margin:0;font-family:Arial,sans-serif;font-size:12px;line-height:1.6;color:#6B5F72;">
       Este link vale por ${minutosDeValidade} minutos e funciona uma vez só.
       Depois, é só pedir outro em bruxario.com.br/entrar — nunca vai existir
@@ -391,17 +440,26 @@ export async function enviarContaCriada(params: {
 
   await enviar({
     para: email,
-    assunto: contaNova
-      ? `${nome}, seu Bruxário está aberto`
-      : `${nome}, sua revelação foi guardada`,
+    assunto: chegou
+      ? `${nome}, ${nomeFamiliar} atravessou o véu`
+      : contaNova
+        ? `${nome}, seu Bruxário está aberto`
+        : `${nome}, sua revelação foi guardada`,
     html,
     texto: [
-      contaNova
-        ? `${nome}, criamos uma conta no Bruxário com este e-mail. Sua revelação fica guardada nela, sem prazo.`
-        : `${nome}, sua revelação foi guardada no seu Bruxário.`,
-      `Entrar: ${url}`,
-      `O link vale ${minutosDeValidade} minutos e funciona uma vez só. Depois é só pedir outro em bruxario.com.br/entrar.`,
-    ].join('\n\n'),
+      chegou
+        ? `${nome}, ${nomeFamiliar} atravessou.${nomeSecreto ? ` O nome secreto dele é ${nomeSecreto}.` : ''} A leitura inteira e o PDF estão dentro do seu Bruxário.`
+        : contaNova
+          ? `${nome}, criamos uma conta no Bruxário com este e-mail. O que é seu fica guardado nela, sem prazo.`
+          : `${nome}, sua revelação foi guardada no seu Bruxário.`,
+      `Abrir: ${url}`,
+      chegou
+        ? 'Lá dentro também estão o Oráculo, o calendário dos seus dias e o seu retrato.'
+        : '',
+      `O link vale ${minutosDeValidade} minutos e funciona uma vez só.`,
+    ]
+      .filter(Boolean)
+      .join('\n\n'),
   });
 }
 

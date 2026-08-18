@@ -104,12 +104,32 @@ export default async function FamiliarDaConta() {
               </p>
             )}
 
-            <Link
-              href={`/revelacao/${linha.id}`}
-              className="font-corpo text-sm px-6 py-2.5 rounded-full border border-vela/45 text-vela hover:bg-vela/10 transition-colors"
-            >
-              Abrir a revelação completa
-            </Link>
+            <div className="flex flex-wrap items-center justify-center gap-2.5">
+              <Link
+                href={`/revelacao/${linha.id}`}
+                className="font-corpo text-sm px-6 py-2.5 rounded-full border border-vela/45 text-vela hover:bg-vela/10 transition-colors"
+              >
+                Abrir a revelação
+              </Link>
+
+              {/*
+                O PDF baixa AQUI, não pelo e-mail. É a troca que a mudança de
+                agosto/2026 fez: o e-mail virou a chave, e o artefato mora
+                dentro — do lado do Oráculo e do calendário, que é o que a
+                pessoa precisa ver para querer o resto.
+
+                `download` no anchor, e não `target=_blank`: o PDF é dela, e
+                abrir num visualizador de aba nova esconde justamente o gesto
+                de guardar.
+              */}
+              <a
+                href={`/api/storage/${linha.id}/revelacao.pdf`}
+                download={`bruxario-${familiar.nome.toLowerCase().replace(/\s+/g, '-')}.pdf`}
+                className="font-corpo text-sm px-6 py-2.5 rounded-full border border-pergaminho/20 text-pergaminho/65 hover:border-pergaminho/45 hover:text-pergaminho transition-colors"
+              >
+                Baixar o PDF
+              </a>
+            </div>
           </article>
         );
       })}

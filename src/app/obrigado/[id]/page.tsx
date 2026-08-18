@@ -73,7 +73,15 @@ export default function Obrigado({ params }: { params: Promise<{ id: string }> }
 
         if (dados.status === 'entregue') {
           clearInterval(poll);
-          router.push(`/revelacao/${id}`);
+          /**
+           * Vai para a OFERTA, não direto para a revelação.
+           *
+           * Ir direto entregava o produto e fazia a plataforma desaparecer: a
+           * pessoa lia o familiar, fechava a aba, e nunca ficava sabendo do
+           * Oráculo nem do calendário. Este é o único momento de atenção
+           * total dela — e a revelação continua a um clique dali.
+           */
+          router.push(`/oferta/${id}`);
           return;
         }
 
