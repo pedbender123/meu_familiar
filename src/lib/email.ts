@@ -935,3 +935,138 @@ export async function enviarPedidoDeNascimento(params: {
     ].join('\n\n'),
   });
 }
+
+/**
+ * O aviso de dia de ouro — o retorno mais barato que a plataforma tem.
+ *
+ * ── Por que este e-mail é diferente dos outros ────────────────────────────
+ *
+ * Ele não vende nada e não pede nada. Diz que hoje é um dos poucos dias em
+ * que os quatro domínios abrem juntos no mapa DELA, e que isso já está
+ * calculado esperando. É o único e-mail do sistema cujo conteúdo é
+ * inteiramente determinístico: sai de `astronomy-engine`, sem uma chamada de
+ * IA e sem um centavo de custo variável.
+ *
+ * ── E por que ele é raro por construção ───────────────────────────────────
+ *
+ * Dia de ouro exige as quatro portas abertas ao mesmo tempo. São poucos por
+ * ano, e é justamente a raridade que faz o aviso valer — se chegasse toda
+ * semana viraria ruído, e o próximo iria para a lixeira sem ser aberto.
+ */
+export async function enviarDiaDeOuro(params: {
+  email: string;
+  nome: string;
+  url: string;
+  frase: string;
+}): Promise<void> {
+  const { email, nome, url, frase } = params;
+  const primeiro = nome.trim().split(/\s+/)[0] || '';
+
+  const html = moldura(`
+    <p style="margin:0 0 6px;font-family:Arial,sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#B08D3F;">
+      dia de ouro
+    </p>
+    <p style="margin:0 0 18px;font-size:22px;font-style:italic;color:#2E2438;">
+      ${primeiro ? `${primeiro}, hoje` : 'Hoje'} as quatro portas abrem juntas.
+    </p>
+    <p style="margin:0 0 22px;font-size:15px;line-height:1.6;">
+      ${frase}
+    </p>
+    <p style="margin:0 0 22px;">${botao(url, 'Ver o meu dia')}</p>
+    <p style="margin:0;font-family:Arial,sans-serif;font-size:12px;line-height:1.6;color:#6B5F72;">
+      São poucos por ano — é isso que os torna o que são. Este aviso só chega
+      nos dias em que acontece.
+    </p>
+  `);
+
+  await enviar({
+    para: email,
+    assunto: primeiro
+      ? `${primeiro}, hoje é um dia de ouro`
+      : 'Hoje é um dia de ouro',
+    html,
+    texto: `${frase}\n\nVeja o seu dia: ${url}`,
+  });
+}
+
+/**
+ * "Suas leituras voltaram" — o e-mail do primeiro dia do mês.
+ *
+ * A cota do Oráculo vira no dia 1 (ver `nucleo/consumo.ts`: a janela está na
+ * chave, então nada precisa ser zerado). Quem gastou tudo no dia 20 não tem
+ * como saber disso sem abrir o site — e não abre, porque da última vez que
+ * abriu estava esgotado.
+ *
+ * É o gancho de retorno mais honesto que existe aqui: não inventa urgência,
+ * só avisa de uma coisa verdadeira que a pessoa não tem como ver de fora.
+ */
+export async function enviarCotaRenovada(params: {
+  email: string;
+  nome: string;
+  url: string;
+  leituras: number;
+  mensagens: number;
+}): Promise<void> {
+  const { email, nome, url, leituras, mensagens } = params;
+  const primeiro = nome.trim().split(/\s+/)[0] || '';
+
+  const html = moldura(`
+    <p style="margin:0 0 18px;font-size:22px;font-style:italic;color:#2E2438;">
+      ${primeiro ? `${primeiro}, o` : 'O'} mês virou — e o Oráculo também.
+    </p>
+    <p style="margin:0 0 22px;font-size:15px;line-height:1.6;">
+      Você tem ${leituras === 1 ? '1 leitura' : `${leituras} leituras`} e
+      ${mensagens} mensagens esperando. Elas não acumulam de um mês para o
+      outro, então o que não for usado até o fim do mês se perde.
+    </p>
+    <p style="margin:0 0 22px;">${botao(url, 'Falar com o Oráculo')}</p>
+  `);
+
+  await enviar({
+    para: email,
+    assunto: primeiro ? `${primeiro}, suas leituras voltaram` : 'Suas leituras voltaram',
+    html,
+    texto: `${leituras} leitura(s) e ${mensagens} mensagens esperando: ${url}`,
+  });
+}
+
+/**
+ * O resumo do dia, para o dono. **Único e-mail do sistema que não vai para
+ * cliente**, e o único que pode ser feio se precisar ser rápido.
+ *
+ * Existe porque o painel só conta a história para quem abre o painel, e a
+ * pergunta "vendeu alguma coisa ontem?" não deveria exigir abrir nada. É
+ * também um alarme passivo: um dia em que o número de rituais cai a zero é
+ * visível na caixa de entrada antes de ser visível em qualquer gráfico.
+ */
+export async function enviarResumoDoDia(params: {
+  email: string;
+  linhas: { rotulo: string; valor: string }[];
+  quando: string;
+}): Promise<void> {
+  const { email, linhas, quando } = params;
+
+  const html = moldura(`
+    <p style="margin:0 0 18px;font-size:22px;font-style:italic;color:#2E2438;">
+      Bruxário · ${quando}
+    </p>
+    <table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:14px;">
+      ${linhas
+        .map(
+          (l) => `<tr>
+        <td style="padding:6px 0;color:#6B5F72;">${l.rotulo}</td>
+        <td style="padding:6px 0;text-align:right;color:#2E2438;font-weight:bold;">${l.valor}</td>
+      </tr>`
+        )
+        .join('')}
+    </table>
+    <p style="margin:24px 0 0;">${botao(`${base()}/painel/central`, 'Abrir o painel')}</p>
+  `);
+
+  await enviar({
+    para: email,
+    assunto: `Bruxário · ${quando}`,
+    html,
+    texto: linhas.map((l) => `${l.rotulo}: ${l.valor}`).join('\n'),
+  });
+}
