@@ -10,14 +10,14 @@ export const metadata = {
 /**
  * A porta do painel.
  *
- * **Não há campo nenhum aqui, e é isso que a torna segura.** Sem caixa de
- * e-mail não há para onde apontar o link; sem senha não há o que forçar; sem
- * lista de usuários não há quem enumerar. O botão sempre faz a mesma coisa:
- * manda um link para o endereço fixo em `ADMIN_EMAIL`. Quem não tem acesso a
- * essa caixa de entrada não entra, e nenhuma tentativa daqui muda isso.
+ * Havia só um botão aqui: sem campo, não havia para onde apontar o link. Com
+ * a equipe do painel (migração 021) passou a existir um campo de e-mail, e a
+ * garantia mudou de forma sem enfraquecer: **a resposta é idêntica para todo
+ * endereço**, esteja ele na lista ou não. Não há quem enumerar, não há senha
+ * para forçar, e só quem tem acesso à caixa de entrada certa entra.
  *
- * O caminho não é segredo e não precisa ser — a segurança está no e-mail
- * fixo, não na obscuridade da URL.
+ * O caminho não é segredo e não precisa ser — a segurança está em quem recebe
+ * o e-mail, não na obscuridade da URL.
  */
 export default function EntrarNoPainel() {
   return (
@@ -29,8 +29,8 @@ export default function EntrarNoPainel() {
             Painel do Bruxário
           </h1>
           <p className="font-corpo font-light text-sm text-escrita-corpo text-center max-w-[38ch] leading-relaxed">
-            Não há o que preencher. O link de acesso vai para o endereço do
-            dono e vale por 20 minutos.
+            O link de acesso vai para o seu e-mail e vale por 20 minutos. Só
+            endereços autorizados recebem.
           </p>
           <BotaoDeAcessoAdmin />
         </FolhaPergaminho>

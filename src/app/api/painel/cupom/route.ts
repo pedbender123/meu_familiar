@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { alternarCupom, criarCupom, listarCupons } from '@/lib/cupons';
 import { registrarEvento } from '@/lib/db';
-import { sessaoAtual } from '@/lib/sessao-servidor';
+import { exigirEdicaoNoPainel, sessaoDoPainel } from '@/lib/guarda-painel';
 
 /**
  * Cupons, do painel. Exige sessão de admin em todos os métodos.
@@ -10,9 +10,9 @@ import { sessaoAtual } from '@/lib/sessao-servidor';
  * apontando para um código inexistente, e some com o histórico de quanto a
  * campanha custou. Desligar resolve o mesmo problema sem perder o rastro.
  */
+/** Ler: dono ou equipe. Alterar tem portão próprio — ver o POST. */
 async function exigirAdmin() {
-  const sessao = await sessaoAtual();
-  return sessao && sessao.tipo === 'admin';
+  return !!(await sessaoDoPainel());
 }
 
 export async function GET() {
@@ -23,9 +23,12 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  if (!(await exigirAdmin())) {
-    return NextResponse.json({ erro: 'não autorizado' }, { status: 401 });
-  }
+  /**
+   * Só o dono altera. A equipe vê a lista pelo GET acima, mas criar, desligar
+   * ou creditar é exclusivo — ver `lib/guarda-painel.ts`.
+   */
+  const barrado = await exigirEdicaoNoPainel();
+  if (barrado) return barrado;
 
   const corpo = (await req.json().catch(() => ({}))) ?? {};
   const resultado = criarCupom({

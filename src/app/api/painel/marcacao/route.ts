@@ -4,11 +4,11 @@ import {
   gerarLinkDeResgate,
   listarMarcacoes,
 } from '@/lib/marcacoes';
-import { sessaoAtual } from '@/lib/sessao-servidor';
+import { exigirEdicaoNoPainel, sessaoDoPainel } from '@/lib/guarda-painel';
 
+/** Ler: dono ou equipe. Alterar tem portão próprio — ver o POST. */
 async function admin() {
-  const s = await sessaoAtual();
-  return s && s.tipo === 'admin';
+  return !!(await sessaoDoPainel());
 }
 
 export async function GET() {
@@ -20,9 +20,12 @@ export async function GET() {
 
 /** Confirma uma marcação (credita o bônus) ou gera link de resgate. */
 export async function POST(req: NextRequest) {
-  if (!(await admin())) {
-    return NextResponse.json({ erro: 'não autorizado' }, { status: 401 });
-  }
+  /**
+   * Só o dono altera. A equipe vê a lista pelo GET acima, mas criar, desligar
+   * ou creditar é exclusivo — ver `lib/guarda-painel.ts`.
+   */
+  const barrado = await exigirEdicaoNoPainel();
+  if (barrado) return barrado;
 
   const { acao, id, arroba } = (await req.json().catch(() => ({}))) ?? {};
 

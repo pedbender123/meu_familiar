@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sessaoAtual } from '@/lib/sessao-servidor';
+import { exigirEdicaoNoPainel } from '@/lib/guarda-painel';
 import { apagarPeca, criarPeca, listarPecas } from '@/lib/campanhas';
 
 /**
@@ -11,10 +11,12 @@ import { apagarPeca, criarPeca, listarPecas } from '@/lib/campanhas';
  * para descobrir o que acabou de criar.
  */
 async function exigirAdmin() {
-  const sessao = await sessaoAtual();
-  if (!sessao || sessao.tipo !== 'admin') {
-    return NextResponse.json({ erro: 'não autorizado' }, { status: 401 });
-  }
+  /**
+   * Só o dono altera. A equipe do painel entra com `tipo === 'admin'` e vê
+   * tudo, mas não muda nada — ver `lib/guarda-painel.ts`.
+   */
+  const barrado = await exigirEdicaoNoPainel();
+  if (barrado) return barrado;
   return null;
 }
 

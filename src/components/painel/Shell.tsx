@@ -44,10 +44,20 @@ export interface Area {
 export function Shell({
   areas,
   email,
+  somenteLeitura = false,
   children,
 }: {
   areas: Area[];
   email: string;
+  /**
+   * `true` para a equipe do painel: vê tudo, não altera nada.
+   *
+   * O aviso na tela não é a trava — a trava está em `guarda-painel.ts`, no
+   * servidor. Ele existe para a pessoa não descobrir a limitação clicando num
+   * botão e recebendo erro: "não pode" dito antes é informação, dito depois é
+   * defeito.
+   */
+  somenteLeitura?: boolean;
   children: React.ReactNode;
 }) {
   const caminho = usePathname();
@@ -160,7 +170,21 @@ export function Shell({
           </nav>
         )}
 
-        <main className="flex-1 px-4 sm:px-6 py-5">{children}</main>
+        <main className="flex-1 px-4 sm:px-6 py-5">
+          {somenteLeitura && (
+            <div
+              className="mb-4 px-4 py-2.5 rounded-lg border text-[0.78rem] font-corpo"
+              style={{
+                borderColor: 'var(--admin-borda)',
+                color: 'var(--admin-texto-fraco)',
+              }}
+            >
+              Acesso de leitura. Você vê tudo o que está aqui, mas não altera
+              nada — botões de criar, editar e apagar não vão funcionar.
+            </div>
+          )}
+          {children}
+        </main>
       </div>
     </div>
   );

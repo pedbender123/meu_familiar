@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { buscarPedido, atualizarPedido, registrarEvento } from '@/lib/db';
 import { pagamento } from '@/nucleo/checkouts/mercadopago';
-import { sessaoAtual } from '@/lib/sessao-servidor';
+import { exigirEdicaoNoPainel } from '@/lib/guarda-painel';
 
 /**
  * Estorna uma compra. **A única rota do painel que escreve.**
@@ -22,10 +22,12 @@ import { sessaoAtual } from '@/lib/sessao-servidor';
  * de alguém que já leu não recupera nada.
  */
 export async function POST(req: NextRequest) {
-  const sessao = await sessaoAtual();
-  if (!sessao || sessao.tipo !== 'admin') {
-    return NextResponse.json({ erro: 'não autorizado' }, { status: 401 });
-  }
+  /**
+   * Só o dono altera. A equipe do painel entra com `tipo === 'admin'` e vê
+   * tudo, mas não muda nada — ver `lib/guarda-painel.ts`.
+   */
+  const barrado = await exigirEdicaoNoPainel();
+  if (barrado) return barrado;
 
   const { pedidoId, confirmacao } = (await req.json().catch(() => ({}))) ?? {};
 

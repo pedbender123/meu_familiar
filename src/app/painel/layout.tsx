@@ -1,4 +1,5 @@
 import { sessaoAtual } from '@/lib/sessao-servidor';
+import { podeEditarPainel } from '@/lib/autenticacao';
 import { contatosAbertos, comentariosPendentes } from '@/lib/db';
 import { Shell, type Area } from '@/components/painel/Shell';
 import { listarEnvios } from '@/lib/remarketing';
@@ -36,6 +37,10 @@ export default async function LayoutDoPainel({
   const sessao = await sessaoAtual();
   if (!sessao || sessao.tipo !== 'admin') return <>{children}</>;
 
+  // O dono altera; a equipe só olha. A distinção desce para o Shell porque é
+  // ela que decide o aviso no topo e o item de menu da Equipe.
+  const dono = podeEditarPainel(sessao.email);
+
   // As contagens que viram bolinha no menu. São duas consultas leves e dizem
   // "tem coisa te esperando" sem exigir que você abra cada área para olhar.
   const abertos = contatosAbertos().length;
@@ -52,6 +57,14 @@ export default async function LayoutDoPainel({
     { href: '/painel/cupons', rotulo: 'Cupons', icone: 'etiqueta' },
     { href: '/painel/contatos', rotulo: 'Contatos & Mural', icone: 'carta', alerta: abertos + pendentes },
     { href: '/painel/marcacoes', rotulo: 'Marcações', icone: 'estrela' },
+    /*
+      A Equipe só existe para o dono. Não é esconder por vergonha: quem é da
+      equipe não pode mexer nela, e um item de menu que leva a um redirect é
+      pior que item nenhum.
+    */
+    ...(dono
+      ? [{ href: '/painel/equipe', rotulo: 'Equipe', icone: 'estrela' as const }]
+      : []),
   ];
 
   return (
@@ -64,7 +77,7 @@ export default async function LayoutDoPainel({
     */
     <div className="admin" data-tema="escuro" suppressHydrationWarning>
       <script dangerouslySetInnerHTML={{ __html: SCRIPT_DO_TEMA }} />
-      <Shell areas={areas} email={sessao.email}>
+      <Shell areas={areas} email={sessao.email} somenteLeitura={!dono}>
         {children}
       </Shell>
     </div>

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   buscarConta,
   criarTokenMagico,
-  emailDoAdmin,
+  podeVerPainel,
   VALIDADE_DO_LINK_MIN,
 } from '@/lib/autenticacao';
 import { enviarLinkMagico } from '@/lib/email';
@@ -18,12 +18,17 @@ import { excedeuLimite } from '@/lib/rate-limit';
  * rota viraria uma consulta pública de "esse e-mail é cliente do Bruxário?" —
  * e o produto lida com intimidade, então isso não é detalhe.
  *
- * ── O painel não aceita e-mail de fora ────────────────────────────────────
+ * ── O painel agora aceita e-mail, e responde sempre igual ─────────────────
  *
- * Para `tipo: 'admin'` o endereço **não vem do pedido**: vem de `ADMIN_EMAIL`
- * no ambiente. Mandar outro e-mail no corpo não muda nada. É o que garante
- * que a tela do painel não tenha superfície de ataque nenhuma — não há para
- * onde apontar o link.
+ * Antes o endereço do painel vinha fixo do ambiente e o corpo era ignorado —
+ * sem campo, não havia para onde apontar o link. Com a equipe (migração 021)
+ * passou a haver um campo, e a propriedade que precisa sobreviver é outra:
+ * **não vazar quem está na lista**.
+ *
+ * Por isso o `tipo: 'admin'` responde `{ ok: true }` para qualquer endereço
+ * válido, esteja ele na lista ou não, e o link só sai de verdade para quem
+ * está. Continua não havendo quem enumerar: quem tentar adivinhar endereços
+ * recebe exatamente a mesma tela em todos eles.
  *
  * ── As duas portas são independentes ──────────────────────────────────────
  *
@@ -53,19 +58,18 @@ export async function POST(req: NextRequest) {
 
   const tipo = corpo.tipo === 'admin' ? 'admin' : 'conta';
 
-  if (tipo === 'admin') {
-    const destino = emailDoAdmin();
-    if (!destino) {
-      console.warn('[auth] ADMIN_EMAIL não configurado — painel inacessível');
-      return NextResponse.json({ ok: true });
-    }
-    await mandar(destino, 'admin', req);
-    return NextResponse.json({ ok: true });
-  }
-
   const email = corpo.email?.trim().toLowerCase() ?? '';
   if (!validarEmail(email)) {
     return NextResponse.json({ erro: 'E-mail inválido.' }, { status: 400 });
+  }
+
+  if (tipo === 'admin') {
+    // Só manda para quem pode ver o painel — mas a resposta é a mesma de
+    // qualquer forma. Ver a nota acima sobre não vazar a lista.
+    if (podeVerPainel(email)) {
+      await mandar(email, 'admin', req);
+    }
+    return NextResponse.json({ ok: true });
   }
 
   // Sempre tipo 'conta': quem quer o painel pede pela porta do painel.
