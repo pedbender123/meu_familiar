@@ -50,8 +50,31 @@ const ALCANCE_EM_PALAVRAS: Record<string, string> = {
   rolante: 'Calendário sempre com 12 meses à frente',
 };
 
+/**
+ * A lista COMPLETA do que um conjunto de direitos entrega, em português.
+ *
+ * Exportada porque os Termos de Uso precisam dela: nas telas de venda a
+ * escada mostra só a diferença entre degraus, mas num documento legal a
+ * pessoa tem que ler tudo o que está levando — "o relatório longo e os
+ * gráficos" não é descrição de produto se o PDF também está incluso e ficou
+ * de fora da frase.
+ */
+export function beneficiosDosDireitos(direitos: Direitos): string[] {
+  return beneficiosDe(direitos);
+}
+
 function beneficiosDe(direitos: Direitos): string[] {
   const lista: string[] = [];
+
+  /**
+   * O texto da revelação vem PRIMEIRO, e faltava inteiro até 19/08.
+   *
+   * `pdf` era o único direito que a lista nunca traduzia em palavra — e virou
+   * justamente a linha que separa o grátis do primeiro degrau pago. Sem ela,
+   * a oferta de R$ 7,90 se descrevia como "os gráficos e o calendário da
+   * semana", escondendo a única coisa pela qual a pessoa está pagando.
+   */
+  if (direitos.pdf) lista.push('O texto completo da sua revelação, em PDF');
 
   if (direitos.leiturasPorMes > 0) {
     lista.push(

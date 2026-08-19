@@ -30,7 +30,16 @@ export const LEGAL = {
   idadeMinima: 18,
   /** CDC art. 49. Contado da confirmação do pagamento. */
   diasDeArrependimento: 7,
-  atualizadoEm: '31 de julho de 2026',
+  /**
+   * Prazo para cancelar uma assinatura sem ser cobrado no ciclo seguinte.
+   *
+   * Zero: o cancelamento vale na hora, e o acesso segue até o fim do período
+   * já pago. Não existe multa, carência nem aviso prévio — cobrar por sair de
+   * um produto mensal de R$ 29,90 renderia centavos e geraria contestação, que
+   * custa muito mais caro que o mês que se tentou segurar.
+   */
+  diasDeAvisoParaCancelar: 0,
+  atualizadoEm: '19 de agosto de 2026',
 } as const;
 
 /** Com quem os dados são compartilhados, e para quê. */
@@ -46,6 +55,22 @@ export const TERCEIROS = [
     para: 'processar o pagamento',
     oQue: 'os dados que você digita na tela de pagamento — nenhum dado de cartão passa pelos nossos servidores',
     fora: false,
+  },
+  {
+    /**
+     * **Estava faltando, e era a omissão mais séria das páginas legais.**
+     *
+     * O site roda o pixel da Meta desde o começo, e desde a Fase 1 também o
+     * CAPI server-side, que envia evento de compra com o e-mail *hasheado*.
+     * A política afirmava, em letras, que não havia "medidor de terceiros" —
+     * o que é o oposto do que acontece. Aviso de tratamento de dados que
+     * contradiz o código não protege ninguém e vira prova contra a operação.
+     */
+    nome: 'Meta (Facebook e Instagram)',
+    para: 'medir o resultado dos anúncios',
+    oQue:
+      'que páginas você abriu e se comprou, mais seu e-mail transformado em código irreversível (hash) para casar a venda com o anúncio — nunca o e-mail legível',
+    fora: true,
   },
   {
     nome: 'Resend',

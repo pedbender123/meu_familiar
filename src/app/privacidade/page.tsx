@@ -51,8 +51,13 @@ export default function Privacidade() {
               montar a revelação, entregar por e-mail e dar acesso à sua conta.
             </>,
             <>
-              <strong className="font-medium">Data e hora de nascimento</strong> —
-              para calcular seus signos e a fase da lua. A hora é opcional.
+              <strong className="font-medium">Data, hora e cidade de
+              nascimento</strong> — para calcular seus signos, a fase da lua e,
+              com o lugar, o seu mapa natal e o calendário. A hora é opcional;
+              sem ela assumimos meio-dia e marcamos o resultado como
+              aproximado. Da cidade guardamos o nome que você escolheu e a
+              coordenada da capital do seu estado, que é a precisão que o
+              cálculo usa.
             </>,
             <>
               <strong className="font-medium">Suas {TOTAL_DE_ITENS} escolhas no
@@ -78,17 +83,21 @@ export default function Privacidade() {
               <strong className="font-medium">Medição de acesso</strong> — que
               páginas foram abertas, até que ponto do ritual você chegou, de
               qual rede social você veio e se o aparelho é celular ou
-              computador. É contagem nossa, no nosso servidor:{' '}
-              <strong className="font-medium">não</strong> usamos Google
-              Analytics nem qualquer medidor de terceiros, e o endereço IP não é
-              guardado junto dessa contagem.
+              computador. Essa contagem é nossa, fica no nosso servidor, e o
+              endereço IP não é guardado junto dela. Não usamos Google
+              Analytics.
             </>,
             <>
-              <strong className="font-medium">O e-mail deixado no meio do
-              ritual</strong>, se você escolher guardar o progresso. Serve para
-              você voltar de onde parou e para <strong className="font-medium">um
-              único</strong> lembrete, caso não termine. Não vira lista de
-              propaganda.
+              <strong className="font-medium">Medição de anúncio pela
+              Meta</strong> — se você chegou por um anúncio no Facebook ou no
+              Instagram, o site avisa a Meta quando você abre uma página, começa
+              o ritual e quando compra. Parte disso sai do seu navegador (o
+              &ldquo;pixel&rdquo;) e parte sai do nosso servidor, e nas duas o
+              seu e-mail vai transformado em{' '}
+              <strong className="font-medium">código irreversível</strong> — a
+              Meta usa para casar a venda com o anúncio, e não recebe o seu
+              e-mail legível. É o único medidor de terceiro que existe aqui, e
+              ele existe porque sem medir o anúncio não há como anunciar.
             </>,
             <>
               <strong className="font-medium">Seu @ do Instagram</strong>, se
@@ -158,6 +167,12 @@ export default function Privacidade() {
           para gerar a leitura, e o processamento acontece em servidores fora do
           país. O envio é feito por conexão criptografada e sob os termos
           contratuais do fornecedor.
+        </p>
+        <p>
+          Os dados de medição de anúncio vão para a{' '}
+          <strong className="font-medium">Meta</strong>, também fora do país —
+          incluindo o seu e-mail em forma de código irreversível, quando você
+          compra.
         </p>
         <p>
           O que fica no Brasil: a hospedagem, o banco de dados e o envio de
@@ -243,7 +258,7 @@ export default function Privacidade() {
       </Secao>
 
       <Secao titulo="Cookies">
-        <p>Quatro, todos nossos, nenhum de publicidade:</p>
+        <p>Quatro são nossos, e o site também carrega os da Meta:</p>
         <Lista
           itens={[
             <>
@@ -267,10 +282,20 @@ export default function Privacidade() {
             </>,
           ]}
         />
+        <p>
+          Além desses quatro, o pixel da Meta grava cookies próprios (
+          <code className="text-[0.85em]">_fbp</code> e{' '}
+          <code className="text-[0.85em]">_fbc</code>) quando você chega por um
+          anúncio. <strong className="font-medium">Esses, sim, servem a
+          publicidade</strong> e pertencem à Meta, não a nós — é assim que ela
+          sabe que a visita virou compra.
+        </p>
         <Destaque>
-          Nenhum deles segue você por outros sites nem alimenta anúncio de
-          ninguém. Apagar os cookies do navegador zera os três, e o site
-          continua funcionando igual.
+          Os quatro cookies nossos não seguem você por outros sites. Os da Meta
+          seguem — é a função deles. Apagar os cookies do navegador zera todos,
+          e o site continua funcionando igual; para bloquear só os de anúncio,
+          dá para usar o bloqueador do seu navegador ou as preferências de
+          anúncio da própria Meta.
         </Destaque>
       </Secao>
     </PaginaLegal>
