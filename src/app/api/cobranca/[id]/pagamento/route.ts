@@ -13,6 +13,7 @@ import {
 import { buscarPlano } from '@/nucleo/planos';
 import { registrarEvento } from '@/lib/db';
 import { excedeuLimite, LIMITES } from '@/lib/rate-limit';
+import { entregarChaveDaPlataforma, nomeDaConta } from '@/lib/acesso-plataforma';
 
 /**
  * Cobra o plano — o gêmeo de `api/pedido/[id]/pagamento`, para assinatura.
@@ -48,8 +49,17 @@ export async function POST(
   }
 
   if (pagamentoEhFake()) {
-    confirmarPagamento(id, { metodo: 'fake' });
+    const confirmada = confirmarPagamento(id, { metodo: 'fake' });
     registrarEvento('assinatura_confirmada_fake', id);
+    // Sem webhook no modo fake, a chave sai daqui — senão testar o funil em
+    // desenvolvimento sempre termina numa tela de login.
+    if (confirmada?.assinatura) {
+      await entregarChaveDaPlataforma({
+        email: cobranca.email,
+        nome: nomeDaConta(cobranca.email),
+        contaNova: false,
+      });
+    }
     return NextResponse.json({ status: 'approved', redirect: '/conta?assinatura=ok' });
   }
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { buscarPedido } from '@/lib/db';
 import { garantirConta } from '@/lib/autenticacao';
 import { abrirCobranca } from '@/nucleo/cobrancas';
-import { ehPlanoDaOferta } from '@/nucleo/oferta';
+import { ehPlanoDaOferta, escadaDaOferta } from '@/nucleo/oferta';
 import { excedeuLimite } from '@/lib/rate-limit';
 
 /**
@@ -58,6 +58,20 @@ export async function POST(
 
   if (!corpo.plano || !ehPlanoDaOferta(corpo.plano)) {
     return NextResponse.json({ erro: 'plano fora da oferta' }, { status: 400 });
+  }
+
+  /**
+   * A mesma regra da tela, checada de novo aqui.
+   *
+   * A página esconde as avulsas de quem já recebeu o acesso grátis, mas
+   * esconder é decisão de renderização: uma aba aberta desde antes do e-mail
+   * chegar ainda tem os botões antigos, e nada impede um POST à mão. Sem esta
+   * checagem alguém pagaria 7,90 por um PDF que já está aberto na conta dela
+   * — e pediria estorno com razão.
+   */
+  const disponivel = escadaDaOferta({ avulsas: !pedido.acesso_gratis_em });
+  if (!disponivel.some((i) => i.plano.id === corpo.plano)) {
+    return NextResponse.json({ erro: 'oferta encerrada' }, { status: 400 });
   }
 
   const conta = garantirConta(pedido.email);

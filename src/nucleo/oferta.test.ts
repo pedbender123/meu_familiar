@@ -147,3 +147,19 @@ describe('a escada da oferta', () => {
     }
   });
 });
+
+describe('a janela das avulsas', () => {
+  test('fecha quando o acesso grátis chega — sobra só a recorrente', () => {
+    const fechada = escadaDaOferta({ avulsas: false });
+    assert.deepEqual(
+      fechada.map((i) => i.plano.id),
+      ['revelacao_mensal']
+    );
+    assert.ok(fechada.every((i) => i.recorrente));
+  });
+
+  test('aberta por padrão — a tela logo depois do ritual mostra as três', () => {
+    assert.equal(escadaDaOferta().length, 3);
+    assert.equal(escadaDaOferta({ avulsas: true }).length, 3);
+  });
+});

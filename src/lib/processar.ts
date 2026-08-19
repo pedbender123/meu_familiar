@@ -302,53 +302,29 @@ export async function processarPedido(pedidoId: string): Promise<void> {
      * SPEC 0.5.1: "conta em vez de download" — "seu familiar está no seu
      * Bruxário" é outra categoria de produto que "baixe seu PDF".
      */
+    /**
+     * **A conta nasce agora; a CHAVE não sai agora.**
+     *
+     * Até 19/08 o e-mail com o link de acesso saía aqui, para todo mundo, no
+     * mesmo instante da entrega. Isso entregava a plataforma inteira antes de
+     * a pessoa ter olhado a oferta — e a tela de oferta, que é o único
+     * momento de atenção total do funil, passava a competir com um e-mail que
+     * já tinha dado tudo.
+     *
+     * Agora a chave sai por dois caminhos, e nenhum deles é este:
+     *
+     *  - **comprou** → `entregarChaveDaPlataforma` no caminho do pagamento,
+     *    na hora, porque ela pagou para entrar;
+     *  - **não comprou** → `scripts/acesso-gratis.ts`, horas depois, com o
+     *    convite para explorar.
+     *
+     * A conta em si continua sendo criada aqui: ela é onde a revelação fica
+     * registrada para sempre, e existir sem ninguém ter entrado nela não
+     * custa nada. O que não existe ainda é o token que abre a porta.
+     */
     try {
-      const contaNova = !contaJaExistia;
-      const conta = garantirConta(pedido.email);
-      const token = criarTokenMagico(pedido.email, 'conta');
-      const base = process.env.BASE_URL || 'http://localhost:3000';
-      await enviarContaCriada({
-        nome: pedido.nome,
-        email: pedido.email,
-        // `lg`: retorno de quem já é cliente, NÃO conta como aquisição.
-        url: `${base}/entrar/verificar?t=${encodeURIComponent(token)}&e=lg`,
-        minutosDeValidade: VALIDADE_DO_LINK_MIN,
-        contaNova,
-        // O familiar vai no e-mail como NOTÍCIA, não como entrega: é o que
-        // faz a pessoa clicar. O que ela vem buscar está dentro.
-        nomeFamiliar: familiar.nome,
-        nomeSecreto: leitura.nome_secreto,
-      });
-      registrarEvento(contaNova ? 'conta_criada' : 'conta_acesso_enviado', pedidoId);
-
-      /**
-       * **Todo mundo que entra ganha o plano gratuito.**
-       *
-       * Desde que a Revelação virou grátis (agosto/2026), completar o ritual
-       * é a porta de entrada da plataforma, não uma compra. A assinatura
-       * `gratuito` é o que liga a tiragem do dia, a semana do calendário e a
-       * primeira leitura do Oráculo — sem ela a pessoa entraria numa casa de
-       * cômodos todos trancados.
-       *
-       * `assinaturasAtivasDaConta` antes de criar: quem já assina não pode
-       * ser rebaixado por refazer o ritual, e o webhook pode repetir. Falha
-       * aqui só loga — nunca pode atrapalhar a entrega.
-       */
-      try {
-        if (assinaturasAtivasDaConta(conta.id).length === 0) {
-          criarAssinatura({
-            contaId: conta.id,
-            planoId: 'gratuito',
-            pedidoId,
-            inicio: new Date(),
-          });
-        }
-      } catch (erroAssinatura) {
-        console.error(
-          `[processarPedido] assinatura gratuita falhou no ${pedidoId}:`,
-          erroAssinatura
-        );
-      }
+      garantirConta(pedido.email);
+      registrarEvento(contaJaExistia ? 'conta_reencontrada' : 'conta_criada', pedidoId);
     } catch (erroConta) {
       console.error(`[processarPedido] conta falhou no pedido ${pedidoId}:`, erroConta);
       registrarEvento('conta_falhou', pedidoId);

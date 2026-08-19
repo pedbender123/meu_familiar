@@ -15,6 +15,7 @@ import { aposPagamento } from './processar';
 import { checarEmLinha } from '../nucleo/sentinela/emLinha';
 import { checarValorCobrado } from '../nucleo/sentinela/invariantes/financeiro';
 import { enfileirarEventoCapi } from './fila-capi';
+import { entregarChaveDaPlataforma, nomeDaConta } from './acesso-plataforma';
 
 export type DesfechoNotificacao =
   | 'nao_libera_acesso'
@@ -80,6 +81,27 @@ export async function processarNotificacaoDePagamento(
     registrarEvento(
       confirmada?.assinatura ? 'assinatura_confirmada' : 'assinatura_ja_confirmada'
     );
+
+    /**
+     * **Quem pagou entra agora.**
+     *
+     * A pessoa que compra na tela de oferta não tem sessão — ela acabou de
+     * sair do ritual e nunca fez login. Sem este e-mail ela pagaria, seria
+     * mandada para `/conta` e cairia na tela de entrar, sem nada que a
+     * ligasse ao que acabou de comprar. Era o beco sem saída do funil novo.
+     *
+     * Só na PRIMEIRA confirmação (`confirmada?.assinatura`): o Mercado Pago
+     * reenvia a notificação, e reenviar o link mágico a cada repetição
+     * encheria a caixa de entrada de quem só comprou uma vez.
+     */
+    if (confirmada?.assinatura) {
+      await entregarChaveDaPlataforma({
+        email: cobranca.email,
+        nome: nomeDaConta(cobranca.email),
+        contaNova: false,
+      });
+    }
+
     return { desfecho: 'assinatura_confirmada' };
   }
 

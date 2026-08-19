@@ -29,6 +29,7 @@ db.exec(`
     expira_em TEXT,
     pago_em TEXT,
     lembrete_em TEXT,
+    acesso_gratis_em TEXT,
     exemplo INTEGER NOT NULL DEFAULT 0,
     leitura_json TEXT,
     tentativas INTEGER NOT NULL DEFAULT 0,
@@ -382,6 +383,7 @@ function garantirColunas() {
   // Recuperação de carrinho: marca quando o lembrete saiu, para não mandar
   // duas vezes. Sem isso, rodar o job de novo vira spam.
   adicionarColunaSeFaltar('lembrete_em', 'TEXT');
+  adicionarColunaSeFaltar('acesso_gratis_em', 'TEXT');
   // Marca as revelações que somos NÓS que geramos para a vitrine. Sem esta
   // coluna não dá para separar amostra de cliente na hora de contar receita
   // nem de medir distribuição dos 12 — e as duas medidas ficariam mentindo.
@@ -582,6 +584,14 @@ export interface Pedido {
   expira_em: string | null;
   pago_em: string | null;
   lembrete_em: string | null;
+  /**
+   * Quando a chave da plataforma foi entregue **de graça** (o cron das horas
+   * seguintes), e não pelo caminho do pagamento.
+   *
+   * Também fecha a janela das avulsas: quem já entrou pelo grátis não vê mais
+   * as ofertas de 7,90 e 15,90 — dali em diante só os planos recorrentes.
+   */
+  acesso_gratis_em: string | null;
   /** 1 = amostra nossa para o mural, não é cliente. */
   exemplo: number;
   /** De onde veio: tiktok, instagram, ... Ver analitica.ts. */

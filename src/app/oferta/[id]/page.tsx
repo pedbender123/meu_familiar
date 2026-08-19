@@ -54,7 +54,12 @@ export default async function Oferta({
    * opções fixas, na ordem em que a decisão fica fácil — duas avulsas e a
    * recorrente por último. Ver `nucleo/oferta.ts`.
    */
-  const planos = escadaDaOferta().map((item) => ({
+  const planos = escadaDaOferta({
+    // Quem já recebeu a chave de graça (o cron das horas seguintes) não vê
+    // mais as compras únicas: elas eram a oferta daquele momento, e o momento
+    // passou. Ver `nucleo/oferta.ts`.
+    avulsas: !pedido.acesso_gratis_em,
+  }).map((item) => ({
     id: item.plano.id,
     nome: item.plano.nome,
     precoCentavos: item.plano.preco_centavos,

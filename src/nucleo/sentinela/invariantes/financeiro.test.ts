@@ -18,6 +18,7 @@ function pedido(sobrescreve: Partial<Pedido> = {}): Pedido {
     perfil_json: null,
     desempatado_pela_pessoa: 0,
     expira_em: null,
+    acesso_gratis_em: null,
     pago_em: null,
     lembrete_em: null,
     exemplo: 0,

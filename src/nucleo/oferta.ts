@@ -90,10 +90,22 @@ const GANHOS: Record<PlanoDaOfertaId, string[]> = {
  * vez de derrubar a página — esta tela está no caminho do dinheiro, e ela
  * ficar de pé com duas opções é infinitamente melhor do que dar 500.
  */
-export function escadaDaOferta(): ItemDaOferta[] {
+export function escadaDaOferta(opcoes: { avulsas?: boolean } = {}): ItemDaOferta[] {
+  const comAvulsas = opcoes.avulsas ?? true;
   const itens: ItemDaOferta[] = [];
 
   for (const id of PLANOS_DA_OFERTA) {
+    /**
+     * A janela das avulsas fecha quando o acesso grátis chega.
+     *
+     * As duas compras únicas são a oferta **daquele momento** — logo depois
+     * do ritual, antes de a pessoa ter entrado na plataforma. Depois que ela
+     * recebe a chave de graça e vê tudo por dentro, vender "a revelação em
+     * PDF" por 7,90 é oferecer um pedaço do que ela já está usando. Dali em
+     * diante o que se vende é permanência, e permanência é recorrente.
+     */
+    if (!comAvulsas && id !== 'revelacao_mensal') continue;
+
     const plano = buscarPlano(id);
     if (!plano || !plano.ativo) continue;
 
