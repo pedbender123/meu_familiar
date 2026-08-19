@@ -1,4 +1,15 @@
 import { buscarPlano, direitosDoPlano, type Plano } from './planos';
+import {
+  PLANOS_DA_OFERTA,
+  ehPlanoDaOferta,
+  MARCO_DO_DEGRAU,
+  type PlanoDaOfertaId,
+} from './oferta-degraus';
+
+// Re-exportados para quem já importava daqui. As definições moram na folha
+// `oferta-degraus.ts` porque a tela de cliente precisa delas sem o banco junto.
+export { PLANOS_DA_OFERTA, ehPlanoDaOferta, MARCO_DO_DEGRAU };
+export type { PlanoDaOfertaId };
 import type { Direitos } from './direitos';
 
 /**
@@ -23,18 +34,6 @@ import type { Direitos } from './direitos';
  * pessoa avaliar um compromisso mensal antes de ter avaliado sete reais — e
  * quem recusa o compromisso tende a recusar a tela inteira junto.
  */
-export const PLANOS_DA_OFERTA = [
-  'avulsa_simples',
-  'avulsa_completa',
-  'revelacao_mensal',
-] as const;
-
-export type PlanoDaOfertaId = (typeof PLANOS_DA_OFERTA)[number];
-
-export function ehPlanoDaOferta(id: string): id is PlanoDaOfertaId {
-  return (PLANOS_DA_OFERTA as readonly string[]).includes(id);
-}
-
 export interface ItemDaOferta {
   plano: Plano;
   direitos: Direitos;

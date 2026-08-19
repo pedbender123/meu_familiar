@@ -5,6 +5,7 @@ import { buscarPlano, direitosDoPlano } from '@/nucleo/planos';
 import { CheckoutMercadoPago } from '@/components/CheckoutMercadoPago';
 import { PagamentoFake } from '@/components/PagamentoFake';
 import { PoeiraNaLuz } from '@/components/PoeiraNaLuz';
+import { MarcoDoCheckout } from '@/components/MarcoDoCheckout';
 
 export const metadata = {
   title: 'Assinar · Bruxário',
@@ -51,6 +52,17 @@ export default async function Assinar({
 
   return (
     <>
+      {/*
+        O checkout de plano nascia sem medição nenhuma. `checkout_aberto` só
+        existia em `/pagamento/[id]`, do funil antigo — então a queda entre
+        "clicou no plano" e "viu a tela de pagar", que é o degrau mais caro do
+        funil, era invisível para a assinatura.
+
+        O id usado no `eventId` é o da COBRANÇA, não o do pedido: é ele que
+        identifica esta tentativa de pagamento, e é ele que o webhook vai
+        reencontrar depois para o `Purchase` deduplicar contra este evento.
+      */}
+      <MarcoDoCheckout pedidoId={cobranca.id} valorEmReais={cobranca.valor_centavos / 100} />
       <PoeiraNaLuz />
       <main className="quarto-de-vela relative z-10 flex-1 flex flex-col items-center justify-center px-6 py-16">
         {pagamentoEhFake() || !chave ? (

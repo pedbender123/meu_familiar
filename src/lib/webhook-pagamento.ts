@@ -100,6 +100,37 @@ export async function processarNotificacaoDePagamento(
         nome: nomeDaConta(cobranca.email),
         contaNova: false,
       });
+
+      /**
+       * **A venda de plano também é venda.**
+       *
+       * O `Purchase` só existia no ramo do pedido, mais abaixo — e cobrança de
+       * plano retorna aqui, antes de chegar lá. Resultado: desde que o modelo
+       * virou assinatura, NENHUMA receita nova chegava à Meta. A campanha
+       * otimizava por um funil que parou de ser o que vende, e o Ads Manager
+       * mostrava um faturamento que não era o real.
+       *
+       * `cobranca.id` no lugar do pedido: `fila_capi.pedido_id` não tem chave
+       * estrangeira, e é o id da cobrança que identifica esta venda de ponta a
+       * ponta — o mesmo que `MarcoDoCheckout` usou no `InitiateCheckout`.
+       *
+       * Só na primeira confirmação, como o e-mail: o `ON CONFLICT(event_id)`
+       * já protegeria contra duplicata, mas depender disso é deixar a
+       * idempotência num detalhe de índice em vez de na lógica.
+       */
+      if (process.env.NEXT_PUBLIC_META_PIXEL_ID) {
+        enfileirarEventoCapi({
+          pedidoId: cobranca.id,
+          nome: 'Purchase',
+          quando: new Date(),
+          email: cobranca.email || undefined,
+          valorEmReais:
+            resultado.brutoCentavos !== null
+              ? resultado.brutoCentavos / 100
+              : cobranca.valor_centavos / 100,
+          eventId: `${cobranca.id}:purchase`,
+        });
+      }
     }
 
     return { desfecho: 'assinatura_confirmada' };

@@ -1,6 +1,7 @@
 import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { escadaDaOferta, PLANOS_DA_OFERTA, ehPlanoDaOferta } from './oferta';
+import { escadaDaOferta, PLANOS_DA_OFERTA, ehPlanoDaOferta, MARCO_DO_DEGRAU } from './oferta';
+import { MARCOS } from '../lib/analitica';
 import type { Direitos } from './direitos';
 
 /**
@@ -161,5 +162,32 @@ describe('a janela das avulsas', () => {
   test('aberta por padrão — a tela logo depois do ritual mostra as três', () => {
     assert.equal(escadaDaOferta().length, 3);
     assert.equal(escadaDaOferta({ avulsas: true }).length, 3);
+  });
+});
+
+describe('o rastreio da oferta', () => {
+  /**
+   * Botão de venda que não é medido é pior que botão que não existe: consome
+   * tráfego e não aparece em relatório nenhum. Este teste é o que impede um
+   * degrau novo de entrar mudo.
+   */
+  test('todo degrau da oferta tem marco de painel', () => {
+    for (const id of PLANOS_DA_OFERTA) {
+      assert.ok(MARCO_DO_DEGRAU[id], `${id} não tem marco`);
+    }
+  });
+
+  test('os marcos existem na lista que o painel conhece', () => {
+    for (const id of PLANOS_DA_OFERTA) {
+      assert.ok(
+        (MARCOS as readonly string[]).includes(MARCO_DO_DEGRAU[id]),
+        `${MARCO_DO_DEGRAU[id]} não está em MARCOS — o painel ignoraria`
+      );
+    }
+  });
+
+  test('nenhum degrau divide marco com outro', () => {
+    const marcos = PLANOS_DA_OFERTA.map((id) => MARCO_DO_DEGRAU[id]);
+    assert.equal(new Set(marcos).size, marcos.length, 'dois degraus com o mesmo marco');
   });
 });

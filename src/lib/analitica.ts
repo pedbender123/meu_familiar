@@ -513,6 +513,18 @@ export const MARCOS = [
    */
   'plano_revelacao',
   'plano_completa',
+  /**
+   * Os três botões da tela de oferta de 19/08.
+   *
+   * `plano_revelacao` e `plano_completa` mediam os produtos antigos e não
+   * cobrem mais nada: a escada agora é 7,90 avulso, 15,90 avulso e o mensal.
+   * Sem estes três, a tela mais importante do funil novo — a única que a
+   * pessoa vê com a atenção inteira, logo depois do ritual — não dizia qual
+   * degrau chamava mais, nem se algum deles não chamava nunca.
+   */
+  'oferta_simples',
+  'oferta_completa',
+  'oferta_mensal',
   'checkout_aberto',
   'pagamento_tentado',
   /**

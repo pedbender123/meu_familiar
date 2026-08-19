@@ -6,6 +6,7 @@ import { escadaDaOferta } from '@/nucleo/oferta';
 import { PoeiraNaLuz } from '@/components/PoeiraNaLuz';
 import { SigiloFamiliar } from '@/components/SigiloFamiliar';
 import { OfertaDepoisDoRitual } from '@/plataforma/OfertaDepoisDoRitual';
+import { MarcoDaOferta } from '@/components/MarcoDaOferta';
 
 export const metadata = {
   title: 'Seu familiar atravessou · Bruxário',
@@ -70,6 +71,12 @@ export default async function Oferta({
 
   return (
     <>
+      {/*
+        Sem isto a tela de venda mais importante do funil não existia no
+        painel: `plano_visto` só era marcado em `/seu-familiar`, que é a
+        oferta do fluxo antigo.
+      */}
+      <MarcoDaOferta />
       <PoeiraNaLuz />
       <main className="quarto-de-vela relative z-10 flex-1 flex flex-col items-center px-5 py-12 sm:py-16">
         <div className="w-full max-w-2xl flex flex-col items-center gap-10">

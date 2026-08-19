@@ -2,6 +2,9 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { marcar } from '@/lib/marcar';
+import { MARCO_DO_DEGRAU } from '@/nucleo/oferta-degraus';
+import { evento } from '@/lib/pixel';
 
 export interface PlanoDaOferta {
   id: string;
@@ -55,6 +58,25 @@ export function OfertaDepoisDoRitual({
     if (indo) return;
     setIndo(planoId);
     setErro('');
+
+    /**
+     * Marca a intenção ANTES de sair da tela.
+     *
+     * A pessoa clicou; se a rota falhar ou ela desistir no checkout, a
+     * intenção existiu e é justamente essa diferença que diz onde o funil
+     * perde dinheiro. Marcar depois do redirecionamento perderia todos os
+     * cliques que não completaram — que são os que interessam.
+     */
+    const marco = MARCO_DO_DEGRAU[planoId as keyof typeof MARCO_DO_DEGRAU];
+    if (marco) marcar(marco as Parameters<typeof marcar>[0]);
+    marcar('pagamento_aberto');
+    const escolhido = planos.find((p) => p.id === planoId);
+    if (escolhido) {
+      evento('AddToCart', {
+        value: escolhido.precoCentavos / 100,
+        currency: 'BRL',
+      }, `${pedidoId}:${planoId}`);
+    }
     try {
       const r = await fetch(`/api/oferta/${pedidoId}/comprar`, {
         method: 'POST',
