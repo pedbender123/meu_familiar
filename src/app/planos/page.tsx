@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { sessaoAtual } from '@/lib/sessao-servidor';
-import { vitrine, beneficiosDoGratuito } from '@/nucleo/vitrine';
+import { vitrineEmEscada, beneficiosDoGratuito } from '@/nucleo/vitrine';
 import { CardsDePlano, type PlanoNaTela } from '@/plataforma/CardsDePlano';
 import { PoeiraNaLuz } from '@/components/PoeiraNaLuz';
 
@@ -22,8 +22,18 @@ export const metadata = {
  */
 export default async function Planos() {
   const sessao = await sessaoAtual();
-  const itens = vitrine();
+  const itens = vitrineEmEscada();
   const gratuito = beneficiosDoGratuito();
+
+  /**
+   * O destaque vai no card do MEIO, não no mais caro.
+   *
+   * É o âncora: o de baixo faz o do meio parecer completo, o de cima faz o do
+   * meio parecer razoável. Destacar o mais caro empurra a decisão para o
+   * extremo e faz a maioria escolher o mais barato por reação.
+   */
+  const mensais = itens.filter((i) => !i.anual);
+  const doMeio = mensais[Math.floor((mensais.length - 1) / 2)]?.plano.id;
 
   const planos: PlanoNaTela[] = itens.map((item) => ({
     id: item.plano.id,
@@ -33,7 +43,9 @@ export default async function Planos() {
     anual: item.anual,
     familia: item.familia,
     beneficios: item.beneficios,
+    ganhos: item.ganhos,
     parcelasMax: item.plano.parcelas_max,
+    destaque: item.plano.id === doMeio,
   }));
 
   return (
@@ -70,7 +82,7 @@ export default async function Planos() {
 
             <ul className="flex flex-col gap-1.5">
               <li className="font-corpo font-light text-sm text-pergaminho/70">
-                O seu familiar, revelado — com o PDF e as imagens
+                O nome e a imagem do seu familiar, para sempre
               </li>
               {gratuito.map((beneficio) => (
                 <li

@@ -1,4 +1,4 @@
-import test, { describe, beforeEach } from 'node:test';
+import test, { describe, beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'crypto';
 import db from '../lib/db';
@@ -49,6 +49,22 @@ function semearPlanoDeTeste() {
     agora,
   });
 }
+
+/**
+ * O plano de teste é `publico = 1` porque `abrirCobranca` exige isso — e por
+ * ser público ele aparece na `vitrine()`, que roda em OUTRO arquivo de teste
+ * no mesmo banco temporário (`--test-concurrency=1` compartilha o diretório).
+ * Lá ele quebrava o invariante da escada, sendo um degrau de R$ 12,34 sem
+ * direito nenhum no meio dos planos de verdade.
+ *
+ * Limpar depois de si é mais barato que fazer a vitrine conhecer o conceito
+ * de "plano de teste".
+ */
+after(() => {
+  db.prepare('DELETE FROM cobrancas WHERE plano_id = ?').run(TESTE_MENSAL);
+  db.prepare('DELETE FROM assinaturas WHERE plano_id = ?').run(TESTE_MENSAL);
+  db.prepare('DELETE FROM planos WHERE id = ?').run(TESTE_MENSAL);
+});
 
 beforeEach(() => {
   db.exec('DELETE FROM cobrancas');

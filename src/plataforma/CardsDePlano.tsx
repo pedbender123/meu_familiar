@@ -11,7 +11,11 @@ export interface PlanoNaTela {
   anual: boolean;
   familia: string;
   beneficios: string[];
+  /** Só o que este plano acrescenta ao degrau anterior. Ver `vitrineEmEscada`. */
+  ganhos: string[];
   parcelasMax: number;
+  /** `true` no card do meio: é o âncora, o que a maioria deve escolher. */
+  destaque: boolean;
 }
 
 function reais(centavos: number): string {
@@ -44,6 +48,7 @@ export function CardsDePlano({
   const [carregando, setCarregando] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
 
+  const temAnual = planos.some((p) => p.anual);
   const visiveis = planos.filter((p) => p.anual === anual);
 
   async function assinar(planoId: string) {
@@ -84,7 +89,17 @@ export function CardsDePlano({
 
   return (
     <div className="w-full flex flex-col items-center gap-7">
-      {/* ── mensal / anual ─────────────────────────────────────────────── */}
+      {/*
+        O pulo mensal/anual só aparece quando há anual à venda.
+        
+        Desde 19/08 os anuais saíram da vitrine: três degraus vezes dois
+        prazos são seis cards, e seis cards recriam exatamente o problema que
+        a escada resolve — a pessoa comparando listas quase idênticas em vez
+        de decidir. O anual volta como oferta de dentro, para quem já sabe que
+        usa. Renderizar o pulo mesmo assim mostraria uma aba "Anual" que abre
+        vazia, que é pior do que não ter.
+      */}
+      {temAnual && (
       <div className="flex items-center gap-1 p-1 rounded-full border border-pergaminho/15">
         {[false, true].map((ehAnual) => (
           <button
@@ -104,10 +119,11 @@ export function CardsDePlano({
           </button>
         ))}
       </div>
+      )}
 
-      <div className="w-full grid gap-4 sm:grid-cols-2">
-        {visiveis.map((plano) => {
-          const destaque = plano.familia === 'acompanhamento';
+      <div className="w-full grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {visiveis.map((plano, i) => {
+          const destaque = plano.destaque;
           return (
             <div
               key={plano.id}
@@ -124,7 +140,7 @@ export function CardsDePlano({
               <div className="flex flex-col gap-1">
                 {destaque && (
                   <span className="font-corpo text-[0.55rem] tracking-[0.2em] uppercase text-vela">
-                    o mais completo
+                    o mais escolhido
                   </span>
                 )}
                 <h3 className="font-display italic text-2xl text-pergaminho leading-tight">
@@ -148,7 +164,18 @@ export function CardsDePlano({
               </div>
 
               <ul className="flex flex-col gap-2">
-                {plano.beneficios.map((beneficio) => (
+                {/*
+                  Do segundo card em diante, só o que ele ACRESCENTA. Repetir
+                  a lista inteira faz a pessoa procurar as duas linhas que
+                  mudaram no meio de sete iguais — e é nessas duas que a
+                  decisão mora.
+                */}
+                {i > 0 && (
+                  <li className="font-corpo text-[0.62rem] uppercase tracking-[0.16em] text-pergaminho/35 pb-0.5">
+                    tudo da {visiveis[i - 1].nome.replace(' · anual', '')}, e:
+                  </li>
+                )}
+                {(i > 0 ? plano.ganhos : plano.beneficios).map((beneficio) => (
                   <li key={beneficio} className="flex items-start gap-2">
                     <svg
                       width="13" height="13" viewBox="0 0 24 24" fill="none"

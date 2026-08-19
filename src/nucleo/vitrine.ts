@@ -19,11 +19,25 @@ export interface ItemDaVitrine {
   plano: Plano;
   direitos: Direitos;
   /** `revelacao_mensal` e `revelacao_anual` são o mesmo produto em dois prazos. */
-  familia: 'revelacao' | 'acompanhamento' | 'outro';
+  familia: 'vigilia' | 'revelacao' | 'conselho' | 'outro';
   anual: boolean;
   /** Quanto sai por mês — é assim que se compara anual com mensal. */
   porMesCentavos: number;
   beneficios: string[];
+  /**
+   * Só o que este plano acrescenta ao degrau imediatamente mais barato.
+   *
+   * A vitrine inteira é uma escada: quem paga mais recebe tudo do de baixo e
+   * mais alguma coisa. Repetir a lista inteira em cada card obriga a pessoa a
+   * comparar três listas quase idênticas para achar as duas linhas que
+   * mudaram — e é exatamente nessas duas linhas que a decisão mora.
+   *
+   * Derivado, e não escrito à mão, pelo mesmo motivo que `beneficios`: se uma
+   * migração mudar uma cota, a diferença na tela muda junto.
+   *
+   * No degrau mais barato é igual a `beneficios` — não há anterior.
+   */
+  ganhos: string[];
 }
 
 const ALCANCE_EM_PALAVRAS: Record<string, string> = {
@@ -70,8 +84,9 @@ function beneficiosDe(direitos: Direitos): string[] {
 }
 
 function familiaDe(id: string): ItemDaVitrine['familia'] {
+  if (id.startsWith('vigilia')) return 'vigilia';
   if (id.startsWith('revelacao')) return 'revelacao';
-  if (id.startsWith('acompanhamento')) return 'acompanhamento';
+  if (id.startsWith('conselho')) return 'conselho';
   return 'outro';
 }
 
@@ -97,9 +112,33 @@ export function vitrine(): ItemDaVitrine[] {
           ? Math.round(plano.preco_centavos / 12)
           : plano.preco_centavos,
         beneficios: beneficiosDe(direitos),
+        // Preenchido por `vitrineEmEscada`; sozinha, a vitrine não sabe qual
+        // é o degrau anterior de cada plano.
+        ganhos: [],
       };
     })
     .sort((a, b) => a.porMesCentavos - b.porMesCentavos);
+}
+
+/**
+ * A vitrine com a escada já calculada, separada por prazo.
+ *
+ * A comparação só vale dentro do mesmo prazo: o que o anual de 29,90
+ * acrescenta é medido contra o anual de 15,90, nunca contra o mensal.
+ */
+export function vitrineEmEscada(): ItemDaVitrine[] {
+  const itens = vitrine();
+
+  for (const prazo of [false, true]) {
+    const degraus = itens.filter((i) => i.anual === prazo);
+    let anteriores = new Set<string>();
+    for (const degrau of degraus) {
+      degrau.ganhos = degrau.beneficios.filter((b) => !anteriores.has(b));
+      anteriores = new Set(degrau.beneficios);
+    }
+  }
+
+  return itens;
 }
 
 /** O que o plano gratuito entrega — pra landing mostrar o que é de graça. */
