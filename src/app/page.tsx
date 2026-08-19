@@ -14,6 +14,7 @@ import {
 } from '@/lib/funis';
 import { lerCodigoDeCampanha, normalizarOrigem } from '@/lib/rastreio';
 import { FunilEscolhido } from '@/components/FunilEscolhido';
+import { PortaDoRitual } from './PortaDoRitual';
 
 export const dynamic = 'force-dynamic';
 
@@ -68,7 +69,24 @@ export default async function Raiz({
     <>
       {viaMarcador && <FunilEscolhido funil={funil} />}
       {funil === 'padrao' ? (
-        <Landing />
+        /*
+         * Tráfego marcado no funil `padrao` abre DIRETO na primeira cena.
+         *
+         * A landing explicativa ficava entre o anúncio e a pergunta, e era
+         * material demais para quem ainda não decidiu nada — os doze
+         * familiares, o método, a tabela de planos. Tudo isso deixa o cérebro
+         * calcular o que vem no fim antes de chegar lá, e quem calcula fecha a
+         * aba. A `/vendas` já tinha aprendido isso no funil de sete perguntas.
+         *
+         * Sem marcador (`viaMarcador` falso), a landing continua: ali é quem
+         * digitou o endereço, foi indicado ou já é cliente, e essa pessoa
+         * precisa das respostas — e do link de login, que só existe lá.
+         */
+        viaMarcador ? (
+          <PortaDoRitual />
+        ) : (
+          <Landing />
+        )
       ) : funil === 'familiar' ? (
         <RitualLongo />
       ) : (

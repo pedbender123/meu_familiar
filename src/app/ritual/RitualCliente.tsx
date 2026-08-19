@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { marcar } from '@/lib/marcar';
+import { BuscaDeCidade, type CidadeEscolhida } from '@/components/funil/BuscaDeCidade';
 import { evento } from '@/lib/pixel';
 import { LinhaDeProgresso } from '@/components/LinhaDeProgresso';
 import { FolhaPergaminho } from '@/components/FolhaPergaminho';
@@ -39,7 +40,7 @@ import type { ProdutoId } from '@/lib/produtos';
  * o índice ORIGINAL do item, não a posição na tela.
  */
 interface Etapa {
-  tipo: 'cena' | 'nome' | 'data' | 'guardar';
+  tipo: 'cena' | 'formulario';
   item?: Item;
 }
 
@@ -53,6 +54,8 @@ export function RitualCliente({
   itens,
   ordemDasOpcoes,
   produtoPadrao,
+  hero,
+  rodape,
 }: {
   itens: Item[];
   /**
@@ -65,19 +68,47 @@ export function RitualCliente({
    */
   ordemDasOpcoes: Record<string, number[]>;
   produtoPadrao: ProdutoId;
+  /**
+   * Título da porta de entrada sem landing. Some depois da primeira resposta
+   * — dali em diante ele só empurraria a cena para baixo da dobra.
+   * Ausente em `/ritual`, que vem depois de uma landing que já prometeu.
+   */
+  hero?: ReactNode;
+  /** Aviso legal e links de Termos/Privacidade. Exigência, corpo pequeno. */
+  rodape?: ReactNode;
 }) {
   const semMovimento = usePrefereMenosMovimento();
 
-  const etapas: Etapa[] = useMemo(() => {
-    const cenas = itens.map((item) => ({ tipo: 'cena' as const, item }));
-    return [
-      ...cenas.slice(0, 1),
-      { tipo: 'guardar' as const },
-      { tipo: 'nome' as const },
-      { tipo: 'data' as const },
-      ...cenas.slice(1),
-    ];
-  }, [itens]);
+  /**
+   * As 26 cenas primeiro, e **só então** quem você é.
+   *
+   * ── Como era, e por que mudou ─────────────────────────────────────────
+   *
+   * A ordem antiga era: cena 1 → e-mail → nome → data → cenas 2 a 26. Três
+   * campos de digitação logo depois da primeira pergunta, antes de a pessoa
+   * ter recebido nada. Cada um deles é um pedágio, e pedágio no começo cobra
+   * de quem ainda não sabe se quer o que está do outro lado.
+   *
+   * Agora o ritual inteiro acontece primeiro. Quem chega ao formulário
+   * atravessou 26 cenas — já investiu, já quer ver o resultado, e o
+   * formulário deixa de ser um pedágio para virar o último passo de uma coisa
+   * que ela decidiu terminar.
+   *
+   * ── O que se perde, e foi decisão explícita ───────────────────────────
+   *
+   * O passo "guardar progresso" sumiu, e com ele o lembrete de rascunho
+   * (`scripts/lembrar-rascunho.ts`) para este funil: sem e-mail no meio, quem
+   * abandona na cena 12 não deixa endereço nenhum, e as respostas se perdem.
+   * A troca foi aceita — o e-mail passa a ser pedido uma vez só, no fim, e
+   * quem chegar até lá vale mais do que quem seria resgatado.
+   */
+  const etapas: Etapa[] = useMemo(
+    () => [
+      ...itens.map((item) => ({ tipo: 'cena' as const, item })),
+      { tipo: 'formulario' as const },
+    ],
+    [itens]
+  );
 
   const busca = useSearchParams();
 
@@ -109,6 +140,8 @@ export function RitualCliente({
   const [escolhaVisivel, setEscolhaVisivel] = useState<number | null>(null);
   const [nome, setNome] = useState('');
   const [dataNascimento, setDataNascimento] = useState('');
+  const [horaNascimento, setHoraNascimento] = useState('');
+  const [cidade, setCidade] = useState<CidadeEscolhida | null>(null);
   const [email, setEmail] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState('');
@@ -130,12 +163,45 @@ export function RitualCliente({
     if (daLanding) marcar('cena', 1);
   }, [daLanding]);
 
-  // Um marco por etapa alcançada. `plano_visto` não está aqui: ele é marcado
-  // na tela de revelação parcial, que é onde a oferta passou a viver.
+  /**
+   * Um marco por campo do formulário final, na primeira vez que ele fica
+   * válido.
+   *
+   * Antes eram marcos de ETAPA — "chegou na tela do nome". Com os três campos
+   * numa tela só isso viraria um marco só, e a curva de desistência do último
+   * passo (a parte mais cara do funil, onde a pessoa já investiu 26 cenas)
+   * ficaria cega. Marcar por preenchimento diz qual campo trava.
+   *
+   * A ordem bate com a de `MARCOS` em `analitica.ts`: cena → nome → data →
+   * hora → e-mail. `plano_visto` não está aqui: ele é marcado na tela de
+   * revelação parcial, que é onde a oferta passou a viver.
+   */
+  const marcados = useRef(new Set<string>());
+  function marcarUmaVez(marco: Parameters<typeof marcar>[0]) {
+    if (marcados.current.has(marco)) return;
+    marcados.current.add(marco);
+    marcar(marco);
+  }
   useEffect(() => {
-    if (atual.tipo === 'nome') marcar('nome_ok');
-    if (atual.tipo === 'data') marcar('data_ok');
-  }, [atual.tipo]);
+    if (nome.trim()) marcarUmaVez('nome_ok');
+  }, [nome]);
+  useEffect(() => {
+    if (dataNascimento) marcarUmaVez('data_ok');
+  }, [dataNascimento]);
+  useEffect(() => {
+    if (horaNascimento) marcarUmaVez('hora_ok');
+  }, [horaNascimento]);
+  useEffect(() => {
+    if (email.includes('@')) {
+      marcarUmaVez('email_ok');
+      // `Lead` só faz sentido quando há endereço para o qual voltar. Ele saía
+      // do passo "guardar progresso", que não existe mais.
+      if (!marcados.current.has('lead')) {
+        marcados.current.add('lead');
+        evento('Lead');
+      }
+    }
+  }, [email]);
 
   function escolher(indiceOriginal: number, posicaoNaTela: number) {
     if (!atual.item || escolhaVisivel !== null) return;
@@ -145,22 +211,17 @@ export function RitualCliente({
     setRespostas(respostasAtualizadas);
     marcar('cena', numeroDaCena);
 
-    // Última etapa: não há mais "próxima cena" para avançar — é daqui que o
-    // ritual é enviado. `respostas` ainda não teria a escolha atual no
-    // momento do envio (setRespostas é assíncrono), por isso a versão
-    // atualizada é passada direto para `enviar`, em vez de lida do estado.
-    const ehUltimaEtapa = etapa === etapas.length - 1;
-
     // A pausa existe para a tinta assentar na opção escolhida antes de virar.
     // Sem ela a tela pula e a escolha não é confirmada visualmente.
+    //
+    // A última cena não envia mais nada: depois dela vem o formulário, e é o
+    // botão de lá que fecha o ritual. Por isso `respostasAtualizadas` não
+    // precisa mais viajar até `enviar` — quando o botão for tocado, o estado
+    // já assentou há muito tempo.
     setTimeout(
       () => {
         setEscolhaVisivel(null);
-        if (ehUltimaEtapa) {
-          enviar(undefined, respostasAtualizadas);
-        } else {
-          setEtapa((e) => e + 1);
-        }
+        setEtapa((e) => e + 1);
       },
       semMovimento ? 0 : 420
     );
@@ -174,8 +235,8 @@ export function RitualCliente({
 
   async function enviar(desempate?: string, respostasFinal?: Respostas) {
     setErro('');
-    if (!email.trim()) return setErro('Diga onde a revelação deve te encontrar.');
     if (!nome.trim()) return setErro('Diga seu nome, para que ele possa te reconhecer.');
+    if (!email.trim()) return setErro('Diga onde a revelação deve te encontrar.');
     if (!dataNascimento) return setErro('Diga quando você chegou a este mundo.');
 
     setEnviando(true);
@@ -187,6 +248,12 @@ export function RitualCliente({
           respostas: respostasFinal ?? respostas,
           nome,
           dataNascimento,
+          // Vazio quando a pessoa não sabe: o servidor trata a ausência com
+          // meio-dia e marca a hora como aproximada. Chutar aqui esconderia
+          // dela que o ascendente é palpite.
+          horaNascimento: horaNascimento || undefined,
+          cidadeNascimento: cidade?.cidade,
+          estadoNascimento: cidade?.estado,
           email,
           produto: produtoPadrao,
           ...(desempate ? { desempate } : {}),
@@ -226,7 +293,7 @@ export function RitualCliente({
 
   if (empate) {
     return (
-      <Quarto respondidas={itens.length} total={itens.length}>
+      <Quarto respondidas={itens.length} total={itens.length} rodape={rodape}>
         <FolhaPergaminho>
           <p className="font-corpo text-[0.68rem] tracking-[0.24em] uppercase text-escrita-fraca">
             Um último passo
@@ -261,14 +328,15 @@ export function RitualCliente({
   }
 
   return (
-    <Quarto respondidas={respondidas} total={itens.length}>
+    <Quarto
+      respondidas={respondidas}
+      total={itens.length}
+      hero={respondidas === 0 ? hero : undefined}
+      rodape={rodape}
+    >
       <FolhaPergaminho>
         <p className="font-corpo text-[0.68rem] tracking-[0.24em] uppercase text-escrita-fraca">
-          {atual.tipo === 'cena'
-            ? 'Ele observa'
-            : atual.tipo === 'guardar'
-              ? 'Uma pausa'
-              : 'Quase lá'}
+          {atual.tipo === 'cena' ? 'Ele observa' : 'O ritual terminou'}
         </p>
 
         {atual.tipo === 'cena' && atual.item && (
@@ -288,43 +356,20 @@ export function RitualCliente({
           )
         )}
 
-        {atual.tipo === 'nome' && (
-          <Campo
-            key="nome"
-            titulo="Diga seu nome, para que ele possa te reconhecer"
-            valor={nome}
-            onChange={setNome}
-            onAvancar={() => setEtapa((e) => e + 1)}
-            podeAvancar={!!nome.trim()}
-            placeholder="Seu nome"
-            maxLength={40}
-          />
-        )}
-
-        {/*
-          Último campo antes de voltar para as cenas. Daqui em diante é só
-          responder até a última — que já dispara a revelação sozinha, sem
-          mais nenhum campo no meio do caminho.
-        */}
-        {atual.tipo === 'data' && (
-          <Campo
-            key="data"
-            titulo="Quando você chegou a este mundo?"
-            tipo="date"
-            valor={dataNascimento}
-            onChange={setDataNascimento}
-            onAvancar={() => setEtapa((e) => e + 1)}
-            podeAvancar={!!dataNascimento}
-          />
-        )}
-
-        {atual.tipo === 'guardar' && (
-          <GuardarProgresso
-            key="guardar"
-            valor={email}
-            onChange={setEmail}
-            cena={respondidas}
-            onAvancar={() => setEtapa((e) => e + 1)}
+        {atual.tipo === 'formulario' && (
+          <FormularioFinal
+            nome={nome}
+            onNome={setNome}
+            email={email}
+            onEmail={setEmail}
+            data={dataNascimento}
+            onData={setDataNascimento}
+            hora={horaNascimento}
+            onHora={setHoraNascimento}
+            cidade={cidade}
+            onCidade={setCidade}
+            enviando={enviando}
+            onEnviar={() => enviar()}
           />
         )}
 
@@ -354,17 +399,23 @@ function Quarto({
   children,
   respondidas,
   total,
+  hero,
+  rodape,
 }: {
   children: React.ReactNode;
   respondidas: number;
   total: number;
+  hero?: ReactNode;
+  rodape?: ReactNode;
 }) {
   return (
     <>
       <PoeiraNaLuz />
       <main className="quarto-de-vela relative z-10 flex-1 flex flex-col items-center gap-6 px-5 py-10 sm:py-14">
         <LinhaDeProgresso total={total} respondidas={respondidas} />
+        {hero}
         {children}
+        {rodape}
       </main>
     </>
   );
@@ -426,190 +477,164 @@ function Cena({
   );
 }
 
-/* ── guardar o progresso ──────────────────────────────────────────────── */
+/* ── o formulário final ───────────────────────────────────────────────── */
 
 /**
- * O e-mail pedido no meio do caminho.
+ * Tudo o que precisamos saber, numa tela só, **depois** do ritual inteiro.
  *
- * ── Por que aqui, e por que com este texto ────────────────────────────────
+ * ── Por que uma tela e não cinco passos ───────────────────────────────────
  *
- * A justificativa é verdadeira: o e-mail guarda o progresso e é para onde a
- * revelação vai. Não é pretexto — quem sair agora recebe **um** lembrete com o
- * link de onde parou, e nada além disso.
+ * Passo a passo é a forma certa de fazer perguntas quando cada resposta é uma
+ * decisão — foi assim que as 26 cenas foram desenhadas, e é por isso que elas
+ * funcionam. Mas nome, e-mail e nascimento não são decisões: são dados que a
+ * pessoa já tem na cabeça. Fatiá-los em cinco telas transforma trinta
+ * segundos de digitação em cinco momentos de "ainda tem mais?", e é no
+ * terceiro deles que a aba fecha.
  *
- * Isso importa porque a versão desonesta desta mesma tela é fácil de escrever:
- * bastaria inventar que o resultado "expira em 10 minutos" ou que a vaga é
- * limitada. Nada aqui expira e nada é limitado, então nada aqui diz isso.
+ * Aqui ela vê o fim inteiro de uma vez, e o fim é curto.
  *
- * ── Pular é de verdade ────────────────────────────────────────────────────
+ * ── A hora é opcional de verdade ──────────────────────────────────────────
  *
- * O botão de seguir sem dizer não é decorativo e não fica escondido em cinza
- * ilegível. Bloquear o ritual aqui converteria um pouco mais e transformaria o
- * produto num pedágio — e quem é obrigada a dar e-mail para continuar dá o
- * e-mail errado, o que não serve para nada.
+ * Muita gente não sabe a hora em que nasceu, e essa é a pergunta que mais
+ * trava formulário de astrologia. Deixar em branco é um caminho declarado,
+ * não um campo que a pessoa descobre que pode pular: o servidor assume
+ * meio-dia e marca o dado como aproximado, e o que depende dela — ascendente
+ * e casas — sai como estimativa em vez de sair errado calado.
+ *
+ * ── A cidade não muda quase nada, e mesmo assim é pedida ──────────────────
+ *
+ * `coordenadas.ts` usa a capital do estado (o erro de longitude cabe dentro
+ * do erro da hora informada de memória). O nome exato entra porque é dela,
+ * porque aparece na carta, e porque no dia em que houver uma base
+ * geocodificada o dado já vai estar no banco de todo mundo que passou por
+ * aqui.
  */
-function GuardarProgresso({
-  valor,
-  onChange,
-  cena,
-  onAvancar,
+function FormularioFinal({
+  nome,
+  onNome,
+  email,
+  onEmail,
+  data,
+  onData,
+  hora,
+  onHora,
+  cidade,
+  onCidade,
+  enviando,
+  onEnviar,
 }: {
-  valor: string;
-  onChange: (v: string) => void;
-  cena: number;
-  onAvancar: () => void;
+  nome: string;
+  onNome: (v: string) => void;
+  email: string;
+  onEmail: (v: string) => void;
+  data: string;
+  onData: (v: string) => void;
+  hora: string;
+  onHora: (v: string) => void;
+  cidade: CidadeEscolhida | null;
+  onCidade: (v: CidadeEscolhida | null) => void;
+  enviando: boolean;
+  onEnviar: () => void;
 }) {
-  const [salvando, setSalvando] = useState(false);
-  const [erro, setErro] = useState('');
-
-  async function guardar() {
-    if (!valor.trim()) return;
-    setErro('');
-    setSalvando(true);
-    try {
-      const r = await fetch('/api/progresso', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: valor, cena }),
-      });
-      const d = await r.json().catch(() => ({ ok: true }));
-      if (d.ok === false && d.erro) {
-        setErro(d.erro);
-        setSalvando(false);
-        return;
-      }
-      marcar('email_ok');
-      evento('Lead');
-      onAvancar();
-    } catch {
-      // Falha de rede não pode prender ninguém no meio do ritual: o e-mail é
-      // pedido de novo, de qualquer forma, antes do pagamento.
-      onAvancar();
-    }
-  }
+  const [mostrarHora, setMostrarHora] = useState(false);
+  const completo = !!nome.trim() && email.includes('@') && !!data;
 
   return (
-    <div className="flex flex-col gap-5 self-stretch anima-surgir">
-      <h2 className="font-display italic text-2xl sm:text-3xl leading-snug text-escrita text-center text-balance max-w-[26ch] mx-auto">
-        Onde a revelação deve te encontrar?
-      </h2>
+    <div className="flex flex-col gap-6 self-stretch anima-surgir">
+      <div className="flex flex-col gap-2">
+        <h2 className="font-display italic text-2xl sm:text-3xl leading-snug text-escrita text-center text-balance max-w-[26ch] mx-auto">
+          Ele já sabe quem você é. Falta ele saber seu nome.
+        </h2>
+        <p className="font-corpo font-light text-sm text-escrita-corpo text-center leading-relaxed max-w-[40ch] mx-auto">
+          Últimos campos, e a revelação aparece na tela.
+        </p>
+      </div>
 
-      <p className="font-corpo font-light text-sm text-escrita-corpo text-center leading-relaxed max-w-[42ch] mx-auto">
-        Guardamos seu progresso neste e-mail — se você fechar a aba agora, dá
-        para voltar de onde parou. É também para onde o PDF e as imagens vão no
-        final.
-      </p>
+      <div className="flex flex-col gap-4">
+        <Rotulo texto="Seu nome">
+          <input
+            autoFocus
+            type="text"
+            value={nome}
+            onChange={(e) => onNome(e.target.value)}
+            maxLength={40}
+            autoComplete="given-name"
+            placeholder="Como te chamam"
+            className="w-full bg-transparent border border-escrita/20 rounded-xl px-4 py-3 font-corpo text-sm text-escrita placeholder:text-escrita-fraca focus:border-ouro-velho outline-none"
+          />
+        </Rotulo>
 
-      <input
-        autoFocus
-        type="email"
-        inputMode="email"
-        autoComplete="email"
-        value={valor}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={(e) => e.key === 'Enter' && guardar()}
-        placeholder="seu@email.com"
-        aria-label="Seu e-mail"
-        className="bg-transparent border-b border-escrita/25 focus:border-ouro-velho outline-none px-1 py-3 font-corpo text-lg text-escrita text-center placeholder:text-escrita-fraca/50 transition-colors"
-      />
+        <Rotulo texto="Seu e-mail">
+          <input
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => onEmail(e.target.value)}
+            placeholder="seu@email.com"
+            className="w-full bg-transparent border border-escrita/20 rounded-xl px-4 py-3 font-corpo text-sm text-escrita placeholder:text-escrita-fraca focus:border-ouro-velho outline-none"
+          />
+          <span className="font-corpo text-[11px] text-escrita-fraca leading-relaxed">
+            É por ele que você entra na plataforma depois. Sem lista, sem
+            propaganda.
+          </span>
+        </Rotulo>
 
-      {erro && <p className="font-corpo text-sm text-center text-red-700">{erro}</p>}
+        <Rotulo texto="Quando você nasceu">
+          <input
+            type="date"
+            value={data}
+            onChange={(e) => onData(e.target.value)}
+            className="w-full bg-transparent border border-escrita/20 rounded-xl px-4 py-3 font-corpo text-sm text-escrita focus:border-ouro-velho outline-none"
+          />
+        </Rotulo>
+
+        {mostrarHora ? (
+          <Rotulo texto="A que horas (se souber)">
+            <input
+              type="time"
+              value={hora}
+              onChange={(e) => onHora(e.target.value)}
+              className="w-full bg-transparent border border-escrita/20 rounded-xl px-4 py-3 font-corpo text-sm text-escrita focus:border-ouro-velho outline-none"
+            />
+            <span className="font-corpo text-[11px] text-escrita-fraca leading-relaxed">
+              Em branco está tudo bem — o mapa sai com o ascendente estimado, e
+              você pode corrigir depois na sua conta.
+            </span>
+          </Rotulo>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setMostrarHora(true)}
+            className="self-start font-corpo text-xs text-escrita-fraca hover:text-escrita underline underline-offset-4 transition"
+          >
+            Sei a hora em que nasci — quero informar
+          </button>
+        )}
+
+        <Rotulo texto="Onde você nasceu">
+          <BuscaDeCidade valor={cidade} onEscolher={onCidade} />
+        </Rotulo>
+      </div>
 
       <button
-        onClick={guardar}
-        disabled={salvando || !valor.trim()}
-        className="bg-vela text-tinta font-corpo font-medium px-8 py-3.5 rounded-full hover:brightness-110 transition disabled:opacity-40"
+        onClick={onEnviar}
+        disabled={!completo || enviando}
+        className="bg-vela text-tinta font-corpo font-medium px-8 py-4 rounded-full hover:brightness-110 transition disabled:opacity-40"
       >
-        {salvando ? 'Guardando...' : 'Guardar e continuar'}
+        {enviando ? 'Selando o ritual...' : 'Revelar meu familiar'}
       </button>
-
-      <button
-        onClick={onAvancar}
-        className="font-corpo text-sm text-escrita-fraca hover:text-escrita underline underline-offset-4 transition"
-      >
-        Continuar sem guardar
-      </button>
-
-      <p className="font-corpo text-xs text-escrita-fraca text-center leading-relaxed">
-        Um lembrete só, se você não terminar. Sem propaganda, sem lista.
-      </p>
     </div>
   );
 }
 
-/* ── um campo ─────────────────────────────────────────────────────────── */
-
-function Campo({
-  titulo,
-  auxilio,
-  tipo = 'text',
-  valor,
-  onChange,
-  onAvancar,
-  podeAvancar,
-  placeholder,
-  maxLength,
-  rotuloAvancar = 'Continuar',
-  rotuloPular,
-  onPular,
-  erro,
-}: {
-  titulo: string;
-  auxilio?: string;
-  tipo?: 'text' | 'date' | 'time' | 'email';
-  valor: string;
-  onChange: (v: string) => void;
-  onAvancar: () => void;
-  podeAvancar: boolean;
-  placeholder?: string;
-  maxLength?: number;
-  rotuloAvancar?: string;
-  rotuloPular?: string;
-  onPular?: () => void;
-  erro?: string;
-}) {
+function Rotulo({ texto, children }: { texto: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-5 self-stretch anima-surgir">
-      <h2 className="font-display italic text-2xl sm:text-3xl leading-snug text-escrita text-center text-balance max-w-[24ch] mx-auto">
-        {titulo}
-      </h2>
-      {auxilio && (
-        <p className="font-corpo font-light text-sm text-escrita-fraca text-center -mt-2 max-w-[38ch] mx-auto">
-          {auxilio}
-        </p>
-      )}
-
-      <input
-        type={tipo}
-        value={valor}
-        onChange={(e) => onChange(e.target.value)}
-        maxLength={maxLength}
-        placeholder={placeholder}
-        autoFocus
-        onKeyDown={(e) => e.key === 'Enter' && podeAvancar && onAvancar()}
-        style={tipo === 'date' || tipo === 'time' ? { colorScheme: 'light' } : undefined}
-        className="entrada-ritual bg-transparent border border-escrita/25 rounded-xl px-5 py-4 text-center text-lg text-escrita placeholder:text-escrita-fraca/60 focus:border-ouro-velho outline-none font-corpo"
-      />
-
-      {erro && <p className="font-corpo text-sm text-center text-red-700">{erro}</p>}
-
-      <div className="flex gap-3">
-        {rotuloPular && onPular && (
-          <button
-            onClick={onPular}
-            className="flex-1 font-corpo text-sm text-escrita-fraca hover:text-escrita transition py-3"
-          >
-            {rotuloPular}
-          </button>
-        )}
-        <button
-          onClick={onAvancar}
-          disabled={!podeAvancar}
-          className="flex-1 bg-vela text-tinta font-corpo font-medium px-8 py-4 rounded-full hover:brightness-110 transition disabled:opacity-40"
-        >
-          {rotuloAvancar}
-        </button>
-      </div>
-    </div>
+    <label className="flex flex-col gap-1.5">
+      <span className="font-corpo text-[0.65rem] tracking-[0.18em] uppercase text-escrita-fraca">
+        {texto}
+      </span>
+      {children}
+    </label>
   );
 }

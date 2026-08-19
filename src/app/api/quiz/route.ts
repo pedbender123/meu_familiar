@@ -19,6 +19,7 @@ import { aplicarDesempate, opcoesDeDesempate } from '@/lib/quiz/desempate';
 import { FAMILIARES, type FamiliarId } from '@/lib/familiares';
 import { gerarMensagemDoFamiliar } from '@/lib/teaser';
 import { gerarVeu } from '@/lib/arte';
+import { coordenadaDoEstado } from '@/lib/coordenadas';
 
 /**
  * Fecha o ritual: pontua, decide o familiar e cria o pedido.
@@ -46,8 +47,18 @@ export async function POST(req: NextRequest) {
   }
 
   const corpo = await req.json();
-  const { respostas, nome, email, dataNascimento, horaNascimento, produto, desempate, cupom } =
-    corpo ?? {};
+  const {
+    respostas,
+    nome,
+    email,
+    dataNascimento,
+    horaNascimento,
+    cidadeNascimento,
+    estadoNascimento,
+    produto,
+    desempate,
+    cupom,
+  } = corpo ?? {};
 
   if (!respostas || typeof respostas !== 'object') {
     return NextResponse.json({ erro: 'Respostas do ritual ausentes.' }, { status: 400 });
@@ -124,7 +135,26 @@ export async function POST(req: NextRequest) {
     id: pedidoId,
     nome: nome.trim().slice(0, 40),
     email: email.trim(),
-    respostas_json: JSON.stringify({ quiz: respostas, dataNascimento, horaNascimento }),
+    /**
+     * O lugar de nascimento entra aqui junto da data e da hora.
+     *
+     * Não é para o familiar — ele sai das 26 cenas e não olha o céu. É para o
+     * mapa natal do Calendário: sem lugar não há ascendente nem casas, e até
+     * agora a cidade nunca era perguntada no ritual, só depois, dentro da
+     * conta, como pendência. Perguntando aqui, `herdarNascimentoDosPedidos`
+     * já entrega a conta completa no primeiro login e a pendência some.
+     *
+     * Sigla do estado validada contra a lista fechada: ela vira coordenada em
+     * `coordenadas.ts`, e sigla inventada viraria mapa de lugar nenhum.
+     */
+    respostas_json: JSON.stringify({
+      quiz: respostas,
+      dataNascimento,
+      horaNascimento,
+      cidadeNascimento:
+        typeof cidadeNascimento === 'string' ? cidadeNascimento.slice(0, 60) : undefined,
+      estadoNascimento: (typeof estadoNascimento === 'string' && coordenadaDoEstado(estadoNascimento)) ? estadoNascimento : undefined,
+    }),
     familiar: resultado.familiar,
     lua,
     signo_sol: signoSol,

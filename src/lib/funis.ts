@@ -51,9 +51,9 @@ export const FUNIS: Record<FunilId, Funil> = {
     id: 'padrao',
     codigo: 'pd',
     caminho: '/',
-    nome: 'Landing e as 26 cenas',
+    nome: 'As 26 cenas, direto',
     aposta:
-      'A pessoa lê o que é, decide entrar, e responde o teste inteiro antes de ver preço. Aposta em qualificação: quem atravessa 26 cenas já quer o resultado.',
+      'A primeira cena É a página. Sem landing, sem explicação, sem preço na frente — a pessoa responde o teste inteiro e só então vê o familiar. Aposta em qualificação: quem atravessa 26 cenas já quer o resultado. A landing explicativa saiu da frente em 18/08 e ficou só para quem chega sem marcador.',
     ativo: true,
   },
   atravessar: {

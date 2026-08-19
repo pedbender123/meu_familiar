@@ -1,4 +1,5 @@
 import db from '../lib/db';
+import { coordenadaDoEstado } from '@/lib/coordenadas';
 
 /**
  * O que a conta ainda precisa informar pra tudo funcionar.
@@ -132,17 +133,50 @@ export function herdarNascimentoDosPedidos(contaId: string, email: string): void
     const respostas = JSON.parse(pedido.respostas_json) as {
       dataNascimento?: string;
       horaNascimento?: string;
+      cidadeNascimento?: string;
+      estadoNascimento?: string;
     };
     if (!respostas.dataNascimento) return;
+
+    /**
+     * A cidade também vem do ritual desde 18/08.
+     *
+     * Antes ela era a única coisa que o funil não perguntava, e por isso toda
+     * conta nova nascia incompleta e ganhava a pendência de mapa natal. Com o
+     * formulário no fim do ritual pedindo o lugar, quem passa por lá chega
+     * com tudo — e a pendência continua existindo só para as contas antigas,
+     * que é para quem ela foi feita.
+     *
+     * A coordenada é a da capital do estado, de propósito: ver o comentário
+     * de `coordenadas.ts`. Sigla que não resolve não grava lugar nenhum, em
+     * vez de gravar um par de zeros que depois viraria um mapa do Golfo da
+     * Guiné.
+     */
+    const lugar = respostas.estadoNascimento
+      ? coordenadaDoEstado(respostas.estadoNascimento)
+      : null;
+    const rotuloDoLugar =
+      lugar && respostas.cidadeNascimento
+        ? `${respostas.cidadeNascimento} · ${respostas.estadoNascimento}`
+        : null;
 
     db.prepare(
       `UPDATE contas SET
          nascimento_data = COALESCE(nascimento_data, @data),
-         nascimento_hora = COALESCE(nascimento_hora, @hora)
+         nascimento_hora = COALESCE(nascimento_hora, @hora),
+         nascimento_hora_aproximada =
+           CASE WHEN nascimento_hora IS NULL AND @hora IS NULL THEN 1
+                ELSE nascimento_hora_aproximada END,
+         nascimento_cidade = COALESCE(nascimento_cidade, @cidade),
+         nascimento_lat = COALESCE(nascimento_lat, @lat),
+         nascimento_lon = COALESCE(nascimento_lon, @lon)
        WHERE id = @contaId`
     ).run({
       data: respostas.dataNascimento,
       hora: respostas.horaNascimento ?? null,
+      cidade: rotuloDoLugar,
+      lat: lugar?.lat ?? null,
+      lon: lugar?.lon ?? null,
       contaId,
     });
   } catch {
