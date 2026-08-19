@@ -24,102 +24,97 @@ em local, sem deploy:
 
 ---
 
-## ⚠️ A contradição que precisa ser resolvida primeiro
+## ✅ Respondido em 18/08 — o modelo de venda
 
-**Os planos novos que você descreveu conflitam com os que estão no ar.**
+**Não havia contradição: são duas telas diferentes.** A tela de oferta logo
+depois do ritual e a página `/planos` vendem coisas distintas, e é por isso que
+os preços não batiam.
 
-Hoje no banco:
+### A tela de oferta (depois do ritual) — produto de entrega rápida
 
-| plano | preço | o que é |
-|---|---|---|
-| gratuito | 0 | ritual + familiar + PDF + 1 leitura/mês |
-| revelacao_mensal | 15,90/mês | app completo, recorrente |
-| acompanhamento_mensal | 39,90/mês | app completo + conselho diário |
+O objetivo declarado dela é **arrecadar caixa**, não montar assinatura. Ela
+mostra três coisas e mais nada:
 
-O que você pediu hoje:
+| oferta | preço | recorrente? | o que entrega |
+|---|---|---|---|
+| opção 1 | R$ 7,90 | não | revelação simples do familiar |
+| opção 2 | R$ 15,90 | não | revelação completa |
+| Revelação | R$ 29,90 | **sim, a única** | revelação completa + app completo por 30 dias |
 
-| plano | preço | o que é |
-|---|---|---|
-| opção 1 | 7,90 | revelação simples, app limitadíssimo |
-| opção 2 | 15,90 | revelação completa, app limitadíssimo |
-| Revelação | 29,90/mês | revelação completa + app completo 30 dias, recorrente |
+As duas avulsas dão acesso ao app **igual ao do grátis**, com uma diferença
+só: o calendário mostra a **semana inteira** em vez de só o dia de hoje.
 
-**As perguntas que decidem tudo:**
+**Nada de "grátis" aparece nessa tela.** As opções são apresentadas como
+produtos pagos. O grátis existe, mas não é oferecido ali.
 
-1. **A Revelação continua grátis, ou volta a ser paga a 7,90?** Se as opções
-   1 e 2 são "as revelações do familiar", elas competem com o que hoje é a
-   porta de entrada gratuita. Os dois modelos não cabem juntos.
-2. **7,90 e 15,90 são compra única ou recorrente?** Pelo texto parecem
-   avulsas ("só as revelações"), com o 29,90 sendo o único recorrente.
-3. **O que sobra do Acompanhamento (39,90)?** Ele sai, ou vira um quarto
-   degrau acima do 29,90?
-4. **"App limitadíssimo, mas como perfil e conta"** — limitadíssimo é
-   exatamente o quê? Só ver o familiar e o perfil, sem Oráculo e sem
-   calendário? Ou com uma amostra de cada?
+### O grátis chega por e-mail, ~4h depois
 
-Sem essas quatro respostas, mexer na tabela de planos é retrabalho garantido.
+Quem passou pela oferta e não comprou recebe *"acesse sua conta free do
+Bruxário"*. A intenção é fazer a pessoa entrar, explorar e ver valor — e a
+partir daí ela **não vê mais as avulsas de 7,90 e 15,90**, só os planos
+recorrentes.
 
----
+O que a conta grátis tem:
+- imagem e nome do familiar (a **revelação completa não**, e o texto também não)
+- as métricas do teste
+- horóscopo e calendário **só até o dia de hoje**
+- 5 mensagens/mês no Oráculo · 1 leitura
 
-## 1 · Planos de upgrade dentro do aplicativo
+Tudo isso acessível **só pela plataforma** — a imagem do familiar é grátis, o
+texto da revelação não.
 
-Vender de dentro, não só na landing: a pessoa esbarra no limite e sobe ali
-mesmo.
+### Os planos recorrentes (`/planos`)
 
-**? Antes de executar**
-- Resolver a contradição acima — os três planos novos convivem com os dois
-  atuais, substituem, ou é reforma completa da tabela?
-- Quem já assinou o 15,90 de hoje vira o quê? (a promessa "ninguém perde o
-  que pagou" está travada por teste; qualquer mudança precisa respeitá-la)
-- O upgrade no meio do ciclo é proporcional, ou a pessoa paga cheio e o prazo
-  soma? A segunda é bem mais simples e não engana ninguém — mas é decisão sua.
-- Onde a oferta aparece: quando bate o limite, no menu, ou nos dois?
+| plano | preço/mês | leituras | mensagens | calendário | extra |
+|---|---|---|---|---|---|
+| — | 15,90 | 1 por semana | 30 | 1 mês | — |
+| — | 29,90 | 10 | 60 | 6 meses | guia espiritual semanal por e-mail |
+| — | 49,90 | 30 | 200 | 1 ano | conselho |
 
----
+**Regra de apresentação:** cada plano mostra **tudo do anterior + a
+diferença**. Não repetir a lista inteira como se fosse independente.
 
-## 2 · Coleta de nome e e-mail DEPOIS das perguntas
+**A revelação (o textão) está inclusa em todos os planos.**
 
-Hoje o nome e o e-mail são pedidos antes. Movê-los para depois aumenta quem
-começa, e é a mudança de funil com maior efeito isolado.
-
-**? Antes de executar**
-- Se a pessoa responde tudo e **não** deixa o e-mail, o que acontece com as
-  respostas? (guardar e recuperar depois é possível, mas muda o modelo de
-  dados)
-- Isso mexe no caminho crítico da venda. Vale rodar como teste A/B contra o
-  fluxo atual, ou troca direto?
-- O funil de anúncio (`/atravessar`) já tem regra própria de e-mail. Muda
-  junto ou fica como está?
+> ? **O que ainda falta decidir:** os nomes dos três planos, e o que acontece
+> com quem já assinou o 15,90 e o 39,90 de ontem. A promessa "ninguém perde o
+> que pagou" está travada por teste.
 
 ---
 
-## 3 · Coletar data, hora (opcional) e **cidade** de nascimento
+## 1 · A porta de entrada sem landing — ✅ **feito em 18/08**
 
-Parcialmente pronto: a conta já tem os campos, já herda data e hora do
-ritual, já trata hora desconhecida com meio-dia, e já pede a cidade por
-estado.
+Commit `5c24ed0`. Tráfego de campanha cai direto na primeira das 26 cenas;
+`/` sem marcador continua sendo a landing (é a única porta de login do site).
+Junto foi a inversão da ordem: as 26 cenas primeiro, formulário no fim.
 
-**Falta:** pedir isso **no ritual**, não depois — hoje é uma pendência que a
-pessoa preenche dentro da plataforma.
+**Falta:** subir para produção. Não há remote git configurado aqui e eu não
+tenho acesso à VPS — o deploy é seu.
 
-**? Antes de executar**
-- Cidade exata ou só o estado? Hoje é o estado (a coordenada é a da capital,
-  precisa o bastante para o ascendente). Cidade exata exige uma base
-  geocodificada — mais peso, ganho pequeno.
-- Entra como passo do ritual ou como tela logo depois? Cada campo a mais no
-  ritual é gente que desiste no meio.
+---
+
+## 2 · Nome e e-mail depois das perguntas — ✅ **feito em 18/08**
+
+Mesmo commit. Um formulário só no fim: nome, e-mail, data, hora (opcional) e
+cidade. Quem abandona no meio não deixa nada — decisão sua, "descarta".
+
+---
+
+## 3 · Data, hora e cidade de nascimento — ✅ **feito em 18/08**
+
+Tudo no formulário do fim. A cidade é busca por texto sobre os 5.571
+municípios, com o estado vindo junto do resultado. A coordenada usada é a da
+capital do estado (o erro cabe dentro do erro da hora informada de memória —
+ver `src/lib/coordenadas.ts`), e a conta passa a nascer completa: a pendência
+de mapa natal só sobra para as contas antigas.
 
 ---
 
 ## 4 · Três criativos por campanha
 
-**? Antes de executar**
-- **Eu não tenho acesso ao Ads Manager**, então não sei o que deu mais
-  resultado. Você precisa me passar: quais criativos rodaram, com quais
-  números (CTR, CPA, conversão), ou pelo menos qual "ganhou".
-- Criativo é imagem/vídeo + copy. Eu escrevo a copy e monto a estrutura; a
-  peça visual em si você produz ou eu gero briefing?
-- Três por campanha — quantas campanhas?
+**? Antes de executar** — continua bloqueado: eu não tenho acesso ao Ads
+Manager. Preciso que você diga quais criativos rodaram e qual ganhou, com
+números se tiver.
 
 ---
 
@@ -135,15 +130,13 @@ um irmão.
 - **Formulário embutido** (tipo o Payment Brick) → mais trabalho, mantém a
   ambientação
 
-**? Antes de executar**
-- **Preciso da documentação do DirectPag.** Não conheço a API deles e não vou
-  chutar sobre coisa que mexe com dinheiro.
-- Fazem Pix? Cartão recorrente? (isso decide se a renovação continua manual)
-- **É troca ou adição?** A tabela `contas_checkout` foi feita para conviverem
-  dois provedores. Dá para pôr o DirectPag em 10% do tráfego e comparar taxa
-  e conversão antes de decidir — bem mais seguro que virar a chave.
-- Por que a troca? Taxa, antecipação, coprodutores? A resposta muda o que
-  priorizar.
+**Documentação:** https://docs.directpag.com.br/ — a cobertura é para ser
+total (Pix, cartão, recorrência, webhook, split).
+
+**? Antes de executar** — falta só a credencial. E vale decidir se é troca ou
+adição: `contas_checkout` foi feita para dois provedores conviverem, então dá
+para pôr o DirectPag em 10% do tráfego e comparar taxa e conversão antes de
+virar a chave.
 
 ---
 
@@ -154,22 +147,18 @@ porque é o que a equipe de marketing vai usar sem te perguntar.
 
 ---
 
-## 7 · Conectar coprodutores
+## 7 · Conectar coprodutores — ❌ **fora do escopo**
 
-**? Antes de executar**
-- Coprodutor de quê: comissão sobre venda, split de pagamento no gateway, ou
-  só acesso ao painel para acompanhar?
-- Se for split, **isso depende do DirectPag** (item 5) — é ele que precisa
-  suportar. Ordem importa.
-- Quantos, e a comissão é fixa ou por campanha?
+Você faz direto no painel do gateway. Nada a construir aqui.
 
 ---
 
 ## 8 · Acessos a passar (você faz, eu não consigo)
 
-- [ ] DirectPag — credenciais e documentação
-- [ ] Dashboard (qual? Utmify, Ads Manager, outro?)
-- [ ] Facebook / Meta Business
+- [ ] **DirectPag — credenciais** (a documentação já veio: docs.directpag.com.br)
+- [ ] Ads Manager — os números dos criativos que rodaram (item 4)
+
+O dashboard da Utmify e o Meta Business ficam adiados junto do item 9.
 
 **Obs:** eu não tenho como acessar nenhuma dessas contas. O que eu preciso é
 do que sai delas — chaves de API, IDs, números de campanha — colados aqui ou
@@ -177,11 +166,13 @@ no `.env`.
 
 ---
 
-## 9 · 🔥 Pixel da Utmify na página de vendas — **URGENTE**
+## 9 · Pixel da Utmify — ⏸️ **adiado, por último**
 
-Marcado como urgente por você.
+Deixou de ser urgente: ainda não está claro qual necessidade a Utmify resolve
+que o pixel da Meta + o painel próprio já não resolvem. Fica junto do item 8
+(quais números acompanhar), para ser decidido com dado na mão.
 
-**? Antes de executar**
+**? Quando voltar**
 - Preciso do **ID do pixel / script da Utmify**.
 - Em quais páginas: só a landing, ou o funil inteiro (`/atravessar`,
   `/ritual`, `/pagamento`, `/planos`)?
@@ -222,9 +213,16 @@ relocação de arquivos e fusão do `horoscopo.db`.
 
 ---
 
-## Como usar este documento
+## A ordem daqui pra frente
 
-Ele está incompleto de propósito. Responda os blocos `?` — de preferência
-escrevendo aqui mesmo — e aí ele vira plano de execução. Os itens 1 e 5 são
-os que mais mudam de forma dependendo das respostas; os itens 2, 3 e 9 dão
-para começar com pouca conversa.
+1. **Deploy do que foi feito hoje** (itens 1, 2 e 3). É seu — não tenho acesso
+   à VPS e não existe remote git configurado. Ver o checklist acima antes.
+2. **A tela de oferta com as três opções** (7,90 · 15,90 · 29,90 recorrente),
+   e o app limitado que as duas avulsas abrem — igual ao grátis, com a semana
+   inteira no calendário em vez de só hoje.
+3. **O e-mail de conta grátis em ~4h** para quem viu a oferta e não comprou, e
+   a regra que esconde as avulsas de quem já entrou por ele.
+4. **Os três planos recorrentes** com os limites novos (15,90 · 29,90 · 49,90),
+   com a `/planos` mostrando "tudo do anterior + a diferença".
+5. **DirectPag**, quando a credencial chegar.
+6. Criativos, Utmify e analytics, com dado na mão.
