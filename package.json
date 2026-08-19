@@ -28,7 +28,8 @@
     "acesso-gratis": "tsx scripts/acesso-gratis.ts",
     "dia-de-ouro": "tsx scripts/dia-de-ouro.ts",
     "cota-renovada": "tsx scripts/cota-renovada.ts",
-    "resumo-do-dia": "tsx scripts/resumo-do-dia.ts"
+    "resumo-do-dia": "tsx scripts/resumo-do-dia.ts",
+    "leitura-esperando": "tsx scripts/leitura-esperando.ts"
   },
   "dependencies": {
     "@google/genai": "^2.16.0",

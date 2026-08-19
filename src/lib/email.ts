@@ -1070,3 +1070,61 @@ export async function enviarResumoDoDia(params: {
     texto: linhas.map((l) => `${l.rotulo}: ${l.valor}`).join('\n'),
   });
 }
+
+/**
+ * "A sua leitura está esperando" — para quem entrou, ganhou a cota e não usou.
+ *
+ * ── Por que este é o e-mail mais fácil de acertar ─────────────────────────
+ *
+ * Ele não pede nada e não vende nada: a pessoa já TEM a leitura, ela é
+ * gratuita, e vai expirar sem ser usada no fim do mês porque a cota não
+ * acumula. Dizer isso é um favor, não uma abordagem comercial — e é a única
+ * mensagem de remarketing deste sistema que continuaria verdadeira mesmo que
+ * a gente não tivesse nada para vender.
+ *
+ * ── A venda acontece do outro lado, e é por isso que funciona ─────────────
+ *
+ * Quem clica cai no Oráculo e faz uma leitura de verdade, com espetáculo,
+ * cartas e o céu do dia. É o produto se explicando sozinho — que converte
+ * muito melhor do que qualquer parágrafo sobre planos escrito aqui.
+ */
+export async function enviarLeituraEsperando(params: {
+  email: string;
+  nome: string;
+  url: string;
+  quantas: number;
+  nomeFamiliar?: string;
+}): Promise<void> {
+  const { email, nome, url, quantas, nomeFamiliar } = params;
+  const primeiro = nome.trim().split(/\s+/)[0] || '';
+  const dele = nomeFamiliar ? `${nomeFamiliar} ainda tem` : 'O Oráculo ainda tem';
+
+  const html = moldura(`
+    <p style="margin:0 0 18px;font-size:22px;font-style:italic;color:#2E2438;">
+      ${primeiro ? `${primeiro}, ${dele.toLowerCase()}` : dele} o que dizer.
+    </p>
+    <p style="margin:0 0 22px;font-size:15px;line-height:1.6;">
+      ${
+        quantas === 1
+          ? 'Você tem uma leitura completa esperando, e ela é sua — não custa nada.'
+          : `Você tem ${quantas} leituras completas esperando, e elas são suas — não custam nada.`
+      }
+      As cartas são sorteadas na hora e o céu é o do seu dia. Leva alguns
+      minutos.
+    </p>
+    <p style="margin:0 0 22px;">${botao(url, 'Fazer a minha leitura')}</p>
+    <p style="margin:0;font-family:Arial,sans-serif;font-size:12px;line-height:1.6;color:#6B5F72;">
+      A cota não acumula: o que não for usado até o fim do mês se perde. Este
+      lembrete chega uma vez só.
+    </p>
+  `);
+
+  await enviar({
+    para: email,
+    assunto: primeiro
+      ? `${primeiro}, a sua leitura está esperando`
+      : 'A sua leitura está esperando',
+    html,
+    texto: `Você tem ${quantas} leitura(s) esperando, de graça. Faça a sua: ${url}`,
+  });
+}
