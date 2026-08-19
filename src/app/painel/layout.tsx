@@ -52,6 +52,13 @@ export default async function LayoutDoPainel({
     { href: '/painel/campanhas', rotulo: 'Campanhas', icone: 'alvo' },
     { href: '/painel/rastreio', rotulo: 'Rastreio', icone: 'grafico' },
     { href: '/painel/pedidos', rotulo: 'Pedidos', icone: 'caixa' },
+    /*
+      Assinantes fica ao lado de Pedidos porque são as duas metades da receita
+      — a que aconteceu uma vez e a que se repete. Separadas de propósito:
+      somar as duas na mesma tela é como se comemora um mês excepcional que
+      não vai voltar.
+    */
+    { href: '/painel/assinantes', rotulo: 'Assinantes', icone: 'moeda' },
     { href: '/painel/remarketing', rotulo: 'Remarketing', icone: 'megafone', alerta: rascunhosPendentes },
     { href: '/painel/financeiro', rotulo: 'Financeiro', icone: 'moeda' },
     { href: '/painel/cupons', rotulo: 'Cupons', icone: 'etiqueta' },
