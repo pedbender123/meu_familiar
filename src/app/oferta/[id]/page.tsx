@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { buscarPedido } from '@/lib/db';
 import { FAMILIARES, type FamiliarId } from '@/lib/familiares';
-import { vitrine } from '@/nucleo/vitrine';
+import { escadaDaOferta } from '@/nucleo/oferta';
 import { PoeiraNaLuz } from '@/components/PoeiraNaLuz';
 import { SigiloFamiliar } from '@/components/SigiloFamiliar';
 import { OfertaDepoisDoRitual } from '@/plataforma/OfertaDepoisDoRitual';
@@ -47,17 +47,21 @@ export default async function Oferta({
   const familiar = FAMILIARES[pedido.familiar as FamiliarId];
   const leitura = pedido.leitura_json ? JSON.parse(pedido.leitura_json) : null;
 
-  // Só o mensal — o anual aqui seria uma terceira decisão num momento em que
-  // a pessoa só quer ver o resultado do ritual. Quem quiser compara em /planos.
-  const planos = vitrine()
-    .filter((p) => !p.anual)
-    .map((p) => ({
-      id: p.plano.id,
-      nome: p.plano.nome,
-      precoCentavos: p.plano.preco_centavos,
-      beneficios: p.beneficios.slice(0, 4),
-      destaque: p.familia === 'acompanhamento',
-    }));
+  /**
+   * A escada da oferta, e não a vitrine.
+   *
+   * A `/planos` compara assinaturas para quem já decidiu ficar. Aqui são três
+   * opções fixas, na ordem em que a decisão fica fácil — duas avulsas e a
+   * recorrente por último. Ver `nucleo/oferta.ts`.
+   */
+  const planos = escadaDaOferta().map((item) => ({
+    id: item.plano.id,
+    nome: item.plano.nome,
+    precoCentavos: item.plano.preco_centavos,
+    recorrente: item.recorrente,
+    chamada: item.chamada,
+    ganhos: item.ganhos,
+  }));
 
   return (
     <>
@@ -79,8 +83,8 @@ export default async function Oferta({
               )}
             </div>
             <p className="font-corpo font-light text-sm text-pergaminho/55 max-w-[38ch] leading-relaxed">
-              A leitura inteira está pronta e é sua, de graça. Mandamos o acesso
-              ao seu Bruxário no seu e-mail.
+              O nome e a imagem dele são seus. O que ele tem a dizer está
+              escrito — e é isso que abre abaixo.
             </p>
           </header>
 

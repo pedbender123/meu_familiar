@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import db from '../lib/db';
 import { buscarPlano, type Plano } from './planos';
 import { criarAssinatura, type Assinatura } from './assinaturas';
+import { ehPlanoDaOferta } from './oferta';
 
 export interface Cobranca {
   id: string;
@@ -32,9 +33,25 @@ export function abrirCobranca(dados: {
   contaId: string;
   email: string;
   planoId: string;
+  /**
+   * De onde veio a intenção de comprar.
+   *
+   * `vitrine` (o padrão) só deixa passar plano público: é o que impede que um
+   * link direto venda um plano que não está à venda para todo mundo — anual,
+   * avulso antigo, cortesia.
+   *
+   * `oferta` abre a exceção para a escada de depois do ritual, cujas duas
+   * avulsas existem justamente **fora** da vitrine (ver `nucleo/oferta.ts`).
+   * A exceção é estreita de propósito: só os ids daquela lista, nunca
+   * "qualquer plano não-público".
+   */
+  origem?: 'vitrine' | 'oferta';
 }): { cobranca: Cobranca; plano: Plano } | null {
   const plano = buscarPlano(dados.planoId);
-  if (!plano || !plano.ativo || !plano.publico) return null;
+  if (!plano || !plano.ativo) return null;
+
+  const liberadoPelaOferta = dados.origem === 'oferta' && ehPlanoDaOferta(plano.id);
+  if (!plano.publico && !liberadoPelaOferta) return null;
   // Plano grátis não gera cobrança: quem tentar assinar o gratuito por aqui
   // está no caminho errado, e criar uma cobrança de R$ 0,00 só produziria uma
   // linha que o gateway recusaria depois.

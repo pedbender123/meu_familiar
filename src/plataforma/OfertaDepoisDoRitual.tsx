@@ -7,8 +7,9 @@ export interface PlanoDaOferta {
   id: string;
   nome: string;
   precoCentavos: number;
-  beneficios: string[];
-  destaque: boolean;
+  recorrente: boolean;
+  chamada: string;
+  ganhos: string[];
 }
 
 function reais(centavos: number): string {
@@ -28,9 +29,17 @@ function reais(centavos: number): string {
  * um link cinza no rodapé.
  *
  * O truque de esconder a saída funciona uma vez e custa a confiança de
- * sempre: quem se sente empurrado num produto de assinatura cancela no
+ * sempre: quem se sente empurrada num produto de assinatura cancela no
  * primeiro mês, e conta pra alguém. A landing prometeu que o ritual é de
  * graça; a tela imediatamente seguinte é onde essa promessa é testada.
+ *
+ * ── Escada, não comparação ────────────────────────────────────────────────
+ *
+ * Cada card mostra só o que ele **acrescenta** ao anterior, e não a lista
+ * inteira do que entrega. Três listas completas lado a lado obrigam a pessoa
+ * a fazer um diff de cabeça em pé no celular; a escada deixa a diferença
+ * óbvia e a decisão pequena — "vale mais oito reais?" em vez de "qual desses
+ * três eu escolho?".
  */
 export function OfertaDepoisDoRitual({
   pedidoId,
@@ -40,70 +49,125 @@ export function OfertaDepoisDoRitual({
   planos: PlanoDaOferta[];
 }) {
   const [indo, setIndo] = useState<string | null>(null);
+  const [erro, setErro] = useState('');
+
+  async function comprar(planoId: string) {
+    if (indo) return;
+    setIndo(planoId);
+    setErro('');
+    try {
+      const r = await fetch(`/api/oferta/${pedidoId}/comprar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plano: planoId }),
+      });
+      const d = await r.json();
+      if (!r.ok || !d.redirect) {
+        setErro(d.erro || 'Não consegui abrir o pagamento. Tente de novo.');
+        setIndo(null);
+        return;
+      }
+      window.location.assign(d.redirect);
+    } catch {
+      setErro('O véu está denso. Tente de novo em instantes.');
+      setIndo(null);
+    }
+  }
 
   return (
     <div className="w-full flex flex-col items-center gap-8">
-      {/* ── O que abre com plano ───────────────────────────────────────── */}
       <section className="w-full flex flex-col gap-5">
         <div className="flex flex-col items-center gap-1.5 text-center">
           <p className="font-corpo text-[0.6rem] tracking-[0.24em] uppercase text-pergaminho/35">
-            e tem mais esperando
+            o que ele ainda não te contou
           </p>
           <h2 className="font-display italic text-xl sm:text-2xl text-pergaminho text-balance max-w-[26ch] leading-tight">
-            O seu familiar sabe mais do que cabe numa leitura.
+            O seu familiar sabe mais do que cabe numa imagem.
           </h2>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          {planos.map((plano) => (
-            <div
-              key={plano.id}
-              className="flex flex-col gap-4 p-5 rounded-2xl border"
-              style={{
-                borderColor: plano.destaque
-                  ? 'rgba(217,164,65,0.45)'
-                  : 'rgba(234,224,204,0.14)',
-                background: plano.destaque
-                  ? 'linear-gradient(165deg, rgba(217,164,65,0.1), rgba(234,224,204,0.02))'
-                  : 'rgba(234,224,204,0.03)',
-              }}
-            >
-              <div className="flex items-baseline justify-between gap-2">
-                <h3 className="font-display italic text-lg text-pergaminho">
-                  {plano.nome}
-                </h3>
-                <span className="font-display text-xl text-vela shrink-0">
-                  {reais(plano.precoCentavos)}
-                  <span className="font-corpo text-[0.6rem] text-pergaminho/40">/mês</span>
-                </span>
-              </div>
-
-              <ul className="flex flex-col gap-1.5">
-                {plano.beneficios.map((b) => (
-                  <li
-                    key={b}
-                    className="font-corpo font-light text-[0.8rem] text-pergaminho/70 leading-snug"
-                  >
-                    {b}
-                  </li>
-                ))}
-              </ul>
-
-              <Link
-                href="/planos"
-                onClick={() => setIndo(plano.id)}
-                className={[
-                  'mt-auto text-center font-corpo text-sm px-5 py-2.5 rounded-full transition-all',
-                  plano.destaque
-                    ? 'bg-vela text-tinta font-medium hover:brightness-110'
-                    : 'border border-vela/50 text-vela hover:bg-vela/10',
-                ].join(' ')}
+        <div className="flex flex-col gap-3">
+          {planos.map((plano, i) => {
+            const destaque = plano.recorrente;
+            return (
+              <article
+                key={plano.id}
+                className="flex flex-col gap-3.5 p-5 rounded-2xl border"
+                style={{
+                  borderColor: destaque
+                    ? 'rgba(217,164,65,0.45)'
+                    : 'rgba(234,224,204,0.14)',
+                  background: destaque
+                    ? 'linear-gradient(165deg, rgba(217,164,65,0.1), rgba(234,224,204,0.02))'
+                    : 'rgba(234,224,204,0.03)',
+                }}
               >
-                {indo === plano.id ? 'Abrindo...' : 'Quero este'}
-              </Link>
-            </div>
-          ))}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex flex-col gap-1">
+                    <h3 className="font-display italic text-lg text-pergaminho leading-tight">
+                      {plano.nome}
+                    </h3>
+                    <p className="font-corpo font-light text-[0.8rem] text-pergaminho/60 leading-snug max-w-[34ch]">
+                      {plano.chamada}
+                    </p>
+                  </div>
+                  <span className="font-display text-xl text-vela shrink-0 whitespace-nowrap">
+                    {reais(plano.precoCentavos)}
+                    {plano.recorrente && (
+                      <span className="font-corpo text-[0.6rem] text-pergaminho/40">/mês</span>
+                    )}
+                  </span>
+                </div>
+
+                <ul className="flex flex-col gap-1.5">
+                  {/*
+                    "Tudo do anterior, mais:" só a partir do segundo card — no
+                    primeiro não há anterior, e a frase mentiria.
+                  */}
+                  {i > 0 && (
+                    <li className="font-corpo text-[0.72rem] uppercase tracking-[0.14em] text-pergaminho/35">
+                      tudo do anterior, e:
+                    </li>
+                  )}
+                  {plano.ganhos.map((g) => (
+                    <li
+                      key={g}
+                      className="font-corpo font-light text-[0.82rem] text-pergaminho/75 leading-snug flex gap-2"
+                    >
+                      <span aria-hidden="true" className="text-vela/60">
+                        ·
+                      </span>
+                      {g}
+                    </li>
+                  ))}
+                </ul>
+
+                <button
+                  onClick={() => comprar(plano.id)}
+                  disabled={!!indo}
+                  className={[
+                    'mt-1 text-center font-corpo text-sm px-5 py-2.5 rounded-full transition-all disabled:opacity-50',
+                    destaque
+                      ? 'bg-vela text-tinta font-medium hover:brightness-110'
+                      : 'border border-vela/50 text-vela hover:bg-vela/10',
+                  ].join(' ')}
+                >
+                  {indo === plano.id ? 'Abrindo...' : 'Quero este'}
+                </button>
+
+                {plano.recorrente && (
+                  <p className="font-corpo text-[11px] text-pergaminho/35 text-center leading-relaxed">
+                    Renova todo mês. Dá para cancelar quando quiser.
+                  </p>
+                )}
+              </article>
+            );
+          })}
         </div>
+
+        {erro && (
+          <p className="font-corpo text-sm text-center text-red-400">{erro}</p>
+        )}
       </section>
 
       {/* ── A saída, do mesmo tamanho ──────────────────────────────────── */}
@@ -115,8 +179,8 @@ export function OfertaDepoisDoRitual({
           Ver o meu familiar agora
         </Link>
         <p className="font-corpo text-xs text-pergaminho/40 text-center max-w-[36ch] leading-relaxed">
-          É de graça e continua sendo. Dá para assinar depois, de dentro do seu
-          Bruxário.
+          O nome e a imagem dele são seus, de graça. Dá para voltar aqui
+          depois, de dentro do seu Bruxário.
         </p>
       </div>
     </div>
