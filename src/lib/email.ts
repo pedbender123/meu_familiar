@@ -1128,3 +1128,75 @@ export async function enviarLeituraEsperando(params: {
     texto: `Você tem ${quantas} leitura(s) esperando, de graça. Faça a sua: ${url}`,
   });
 }
+
+/**
+ * O guia da semana — a entrega que o plano do meio vende.
+ *
+ * ── Por que o texto vai INTEIRO no e-mail ─────────────────────────────────
+ *
+ * O resto do sistema usa e-mail como chave: ele avisa e leva para dentro,
+ * porque o valor está na plataforma. Aqui é o contrário, e de propósito. O
+ * direito se chama `guiaPorEmail` e o que ele descreve é justamente "o pago
+ * vai atrás da pessoa": um guia que exige login para ser lido é um lembrete
+ * de tarefa, não um presente de domingo à noite.
+ *
+ * Ele também fica guardado na conta (`guias_semanais`) — e-mail se perde, e o
+ * que a pessoa paga não pode morar só na caixa de entrada dela.
+ */
+export async function enviarGuiaSemanal(params: {
+  email: string;
+  nome: string;
+  nomeDoFamiliar: string;
+  url: string;
+  guia: {
+    abertura: string;
+    dias: { nome: string; texto: string }[];
+    destaque: string;
+    fechamento: string;
+  };
+}): Promise<void> {
+  const { email, nome, nomeDoFamiliar, url, guia } = params;
+  const primeiro = nome.trim().split(/\s+/)[0] || '';
+
+  const dias = guia.dias
+    .map(
+      (d) => `
+      <tr><td style="padding:0 0 14px;">
+        <p style="margin:0 0 3px;font-family:Arial,sans-serif;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#B08D3F;">
+          ${d.nome}
+        </p>
+        <p style="margin:0;font-size:14px;line-height:1.6;color:#3C3145;">${d.texto}</p>
+      </td></tr>`
+    )
+    .join('');
+
+  const html = moldura(`
+    <p style="margin:0 0 6px;font-family:Arial,sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#B08D3F;">
+      o guia da sua semana
+    </p>
+    <p style="margin:0 0 18px;font-size:20px;font-style:italic;color:#2E2438;">
+      ${guia.abertura}
+    </p>
+    <table style="width:100%;border-collapse:collapse;">${dias}</table>
+    <p style="margin:18px 0 0;padding:14px 16px;background:#F6F1E6;border-radius:10px;font-size:14px;line-height:1.6;color:#3C3145;">
+      <strong>O dia da semana:</strong> ${guia.destaque}
+    </p>
+    <p style="margin:20px 0 22px;font-size:15px;font-style:italic;line-height:1.6;color:#2E2438;">
+      ${guia.fechamento}
+    </p>
+    <p style="margin:0 0 22px;">${botao(url, 'Abrir o meu calendário')}</p>
+    <p style="margin:0;font-family:Arial,sans-serif;font-size:12px;line-height:1.6;color:#6B5F72;">
+      ${nomeDoFamiliar} escreve isto toda semana, só para você. Ele também
+      fica guardado no seu Bruxário.
+    </p>
+  `);
+
+  await enviar({
+    para: email,
+    assunto: primeiro ? `${primeiro}, a sua semana` : 'A sua semana',
+    html,
+    texto: `${guia.abertura}\n\n${guia.dias
+      .map((d) => `${d.nome.toUpperCase()}\n${d.texto}`)
+      .join('\n\n')}\n\nO dia da semana: ${guia.destaque}\n\n${guia.fechamento}\n\n${url}`,
+  });
+}

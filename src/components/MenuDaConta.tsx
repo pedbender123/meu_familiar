@@ -15,6 +15,12 @@ import { usePathname } from 'next/navigation';
 const ITENS = [
   { href: '/conta', rotulo: 'Início' },
   { href: '/conta/oraculo', rotulo: 'Oráculo' },
+  /*
+    O Guia aparece para todo mundo, inclusive para quem ainda não tem o
+    direito — a página explica o que é e leva aos planos. Item de menu que
+    some é oportunidade perdida; item que leva a um 404 é defeito.
+  */
+  { href: '/conta/guia', rotulo: 'Guia' },
 ];
 
 export function MenuDaConta({ email }: { email: string }) {
