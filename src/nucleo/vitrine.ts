@@ -28,8 +28,10 @@ export interface ItemDaVitrine {
 
 const ALCANCE_EM_PALAVRAS: Record<string, string> = {
   nenhum: '',
-  semana: 'Calendário da semana',
+  hoje: 'Calendário: o dia de hoje',
+  semana: 'Calendário da semana inteira',
   mes: 'Calendário do mês inteiro',
+  semestre: 'Calendário dos 6 meses à frente',
   ano: 'Calendário dos 12 meses à frente',
   rolante: 'Calendário sempre com 12 meses à frente',
 };

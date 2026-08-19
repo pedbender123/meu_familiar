@@ -76,8 +76,12 @@ const MESES = [
  */
 const DIAS_POR_ALCANCE: Record<AlcanceCalendario, number> = {
   nenhum: 0,
+  // 1, e não 0: `hoje` precisa calcular o dia corrente de verdade. Zero
+  // devolveria o mês inteiro em cadeado, que é o mesmo que não ter.
+  hoje: 1,
   semana: 7,
   mes: 31,
+  semestre: 183,
   ano: 365,
   rolante: 365,
 };

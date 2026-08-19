@@ -7,15 +7,34 @@
  * **alcance e velocidade**, não só sim/não, porque é aí que mora a diferença
  * entre o plano grátis e o pago.
  */
-export type AlcanceCalendario = 'nenhum' | 'semana' | 'mes' | 'ano' | 'rolante';
+export type AlcanceCalendario =
+  | 'nenhum'
+  | 'hoje'
+  | 'semana'
+  | 'mes'
+  | 'semestre'
+  | 'ano'
+  | 'rolante';
 
 /** Ordem de generosidade — é o que `unirDireitos` usa pra escolher o maior. */
 const FORCA_DO_ALCANCE: Record<AlcanceCalendario, number> = {
   nenhum: 0,
-  semana: 1,
-  mes: 2,
-  ano: 3,
-  rolante: 4,
+  /**
+   * Só o dia de hoje.
+   *
+   * Entrou em 19/08 junto do modelo novo, e é o degrau que faz o grátis
+   * valer a pena sem entregar o produto: a pessoa vê o dia dela calculado de
+   * verdade — não uma amostra falsa — e vê o resto do mês desenhado com
+   * cadeado ao lado. `nenhum` esconderia o calendário inteiro, e o que não
+   * aparece não vende.
+   */
+  hoje: 1,
+  semana: 2,
+  mes: 3,
+  /** Seis meses à frente: o degrau do meio dos planos de agosto/2026. */
+  semestre: 4,
+  ano: 5,
+  rolante: 6,
 };
 
 export interface Direitos {

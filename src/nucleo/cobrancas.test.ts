@@ -14,10 +14,47 @@ import { assinaturasAtivasDaConta } from './assinaturas';
 import { direitosEfetivos } from './acesso';
 import { PRODUTOS } from '../lib/produtos';
 
+/**
+ * Um plano do próprio teste, para o que é mecânica e não comércio.
+ *
+ * Já quebrou duas vezes por não existir: testes fixados num plano comercial
+ * viram alarme falso toda vez que a escada de preços muda — e mudou em
+ * 17/08 e de novo em 19/08, quando `acompanhamento_mensal` foi desativado e
+ * `abrirCobranca` passou a recusá-lo com razão. O que estes testes verificam
+ * (idempotência do webhook, prazo, valor vindo do plano) não depende de
+ * nenhum preço de verdade.
+ */
+const TESTE_MENSAL = 'teste_cobranca_mensal';
+
+function semearPlanoDeTeste() {
+  const agora = new Date().toISOString();
+  db.prepare(
+    `INSERT INTO planos (id, nome, preco_centavos, duracao_dias, recorrente,
+       parcelas_max, publico, direitos_json, ativo, criado_em, atualizado_em)
+     VALUES (@id, 'Plano de teste', 1234, 30, 1, 1, 1, @direitos, 1, @agora, @agora)
+     ON CONFLICT (id) DO UPDATE SET
+       direitos_json = @direitos, ativo = 1, publico = 1, atualizado_em = @agora`
+  ).run({
+    id: TESTE_MENSAL,
+    // Direitos genéricos e generosos: o que se testa é que pagar TRANSFERE os
+    // direitos da linha do plano, não quais direitos algum plano comercial
+    // tem hoje.
+    direitos: JSON.stringify({
+      relatorioCompleto: true,
+      conselhoDiario: true,
+      leiturasPorMes: 7,
+      perguntasOraculo: 20,
+      perguntasOraculoPorDia: 3,
+    }),
+    agora,
+  });
+}
+
 beforeEach(() => {
   db.exec('DELETE FROM cobrancas');
   db.exec('DELETE FROM assinaturas');
   db.exec('DELETE FROM contas');
+  semearPlanoDeTeste();
 });
 
 function conta(): { id: string; email: string } {
@@ -98,7 +135,7 @@ describe('confirmarPagamento', () => {
    */
   test('webhook reenviado NÃO cria segunda assinatura', () => {
     const c = conta();
-    const aberta = abrirCobranca({ contaId: c.id, email: c.email, planoId: 'acompanhamento_mensal' })!;
+    const aberta = abrirCobranca({ contaId: c.id, email: c.email, planoId: TESTE_MENSAL })!;
 
     const primeira = confirmarPagamento(aberta.cobranca.id, { metodo: 'pix' })!;
     const segunda = confirmarPagamento(aberta.cobranca.id, { metodo: 'pix' })!;
@@ -142,7 +179,7 @@ describe('confirmarPagamento', () => {
     const c = conta();
     assert.equal(direitosEfetivos(c.id, c.email).leiturasPorMes, 0);
 
-    const aberta = abrirCobranca({ contaId: c.id, email: c.email, planoId: 'acompanhamento_mensal' })!;
+    const aberta = abrirCobranca({ contaId: c.id, email: c.email, planoId: TESTE_MENSAL })!;
     confirmarPagamento(aberta.cobranca.id);
 
     const d = direitosEfetivos(c.id, c.email);
