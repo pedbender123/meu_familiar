@@ -1,5 +1,6 @@
 import test, { describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import db from './db';
 import { definirInterruptor } from './interruptores';
 import {
@@ -39,6 +40,20 @@ describe('desligado — o modelo de produção', () => {
 
   test('depois da entrega vai para a revelação, como produção faz hoje', () => {
     assert.equal(destinoDepoisDaEntrega('abc'), '/revelacao/abc');
+  });
+
+  /**
+   * A porta sem landing já está em produção desde 19/08 e é o que a campanha
+   * em curso usa para converter. Se ela passasse pelo interruptor, subir com
+   * a chave desligada devolveria a landing para quem hoje cai direto na
+   * pergunta — desfazendo justamente o que fez o funil funcionar.
+   */
+  test('o interruptor não toca na porta sem landing', () => {
+    const raiz = readFileSync('src/app/page.tsx', 'utf8');
+    assert.ok(
+      !raiz.includes('modeloNovoLigado'),
+      'a raiz não pode consultar o interruptor para decidir landing'
+    );
   });
 
   test('produtos que não mudaram de preço seguem iguais', () => {

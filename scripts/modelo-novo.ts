@@ -25,8 +25,8 @@ function main() {
     console.log(`modelo novo: ${ligado ? 'LIGADO' : 'desligado'}`);
     console.log(
       ligado
-        ? '  Revelação grátis · oferta de três degraus · campanha cai na cena 1'
-        : '  Revelação a R$ 9,80 · revelação direto · campanha cai na landing'
+        ? '  Revelação grátis · oferta de três degraus · planos vendáveis'
+        : '  Revelação a R$ 9,80 · entrega leva à revelação · planos travados'
     );
     console.log('\nuse: npm run modelo-novo -- ligar   |   -- desligar');
     return;

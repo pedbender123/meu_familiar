@@ -15,7 +15,6 @@ import {
 import { lerCodigoDeCampanha, normalizarOrigem } from '@/lib/rastreio';
 import { FunilEscolhido } from '@/components/FunilEscolhido';
 import { PortaDoRitual } from './PortaDoRitual';
-import { modeloNovoLigado } from '@/lib/modelo-de-venda';
 
 export const dynamic = 'force-dynamic';
 
@@ -82,8 +81,14 @@ export default async function Raiz({
          * Sem marcador (`viaMarcador` falso), a landing continua: ali é quem
          * digitou o endereço, foi indicado ou já é cliente, e essa pessoa
          * precisa das respostas — e do link de login, que só existe lá.
+         *
+         * **Isto NÃO passa pelo interruptor do modelo de venda.** Já está em
+         * produção desde 19/08 e é o que a campanha em curso está usando para
+         * converter; pô-lo atrás da chave desligada devolveria a landing para
+         * quem hoje cai direto na pergunta — que é exatamente a mudança que
+         * fez o funil funcionar.
          */
-        viaMarcador && modeloNovoLigado() ? (
+        viaMarcador ? (
           <PortaDoRitual />
         ) : (
           <Landing />

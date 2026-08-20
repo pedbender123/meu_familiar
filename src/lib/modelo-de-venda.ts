@@ -17,6 +17,14 @@ import { PRODUTOS, type ProdutoId } from './produtos';
  * É a disciplina 3 do projeto — "todo caminho novo nasce desligado" — aplicada
  * à mudança que mais mexe em dinheiro.
  *
+ * ── O que o interruptor NÃO controla ──────────────────────────────────────
+ *
+ * A porta sem landing. Ela já foi para produção sozinha, em 19/08, e é o que
+ * a campanha em curso está usando para converter — devolvê-la à landing seria
+ * desfazer a mudança que fez o funil funcionar. O interruptor cuida só do
+ * **dinheiro**: quanto custa, para onde vai depois da entrega, e se plano é
+ * vendável.
+ *
  * ── Como virar a chave ────────────────────────────────────────────────────
  *
  * Uma linha no banco, sem deploy:
