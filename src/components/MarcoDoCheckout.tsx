@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { marcar } from '@/lib/marcar';
+import { evento } from '@/lib/pixel';
 
 /**
  * Marca que a tela de pagamento apareceu de verdade.
@@ -21,23 +22,24 @@ import { marcar } from '@/lib/marcar';
  * futuro envio via Conversions API do MESMO evento serem deduplicados pela
  * Meta em vez de contados duas vezes (ver o comentário em `lib/pixel.ts`).
  */
-export function MarcoDoCheckout({ pedidoId }: { pedidoId: string }) {
+export function MarcoDoCheckout({
+  pedidoId,
+  valorEmReais,
+}: {
+  pedidoId: string;
+  valorEmReais?: number;
+}) {
   const marcou = useRef(false);
   useEffect(() => {
     if (marcou.current) return;
     marcou.current = true;
     marcar('checkout_aberto');
     /*
-      `InitiateCheckout` NÃO sai daqui.
-
-      No navegador ele dependia desta tela montar: sumia para quem tem
-      bloqueador e contava de novo a cada recarga. Agora sai do servidor, no
-      momento em que a cobrança é criada — que é quando a intenção existe de
-      verdade. Ver `nucleo/eventos-meta.ts`.
-
-      O marco acima continua: ele é do NOSSO painel, não da Meta, e medir a
-      tela renderizada é justamente o que ele existe para fazer.
+      O `event_id` faz este disparo e o que o servidor enfileira serem o mesmo
+      acontecimento. Enquanto não houver token de Conversions API, só este sai
+      — e é ele que mantém a medição de pé.
     */
-  }, [pedidoId]);
+    evento('InitiateCheckout', { value: valorEmReais, currency: 'BRL' }, `${pedidoId}:checkout`);
+  }, [pedidoId, valorEmReais]);
   return null;
 }

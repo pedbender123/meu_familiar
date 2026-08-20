@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { marcar } from '@/lib/marcar';
 import { MARCO_DO_DEGRAU } from '@/nucleo/oferta-degraus';
+import { evento } from '@/lib/pixel';
 
 export interface PlanoDaOferta {
   id: string;
@@ -69,14 +70,18 @@ export function OfertaDepoisDoRitual({
     if (marco) marcar(marco as Parameters<typeof marcar>[0]);
     marcar('pagamento_aberto');
     /*
-      Nenhum evento de Meta sai daqui.
-
-      O clique vira `InitiateCheckout` no servidor, quando a cobrança é criada
-      pela rota abaixo — que é o mesmo instante, sem depender de o navegador
-      conseguir falar com a Meta. Os `marcar()` acima continuam: são do nosso
-      painel, e medir a intenção antes de sair da tela é o que eles existem
-      para fazer.
+      `AddToCart` no clique do degrau: é o sinal de que a pessoa escolheu um
+      preço, e vem antes de a cobrança existir. O `InitiateCheckout` sai
+      depois, na tela de pagamento, quando ela chega lá de verdade.
     */
+    const escolhido = planos.find((p) => p.id === planoId);
+    if (escolhido) {
+      evento(
+        'AddToCart',
+        { value: escolhido.precoCentavos / 100, currency: 'BRL' },
+        `${pedidoId}:${planoId}`
+      );
+    }
     try {
       const r = await fetch(`/api/oferta/${pedidoId}/comprar`, {
         method: 'POST',

@@ -195,13 +195,19 @@ export function RitualCliente({
     if (email.includes('@')) {
       marcarUmaVez('email_ok');
       /*
-        `Lead` NÃO sai daqui.
+        `Lead` no navegador, uma vez por carregamento.
 
-        Disparar no navegador quando o campo fica válido conta gente que
-        digitou o e-mail e desistiu antes de enviar — e conta de novo se a
-        pessoa recarregar. O evento sai do servidor, quando o endereço chega
-        ao banco de verdade. Ver `nucleo/eventos-meta.ts`.
+        O servidor também enfileira este evento quando o pedido nasce, com o
+        mesmo peso — mas sem token de Conversions API ele não sai, e sem este
+        disparo a campanha ficaria sem nenhum sinal de lead para otimizar.
+
+        `marcados` garante uma vez por sessão de ritual; recarregar a página
+        conta de novo, o que é aceitável para um evento de topo de funil.
       */
+      if (!marcados.current.has('lead')) {
+        marcados.current.add('lead');
+        evento('Lead');
+      }
     }
   }, [email]);
 

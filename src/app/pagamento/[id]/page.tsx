@@ -36,7 +36,7 @@ export default async function Pagamento({
 
   return (
     <main className="flex-1 flex flex-col items-center justify-center px-6 py-16">
-      <MarcoDoCheckout pedidoId={id} />
+      <MarcoDoCheckout pedidoId={id} valorEmReais={preco.finalCentavos / 100} />
       {pagamentoEhFake() || !chave ? (
         <PagamentoFake pedidoId={id} />
       ) : (

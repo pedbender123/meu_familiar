@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
+import { useEffect, useRef, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { CirculoMagico } from '@/components/CirculoMagico';
+import { evento } from '@/lib/pixel';
 
 const MENSAGENS = [
   'Seu familiar está atravessando o véu...',
@@ -19,19 +20,43 @@ export default function Obrigado({ params }: { params: Promise<{ id: string }> }
   // `null` = ainda não sabemos. Sem isso o campo pisca na tela de quem já deu
   // o e-mail, no intervalo entre o primeiro render e o primeiro poll.
   const [precisaEmail, setPrecisaEmail] = useState<boolean | null>(null);
+  const disparouCompra = useRef(false);
 
   /**
-   * **Esta tela não conta mais venda nenhuma.**
+   * Dispara o `Purchase` AQUI, e não só em `/revelacao/[id]`.
    *
-   * Ela disparava `Purchase` aqui, sem `event_id`, travado por um
-   * `localStorage` que é por navegador — e `MarcaCompra` fazia o mesmo do
-   * outro lado. Quem pagava no app do Instagram, abria o e-mail no Chrome e
-   * depois olhava no computador gerava TRÊS vendas para um pagamento. Foi
-   * exatamente o que aconteceu em produção.
+   * `/revelacao` só reconhece a dona por sessão logada, e não há login
+   * automático depois de pagar. Quem fecha esta aba ou só abre o e-mail
+   * depois nunca dispararia o evento, e uma venda real sumiria do Ads
+   * Manager. Esta aba É a pessoa que pagou, sem precisar provar nada.
    *
-   * Agora quem conta é o servidor, no webhook, uma vez — ver
-   * `nucleo/eventos-meta.ts`. O navegador ficou só com o `PageView`.
+   * ── O `event_id` é o que conserta a contagem tripla ───────────────────
+   *
+   * Antes este disparo saía SEM id, e a única trava era `localStorage` — que
+   * é por navegador. Quem pagava no app do Instagram, abria o e-mail no
+   * Chrome e depois olhava no computador tinha três memórias diferentes e
+   * gerava três vendas para um pagamento. Com `${id}:purchase`, os três
+   * chegam à Meta como o mesmo acontecimento e ela conta um.
    */
+  function dispararCompraSeNecessario(
+    status: string,
+    valorCentavos: number | undefined,
+    exemplo: boolean | undefined
+  ) {
+    if (disparouCompra.current) return;
+    if (status === 'aguardando_pagamento' || exemplo) return;
+    disparouCompra.current = true;
+
+    const chave = `bx_compra_${id}`;
+    try {
+      if (localStorage.getItem(chave)) return;
+      localStorage.setItem(chave, '1');
+    } catch {
+      // Sem storage: dispara mesmo assim. Quem impede a contagem dobrada é o
+      // `event_id`, não esta trava.
+    }
+    evento('Purchase', { value: (valorCentavos ?? 0) / 100, currency: 'BRL' }, `${id}:purchase`);
+  }
 
   useEffect(() => {
     const rotacao = setInterval(() => {
@@ -49,6 +74,7 @@ export default function Obrigado({ params }: { params: Promise<{ id: string }> }
         if (!ativo) return;
         const faltaEmail = !dados.temEmail;
         setPrecisaEmail((antes) => (antes === false ? false : faltaEmail));
+        dispararCompraSeNecessario(dados.status, dados.valorCentavos, dados.exemplo);
 
         if (dados.status === 'entregue') {
           clearInterval(poll);
