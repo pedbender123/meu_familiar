@@ -55,6 +55,9 @@ export async function entregarChaveDaPlataforma(dados: {
       // a pessoa clicar. O que ela vem buscar está dentro.
       nomeFamiliar: dados.nomeFamiliar,
       nomeSecreto: dados.nomeSecreto,
+      // A arte do familiar ilustra o e-mail. É o que é gratuito de verdade
+      // aqui, e é o que faz a pessoa abrir.
+      pedidoId: dados.pedidoId,
     });
 
     registrarEvento(

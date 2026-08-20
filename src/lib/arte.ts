@@ -324,14 +324,42 @@ export async function gerarArtes(pedidoId: string, params: ParametrosArte) {
     nomeSecreto: params.leitura.nome_secreto,
   });
 
+  /**
+   * A versão de e-mail: PNG pequeno, feito para caixa de entrada.
+   *
+   * `feed.png` tem 2,7 MB e `story.png` 4 MB — servem ao Instagram, onde
+   * ninguém paga o download. Num e-mail isso é uma imagem que demora a
+   * aparecer no celular e engorda a mensagem o bastante para alguns
+   * provedores mandarem para a aba de promoções.
+   *
+   * `carta.webp` seria leve (424 KB), mas webp não abre no Outlook — e um
+   * retângulo quebrado no lugar do familiar é pior do que não ter imagem.
+   *
+   * **JPEG e não PNG.** PNG comprime mal imagem fotográfica: a mesma arte sai
+   * com 348 KB em PNG e 87 KB em JPEG, para o mesmo tamanho de tela. Aqui não
+   * há texto fino nem transparência para preservar — é a arte do familiar, e
+   * é exatamente o caso em que JPEG ganha.
+   *
+   * 640 de largura: o dobro dos 320 que o e-mail exibe, para tela retina.
+   * `flatten` porque JPEG não tem canal alfa — sem ele, o que era transparente
+   * viraria preto no lugar do fundo do grimório.
+   */
+  const emailJpg = await sharp(carta)
+    .resize(640, null, { withoutEnlargement: true })
+    .flatten({ background: '#1A1420' })
+    .jpeg({ quality: 78, mozjpeg: true })
+    .toBuffer();
+
   const storyPath = path.join(dir, 'story.png');
   const feedPath = path.join(dir, 'feed.png');
   const cartaPath = path.join(dir, 'carta.webp');
   const ogPath = path.join(dir, 'og.png');
+  const emailPath = path.join(dir, 'email.jpg');
+  fs.writeFileSync(emailPath, emailJpg);
   fs.writeFileSync(storyPath, story);
   fs.writeFileSync(feedPath, feed);
   fs.writeFileSync(cartaPath, carta);
   fs.writeFileSync(ogPath, og);
 
-  return { storyPath, feedPath, cartaPath, ogPath };
+  return { storyPath, feedPath, cartaPath, ogPath, emailPath };
 }

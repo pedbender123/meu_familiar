@@ -391,16 +391,51 @@ export async function enviarContaCriada(params: {
   contaNova: boolean;
   nomeFamiliar?: string;
   nomeSecreto?: string;
+  /**
+   * O pedido cuja arte ilustra o e-mail. Sem ele o e-mail sai só com texto.
+   *
+   * A imagem é `email.jpg` — a arte reduzida, gerada em `arte.ts` só para
+   * isto. `feed.png` e `story.png` pesam megabytes (servem ao Instagram) e
+   * `carta.webp` é leve mas não abre no Outlook, onde viraria um retângulo
+   * quebrado no lugar do familiar.
+   */
+  pedidoId?: string;
 }): Promise<void> {
-  const { nome, email, url, minutosDeValidade, contaNova, nomeFamiliar, nomeSecreto } =
-    params;
+  const {
+    nome, email, url, minutosDeValidade, contaNova, nomeFamiliar, nomeSecreto, pedidoId,
+  } = params;
 
   const chegou = !!nomeFamiliar;
+
+  /**
+   * **A imagem do familiar vai no e-mail, e é ela que faz o e-mail valer.**
+   *
+   * O nome sozinho é uma informação; a imagem é a coisa que a pessoa mostra
+   * para alguém. É o que é gratuito de verdade neste produto — a leitura
+   * escrita é o que se vende — e por isso ela não pode ficar atrás de um
+   * login: quem recebe abre a caixa de entrada e VÊ o familiar.
+   *
+   * Vai por URL e não anexada: anexo faz o e-mail pesar e alguns provedores
+   * mandam para a promoções. `feed.png` é servido publicamente depois da
+   * entrega (ver `api/storage/[id]/[arquivo]`), e o robô de e-mail busca sem
+   * cookie nenhum.
+   */
+  const imagem =
+    chegou && pedidoId
+      ? `<p style="margin:0 0 22px;text-align:center;">
+           <img src="${base()}/api/storage/${pedidoId}/email.jpg"
+                alt="${nomeFamiliar}"
+                width="320"
+                style="width:320px;max-width:100%;height:auto;border-radius:12px;display:block;margin:0 auto;" />
+         </p>`
+      : '';
 
   const html = moldura(`
     <p style="margin:0 0 18px;font-size:24px;font-style:italic;color:#2E2438;">
       ${chegou ? `${nome}, ${nomeFamiliar} atravessou.` : `${nome}, seu Bruxário está aberto.`}
     </p>
+
+    ${imagem}
 
     ${
       chegou && nomeSecreto
