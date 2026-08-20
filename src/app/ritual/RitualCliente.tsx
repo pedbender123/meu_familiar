@@ -194,12 +194,14 @@ export function RitualCliente({
   useEffect(() => {
     if (email.includes('@')) {
       marcarUmaVez('email_ok');
-      // `Lead` só faz sentido quando há endereço para o qual voltar. Ele saía
-      // do passo "guardar progresso", que não existe mais.
-      if (!marcados.current.has('lead')) {
-        marcados.current.add('lead');
-        evento('Lead');
-      }
+      /*
+        `Lead` NÃO sai daqui.
+
+        Disparar no navegador quando o campo fica válido conta gente que
+        digitou o e-mail e desistiu antes de enviar — e conta de novo se a
+        pessoa recarregar. O evento sai do servidor, quando o endereço chega
+        ao banco de verdade. Ver `nucleo/eventos-meta.ts`.
+      */
     }
   }, [email]);
 

@@ -14,7 +14,7 @@ import { calcularExpiracao, produtoDe } from './produtos';
 import { aposPagamento } from './processar';
 import { checarEmLinha } from '../nucleo/sentinela/emLinha';
 import { checarValorCobrado } from '../nucleo/sentinela/invariantes/financeiro';
-import { enfileirarEventoCapi } from './fila-capi';
+import { registrarCompra } from '../nucleo/eventos-meta';
 import { entregarChaveDaPlataforma, nomeDaConta } from './acesso-plataforma';
 
 export type DesfechoNotificacao =
@@ -118,19 +118,14 @@ export async function processarNotificacaoDePagamento(
        * já protegeria contra duplicata, mas depender disso é deixar a
        * idempotência num detalhe de índice em vez de na lógica.
        */
-      if (process.env.NEXT_PUBLIC_META_PIXEL_ID) {
-        enfileirarEventoCapi({
-          pedidoId: cobranca.id,
-          nome: 'Purchase',
-          quando: new Date(),
-          email: cobranca.email || undefined,
-          valorEmReais:
-            resultado.brutoCentavos !== null
-              ? resultado.brutoCentavos / 100
-              : cobranca.valor_centavos / 100,
-          eventId: `${cobranca.id}:purchase`,
-        });
-      }
+      registrarCompra({
+        referencia: cobranca.id,
+        email: cobranca.email,
+        valorEmReais:
+          resultado.brutoCentavos !== null
+            ? resultado.brutoCentavos / 100
+            : cobranca.valor_centavos / 100,
+      });
     }
 
     return { desfecho: 'assinatura_confirmada' };
@@ -178,29 +173,23 @@ export async function processarNotificacaoDePagamento(
   checarEmLinha('valor_cobrado', () => checarValorCobrado(buscarPedido(pedido.id)!));
 
   /**
-   * Disciplina 6: "o pixel nunca depende do navegador". Enfileira aqui — não
-   * manda direto — porque enfileirar é uma escrita local rápida (nunca toca
-   * a Meta) e este handler precisa responder rápido ao Mercado Pago; quem
-   * fala com a rede é `processarFilaCapi()`, à parte (`npm run capi`).
+   * **A venda é contada AQUI, e só aqui.**
    *
-   * `eventId: ${pedido.id}:purchase` é a MESMA chave que `MarcaCompra.tsx`
-   * manda pro pixel do navegador — é o que deixa a Meta deduplicar os dois
-   * em vez de contar a venda duas vezes.
+   * Disciplina 6 do projeto — "o pixel nunca depende do navegador" — levada
+   * até o fim: o navegador não dispara mais `Purchase` em lugar nenhum. Ele
+   * não sabe quantas vezes já contou, porque a memória dele é `localStorage`
+   * e ela é por navegador. Este ponto sabe: o pagamento confirma uma vez.
    *
-   * Só enfileira com o pixel configurado: sem `NEXT_PUBLIC_META_PIXEL_ID` (dev,
-   * ou enquanto a chave não chega) a fila acumularia eventos que nunca vão
-   * sair e a Sentinela acabaria gritando falso alarme de "falhou definitivo".
+   * `registrarCompra` enfileira em vez de mandar direto — enfileirar é uma
+   * escrita local rápida e este handler precisa responder rápido ao Mercado
+   * Pago; quem fala com a rede é `processarFilaCapi()` (`npm run capi`).
    */
-  if (process.env.NEXT_PUBLIC_META_PIXEL_ID) {
-    enfileirarEventoCapi({
-      pedidoId: pedido.id,
-      nome: 'Purchase',
-      quando: pagoEm,
-      email: pedido.email || undefined,
-      valorEmReais: resultado.brutoCentavos !== null ? resultado.brutoCentavos / 100 : undefined,
-      eventId: `${pedido.id}:purchase`,
-    });
-  }
+  registrarCompra({
+    referencia: pedido.id,
+    email: pedido.email ?? '',
+    valorEmReais: resultado.brutoCentavos !== null ? resultado.brutoCentavos / 100 : undefined,
+    quando: pagoEm,
+  });
 
   // Sem `await` de propósito — ver o comentário em `ResultadoNotificacao.entrega`.
   const entrega = aposPagamento(pedido.id);

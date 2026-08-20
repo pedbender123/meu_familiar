@@ -14,6 +14,7 @@ import { registrarToque, toqueRecenteIgual } from '@/lib/toques';
 import { buscarCampanhaPorCodigo, buscarPeca } from '@/lib/campanhas';
 import { buscarPedidoPorCodigoCurto } from '@/lib/db';
 import { COOKIE_DO_FUNIL, ehFunil } from '@/lib/funis';
+import { anotarIdentidade } from '@/lib/identidade';
 
 /**
  * Recebe uma página vista.
@@ -58,6 +59,8 @@ export async function POST(req: NextRequest) {
     referencia?: string;
     largura?: number;
     funil?: string;
+    url?: string;
+    fbclid?: string;
   };
   try {
     corpo = await req.json();
@@ -77,6 +80,31 @@ export async function POST(req: NextRequest) {
     visitanteExistente && /^[a-f0-9-]{36}$/.test(visitanteExistente)
       ? visitanteExistente
       : randomUUID();
+
+  /**
+   * O tracker próprio: anota quem é este navegador e de onde ele veio.
+   *
+   * `_fbp` e `_fbc` são cookies de PRIMEIRA PARTE no nosso domínio, então
+   * chegam aqui sozinhos, no header `Cookie` — não é preciso o navegador
+   * disparar nada para lê-los. É o que permite mandar `Purchase` do servidor
+   * amanhã, pelo webhook, com o identificador de quem clicou no anúncio hoje.
+   *
+   * Nunca derruba a visita: rastreio quebrado não pode custar uma página.
+   */
+  try {
+    anotarIdentidade({
+      visitante,
+      fbp: req.cookies.get('_fbp')?.value ?? null,
+      fbc: req.cookies.get('_fbc')?.value ?? null,
+      fbclid: corpo.fbclid ?? null,
+      urlEntrada: corpo.url ?? null,
+      referer: corpo.referencia ?? null,
+      userAgent: req.headers.get('user-agent'),
+      ip: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
+    });
+  } catch (erro) {
+    console.error('[visita] identidade falhou:', erro);
+  }
 
   const origemExistente = req.cookies.get('bx_de')?.value ?? null;
   /**

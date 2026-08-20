@@ -62,7 +62,7 @@ export default async function Assinar({
         identifica esta tentativa de pagamento, e é ele que o webhook vai
         reencontrar depois para o `Purchase` deduplicar contra este evento.
       */}
-      <MarcoDoCheckout pedidoId={cobranca.id} valorEmReais={cobranca.valor_centavos / 100} />
+      <MarcoDoCheckout pedidoId={cobranca.id} />
       <PoeiraNaLuz />
       <main className="quarto-de-vela relative z-10 flex-1 flex flex-col items-center justify-center px-6 py-16">
         {pagamentoEhFake() || !chave ? (

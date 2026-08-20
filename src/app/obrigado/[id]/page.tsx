@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState, use } from 'react';
+import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { CirculoMagico } from '@/components/CirculoMagico';
-import { evento } from '@/lib/pixel';
 
 const MENSAGENS = [
   'Seu familiar está atravessando o véu...',
@@ -20,38 +19,19 @@ export default function Obrigado({ params }: { params: Promise<{ id: string }> }
   // `null` = ainda não sabemos. Sem isso o campo pisca na tela de quem já deu
   // o e-mail, no intervalo entre o primeiro render e o primeiro poll.
   const [precisaEmail, setPrecisaEmail] = useState<boolean | null>(null);
-  const disparouCompra = useRef(false);
 
   /**
-   * Dispara o Purchase AQUI, não em `/revelacao/[id]`.
+   * **Esta tela não conta mais venda nenhuma.**
    *
-   * `/revelacao` só reconhece a dona via sessão logada, e não existe login
-   * automático depois de pagar — a conta nasce, mas o acesso vai por link
-   * mágico no e-mail. Resultado: quem fecha esta aba ou só abre o e-mail
-   * depois nunca dispararia o evento, e uma venda real sumia do Ads Manager.
-   * Esta aba É a pessoa que pagou, sem precisar provar nada — o gatilho é só
-   * "o pedido já saiu de `aguardando_pagamento`", travado por `pedidoId` em
-   * `localStorage` (mesma chave de `MarcaCompra.tsx`, que também guarda essa
-   * trava — então visitar `/revelacao` depois não conta a compra duas vezes).
+   * Ela disparava `Purchase` aqui, sem `event_id`, travado por um
+   * `localStorage` que é por navegador — e `MarcaCompra` fazia o mesmo do
+   * outro lado. Quem pagava no app do Instagram, abria o e-mail no Chrome e
+   * depois olhava no computador gerava TRÊS vendas para um pagamento. Foi
+   * exatamente o que aconteceu em produção.
+   *
+   * Agora quem conta é o servidor, no webhook, uma vez — ver
+   * `nucleo/eventos-meta.ts`. O navegador ficou só com o `PageView`.
    */
-  function dispararCompraSeNecessario(
-    status: string,
-    valorCentavos: number | undefined,
-    exemplo: boolean | undefined
-  ) {
-    if (disparouCompra.current) return;
-    if (status === 'aguardando_pagamento' || exemplo) return;
-    disparouCompra.current = true;
-
-    const chave = `bx_compra_${id}`;
-    try {
-      if (localStorage.getItem(chave)) return;
-      localStorage.setItem(chave, '1');
-    } catch {
-      // sem storage: melhor arriscar contar de novo do que nunca contar
-    }
-    evento('Purchase', { value: (valorCentavos ?? 0) / 100, currency: 'BRL' }, `${id}:purchase`);
-  }
 
   useEffect(() => {
     const rotacao = setInterval(() => {
@@ -69,7 +49,6 @@ export default function Obrigado({ params }: { params: Promise<{ id: string }> }
         if (!ativo) return;
         const faltaEmail = !dados.temEmail;
         setPrecisaEmail((antes) => (antes === false ? false : faltaEmail));
-        dispararCompraSeNecessario(dados.status, dados.valorCentavos, dados.exemplo);
 
         if (dados.status === 'entregue') {
           clearInterval(poll);

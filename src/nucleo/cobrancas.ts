@@ -3,6 +3,7 @@ import db from '../lib/db';
 import { buscarPlano, type Plano } from './planos';
 import { criarAssinatura, type Assinatura } from './assinaturas';
 import { ehPlanoDaOferta } from './oferta';
+import { registrarInicioDeCheckout } from './eventos-meta';
 
 export interface Cobranca {
   id: string;
@@ -65,6 +66,24 @@ export function abrirCobranca(dados: {
        (id, conta_id, email, plano_id, valor_centavos, status, criado_em, atualizado_em)
      VALUES (?, ?, ?, ?, ?, 'aguardando_pagamento', ?, ?)`
   ).run(id, dados.contaId, dados.email.trim().toLowerCase(), plano.id, plano.preco_centavos, agora, agora);
+
+  /**
+   * A intenção de pagar nasce AQUI, e é aqui que ela é contada.
+   *
+   * No navegador o `InitiateCheckout` dependia da tela de pagamento montar:
+   * sumia para quem tem bloqueador e contava de novo a cada recarga. Este
+   * ponto acontece uma vez, quando a cobrança passa a existir.
+   */
+  try {
+    registrarInicioDeCheckout({
+      referencia: id,
+      email: dados.email,
+      valorEmReais: plano.preco_centavos / 100,
+    });
+  } catch (erro) {
+    // Rastreio nunca derruba uma cobrança.
+    console.error('[cobrancas] InitiateCheckout falhou:', erro);
+  }
 
   return { cobranca: buscarCobranca(id)!, plano };
 }

@@ -20,7 +20,6 @@ import { comentarioDoPedido } from '@/lib/db';
 import { PedidoDeOpiniao } from '@/components/PedidoDeOpiniao';
 import { RelatorioCompleto, type Perfil } from '@/components/RelatorioCompleto';
 import { TocaAudio } from '@/components/TocaAudio';
-import { MarcaCompra } from '@/components/MarcaCompra';
 import { buscarConta } from '@/lib/autenticacao';
 import { compararAcessoEmSombra } from '@/nucleo/sombra';
 
@@ -147,18 +146,13 @@ export default async function Revelacao({
       <PoeiraNaLuz />
 
       {/*
-        Só a DONA dispara `Purchase` — este link é compartilhável, e quem
-        recebe de outra pessoa vê a mesma página sem ter comprado nada. Sem
-        essa guarda, cada visualização de quem recebeu o link contaria como
-        uma nova venda para o Ads Manager. `exemplo` também fica de fora: é
-        amostra nossa para o mural, não cliente de verdade.
+        Nada de `Purchase` aqui.
+
+        Esta página disparava a venda quando a dona a abria — e a trava era
+        `localStorage`, que é por navegador. A mesma pessoa no celular e no
+        computador contava duas vezes; somada ao disparo de `/obrigado`, três.
+        Quem conta agora é o servidor, no webhook, uma vez só.
       */}
-      {ehADona && !pedido.exemplo && (
-        <MarcaCompra
-          pedidoId={id}
-          valorEmReais={(pedido.bruto_centavos ?? produto.precoCentavos) / 100}
-        />
-      )}
 
       {/*
         A composição segue a regra da estética: o que é grimório vai DENTRO da

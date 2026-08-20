@@ -100,6 +100,14 @@ export default function Privacidade() {
               ele existe porque sem medir o anúncio não há como anunciar.
             </>,
             <>
+              <strong className="font-medium">De qual link você chegou</strong> —
+              o endereço completo da primeira página que você abriu, de onde
+              veio o clique, o navegador e o aparelho que usou, e os
+              identificadores que o Facebook grava no seu navegador. Isso fica
+              no nosso servidor e serve para sabermos qual anúncio funcionou.
+              Sem isso a gente vê a venda e não sabe de onde ela veio.
+            </>,
+            <>
               <strong className="font-medium">Seu @ do Instagram</strong>, se
               você registrar para receber a recompensa por compartilhar. Usado
               só para conferir a marcação e liberar o bônus.

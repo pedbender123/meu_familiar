@@ -20,6 +20,8 @@ import { FAMILIARES, type FamiliarId } from '@/lib/familiares';
 import { gerarMensagemDoFamiliar } from '@/lib/teaser';
 import { gerarVeu } from '@/lib/arte';
 import { coordenadaDoEstado } from '@/lib/coordenadas';
+import { virouLead } from '@/lib/identidade';
+import { registrarLead } from '@/nucleo/eventos-meta';
 
 /**
  * Fecha o ritual: pontua, decide o familiar e cria o pedido.
@@ -264,6 +266,26 @@ export async function POST(req: NextRequest) {
   // mais sair para esta pessoa.
   const visitante = req.cookies.get('bx_v')?.value;
   if (visitante) rascunhoVirouPedido(visitante);
+
+  /**
+   * **O visitante anônimo vira lead.**
+   *
+   * A partir daqui o `bx_v` tem dono, e tudo o que ele fez antes de dizer
+   * quem era passa a poder ser atribuído — inclusive uma venda que só vai
+   * acontecer amanhã, pelo webhook, quando não houver navegador nenhum por
+   * perto para consultar. É este casamento que permite mandar `Purchase` do
+   * servidor com o `_fbp` de quem clicou no anúncio na semana passada.
+   *
+   * O `Lead` sai daqui, e não do navegador: no navegador ele disparava quando
+   * o campo ficava válido, contando quem digitou o e-mail e desistiu antes de
+   * enviar. Aqui o endereço já está no banco.
+   */
+  try {
+    if (visitante) virouLead(visitante, email);
+    registrarLead({ referencia: pedidoId, email });
+  } catch (erro) {
+    console.error('[api/quiz] rastreio do lead falhou:', erro);
+  }
 
   return NextResponse.json({ id: pedidoId });
 }

@@ -42,6 +42,22 @@ export function Farejador() {
         e: busca.get('e') ?? undefined,
         referencia: document.referrer || undefined,
         largura: window.innerWidth,
+        /**
+         * A URL COMPLETA, com query inteira.
+         *
+         * `caminho` é cortado na `?` de propósito — ele vai para `visitas`,
+         * que é relatório de navegação. Esta aqui vai para `identidades` e
+         * responde outra pergunta: "de qual link exatamente essa pessoa
+         * veio?". Sem a query inteira não dá para saber qual criativo, qual
+         * variação de copy, qual teste — que é justamente o que se quer saber
+         * de quem chegou por anúncio.
+         */
+        url: window.location.href,
+        // `_fbp` e `_fbc` NÃO viajam aqui: são cookies de primeira parte e o
+        // servidor já os recebe no header `Cookie`. O `fbclid` vem na URL e
+        // existe antes de o pixel criar o `_fbc` — em navegador com
+        // bloqueador, é a única pista de qual anúncio trouxe a pessoa.
+        fbclid: busca.get('fbclid') ?? undefined,
       }),
     }).catch(() => {});
   }, [caminho, busca]);

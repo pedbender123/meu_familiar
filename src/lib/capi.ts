@@ -29,9 +29,35 @@ export interface EventoCapi {
   quando: Date;
   email?: string | null;
   valorEmReais?: number;
-  /** Estável por pedido+evento, pra dedupe com o pixel do navegador. */
+  /** Estável por pedido+evento — impede o mesmo acontecimento contar duas vezes. */
   eventId: string;
   urlDaAcao?: string;
+
+  /**
+   * Os identificadores do navegador, lidos no servidor e guardados em
+   * `identidades`. São o que liga a venda ao ANÚNCIO.
+   *
+   * Sem eles a Meta conta a venda mas não sabe de onde ela veio: o e-mail
+   * hasheado identifica a pessoa, não o clique. `fbp` diz qual navegador e
+   * `fbc` diz de qual anúncio — os dois vêm de cookie de primeira parte, que
+   * chega ao nosso servidor sozinho.
+   */
+  fbp?: string;
+  fbc?: string;
+  /** Exigidos pela Meta em evento `website`; sem eles a qualidade cai. */
+  userAgent?: string;
+  ip?: string;
+
+  /**
+   * Para qual pixel, quando não for o principal.
+   *
+   * O Horóscopo é outro produto com outro pixel e outro token. Estes campos
+   * viajam DENTRO do evento porque a fila guarda o evento como JSON e o envio
+   * acontece depois, noutro processo — sem eles, tudo que entra na fila sai
+   * pelo pixel principal e a venda do Horóscopo apareceria na campanha errada.
+   */
+  pixelId?: string;
+  token?: string;
 }
 
 export interface ResultadoCapi {
@@ -47,8 +73,9 @@ export async function enviarEventoCapi(
   evento: EventoCapi,
   opcoes?: { pixelId?: string; token?: string }
 ): Promise<ResultadoCapi> {
-  const pixelId = opcoes?.pixelId ?? process.env.NEXT_PUBLIC_META_PIXEL_ID;
-  const token = opcoes?.token ?? process.env.META_CAPI_ACCESS_TOKEN;
+  const pixelId =
+    opcoes?.pixelId ?? evento.pixelId ?? process.env.NEXT_PUBLIC_META_PIXEL_ID;
+  const token = opcoes?.token ?? evento.token ?? process.env.META_CAPI_ACCESS_TOKEN;
 
   if (!pixelId) return { ok: false, erro: 'NEXT_PUBLIC_META_PIXEL_ID ausente' };
   if (!token) return { ok: false, erro: 'META_CAPI_ACCESS_TOKEN ausente' };
@@ -63,6 +90,12 @@ export async function enviarEventoCapi(
         event_source_url: evento.urlDaAcao ?? 'https://bruxario.com.br/',
         user_data: {
           ...(evento.email ? { em: [sha256(evento.email)] } : {}),
+          // Não hasheados de propósito: a Meta espera `fbp`, `fbc`, IP e
+          // user-agent em texto puro. Hashear estes quebra a atribuição.
+          ...(evento.fbp ? { fbp: evento.fbp } : {}),
+          ...(evento.fbc ? { fbc: evento.fbc } : {}),
+          ...(evento.userAgent ? { client_user_agent: evento.userAgent } : {}),
+          ...(evento.ip ? { client_ip_address: evento.ip } : {}),
         },
         ...(evento.valorEmReais !== undefined
           ? { custom_data: { value: evento.valorEmReais, currency: 'BRL' } }
