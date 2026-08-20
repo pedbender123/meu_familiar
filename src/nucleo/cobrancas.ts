@@ -4,6 +4,7 @@ import { buscarPlano, type Plano } from './planos';
 import { criarAssinatura, type Assinatura } from './assinaturas';
 import { ehPlanoDaOferta } from './oferta';
 import { registrarInicioDeCheckout } from './eventos-meta';
+import { modeloNovoLigado } from '../lib/modelo-de-venda';
 
 export interface Cobranca {
   id: string;
@@ -48,6 +49,16 @@ export function abrirCobranca(dados: {
    */
   origem?: 'vitrine' | 'oferta';
 }): { cobranca: Cobranca; plano: Plano } | null {
+  /**
+   * Assinatura só existe no modelo novo.
+   *
+   * Enquanto o interruptor estiver desligado, produção vende a Revelação
+   * avulsa como sempre vendeu e nenhum plano é cobrável — nem por link
+   * direto. Sem isto, alguém que achasse `/planos` compraria um plano num
+   * site cujo funil inteiro ainda é o antigo.
+   */
+  if (!modeloNovoLigado()) return null;
+
   const plano = buscarPlano(dados.planoId);
   if (!plano || !plano.ativo) return null;
 

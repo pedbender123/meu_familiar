@@ -14,6 +14,7 @@ import { FAMILIARES, type FamiliarId } from '@/lib/familiares';
 import { GRUPOS, ehGrupo } from '@/lib/quiz/grupos';
 import { TOTAL_DE_ITENS } from '@/lib/quiz/itens';
 import type { Eixo } from '@/lib/quiz/eixos';
+import { produtoVigente } from '@/lib/modelo-de-venda';
 
 export const metadata = {
   title: 'Alguém atravessou por você — Bruxário',
@@ -174,8 +175,8 @@ export default async function SeuFamiliar({
           pedidoId={id}
           descontoPercentual={desconto}
           precos={{
-            revelacao: precoComDesconto(PRODUTOS.revelacao, desconto),
-            completa: precoComDesconto(PRODUTOS.completa, desconto),
+            revelacao: precoComDesconto(produtoVigente('revelacao'), desconto),
+            completa: precoComDesconto(produtoVigente('completa'), desconto),
           }}
           {...(pedido.ritual_completo === 1
             ? { generoDoFamiliar: familiar.genero }

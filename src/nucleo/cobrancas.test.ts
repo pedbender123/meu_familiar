@@ -13,6 +13,8 @@ import {
 import { assinaturasAtivasDaConta } from './assinaturas';
 import { direitosEfetivos } from './acesso';
 import { PRODUTOS } from '../lib/produtos';
+import { definirInterruptor } from '../lib/interruptores';
+import { CHAVE_DO_MODELO_NOVO } from '../lib/modelo-de-venda';
 
 /**
  * Um plano do próprio teste, para o que é mecânica e não comércio.
@@ -67,6 +69,14 @@ after(() => {
 });
 
 beforeEach(() => {
+  /**
+   * Assinatura só é cobrável com o modelo novo ligado — o interruptor existe
+   * para produção poder receber o código sem trocar o negócio no meio de uma
+   * campanha. Aqui ele é ligado sempre: o que se testa é a máquina de
+   * cobrança, não a data em que ela entra no ar.
+   */
+  definirInterruptor({ chave: CHAVE_DO_MODELO_NOVO, ligado: true, percentual: 100 });
+
   db.exec('DELETE FROM cobrancas');
   db.exec('DELETE FROM assinaturas');
   db.exec('DELETE FROM contas');

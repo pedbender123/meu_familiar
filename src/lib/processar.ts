@@ -10,7 +10,7 @@ import { gerarNarracao, textoDaLeituraParaNarrar } from './narracao';
 import { pastaDoPedido } from './caminhos';
 import { centavosDeNarracao } from './custos';
 import { registrarUsoDeCupom } from './cupons';
-import { enviarContaCriada, enviarCompraConfirmada } from './email';
+import { enviarContaCriada, enviarCompraConfirmada, enviarRevelacao } from './email';
 import {
   garantirConta,
   buscarConta,
@@ -22,6 +22,7 @@ import { produtoDe } from './produtos';
 import { DESCRICAO_DOS_EIXOS, type Eixo } from './quiz/eixos';
 import { FAMILIARES as TODOS } from './familiares';
 import { criarAssinatura, assinaturasAtivasDaConta } from '../nucleo/assinaturas';
+import { entregarChaveDaPlataforma } from './acesso-plataforma';
 
 /**
  * Traduz o perfil numérico para PALAVRAS antes de mandar ao Gemini.
@@ -277,20 +278,41 @@ export async function processarPedido(pedidoId: string): Promise<void> {
     }
 
     /**
-     * **O familiar NÃO vai mais por e-mail.**
+     * **Quem PAGOU recebe o familiar por e-mail. Todo mundo recebe o acesso.**
      *
-     * Ele ia: um e-mail com o nome do familiar, o PDF anexo e um link para a
-     * revelação. Isso resolvia a entrega e matava tudo o mais — a pessoa
-     * baixava o PDF, fechava a caixa de entrada e nunca via que existe um
-     * Oráculo, um calendário e um perfil esperando por ela.
+     * Houve um momento em que o familiar deixou de ir por e-mail: a ideia era
+     * que a pessoa entrasse na plataforma para buscá-lo e, de quebra, visse o
+     * Oráculo e o calendário. Faz sentido para quem entra de graça — não tem
+     * o que reclamar de um brinde que exige uma visita.
      *
-     * Desde que a Revelação virou grátis (agosto/2026), o e-mail deixa de ser
-     * a entrega e passa a ser a CHAVE: ele diz que o familiar chegou e leva
-     * para dentro. O PDF continua sendo dela e baixa lá de dentro, ao lado do
-     * resto — que é justamente o que ela precisa ver para querer assinar.
+     * Para quem pagou, não. Ela comprou uma leitura; segurar a entrega atrás
+     * de um login é transformar produto entregue em produto a resgatar, e é o
+     * tipo de coisa que gera pedido de reembolso com razão.
      *
-     * Ver `enviarContaCriada`, logo abaixo, que virou esse e-mail.
+     * Então os dois e-mails saem, nesta ordem: a revelação (com o PDF anexo)
+     * se houve pagamento, e a chave da plataforma sempre. Um entrega o que
+     * foi comprado; o outro abre a porta do resto.
      */
+    const comprou = (pedido.bruto_centavos ?? 0) > 0;
+    if (comprou) {
+      try {
+        await enviarRevelacao({
+          nome: pedido.nome,
+          email: pedido.email,
+          pedidoId,
+          produtoId: pedido.produto,
+          nomeFamiliar: familiar.nome,
+          nomeSecreto: leitura.nome_secreto,
+          expiraEm: pedido.expira_em,
+        });
+        registrarEvento('revelacao_enviada', pedidoId);
+      } catch (erro) {
+        // A conta abaixo é o outro caminho até a mesma revelação: se este
+        // e-mail falhar, a pessoa ainda entra e lê. Não derruba a entrega.
+        console.error(`[processarPedido] e-mail da revelação falhou no ${pedidoId}:`, erro);
+        registrarEvento('revelacao_email_falhou', pedidoId);
+      }
+    }
 
     /**
      * **Todo comprador ganha conta**, não só a Completa.
@@ -325,6 +347,28 @@ export async function processarPedido(pedidoId: string): Promise<void> {
     try {
       garantirConta(pedido.email);
       registrarEvento(contaJaExistia ? 'conta_reencontrada' : 'conta_criada', pedidoId);
+
+      /**
+       * **Quem pagou entra agora; quem não pagou entra depois.**
+       *
+       * A chave da plataforma sai na hora para quem comprou — ela pagou, e
+       * fazer alguém esperar horas pelo acesso ao que acabou de comprar é
+       * inventar um problema que não existia.
+       *
+       * Quem entrou de graça recebe pelo cron de horas depois
+       * (`scripts/acesso-gratis.ts`): a oferta precisa do momento dela antes
+       * de a plataforma inteira chegar por e-mail.
+       */
+      if (comprou) {
+        await entregarChaveDaPlataforma({
+          email: pedido.email,
+          nome: pedido.nome,
+          pedidoId,
+          nomeFamiliar: familiar.nome,
+          nomeSecreto: leitura.nome_secreto,
+          contaNova: !contaJaExistia,
+        });
+      }
     } catch (erroConta) {
       console.error(`[processarPedido] conta falhou no pedido ${pedidoId}:`, erroConta);
       registrarEvento('conta_falhou', pedidoId);

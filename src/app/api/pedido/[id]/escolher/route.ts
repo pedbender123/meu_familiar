@@ -5,6 +5,7 @@ import { precoComDesconto, validarCupom } from '@/lib/cupons';
 import { CUPOM_DE_LANCAMENTO } from '@/lib/lancamento';
 import { aposPagamento } from '@/lib/processar';
 import { excedeuLimite } from '@/lib/rate-limit';
+import { produtoVigente } from '@/lib/modelo-de-venda';
 
 /**
  * A escolha do plano, feita na tela de revelação parcial.
@@ -51,7 +52,14 @@ export async function POST(
     return NextResponse.json({ erro: 'produto inválido' }, { status: 400 });
   }
 
-  const produto = produtoDe(corpo.produto);
+  /**
+   * O preço vem do MODELO VIGENTE, não da tabela estática.
+   *
+   * `produtos.ts` já tem a Revelação zerada (modelo novo). Enquanto o
+   * interruptor estiver desligado, ela precisa custar o que a campanha está
+   * vendendo — senão o funil entrega de graça o que o anúncio cobra.
+   */
+  const produto = produtoVigente(corpo.produto);
 
   /**
    * O cupom digitado ganha do de lançamento quando é melhor.

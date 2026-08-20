@@ -15,6 +15,7 @@ import {
 import { lerCodigoDeCampanha, normalizarOrigem } from '@/lib/rastreio';
 import { FunilEscolhido } from '@/components/FunilEscolhido';
 import { PortaDoRitual } from './PortaDoRitual';
+import { modeloNovoLigado } from '@/lib/modelo-de-venda';
 
 export const dynamic = 'force-dynamic';
 
@@ -82,7 +83,7 @@ export default async function Raiz({
          * digitou o endereço, foi indicado ou já é cliente, e essa pessoa
          * precisa das respostas — e do link de login, que só existe lá.
          */
-        viaMarcador ? (
+        viaMarcador && modeloNovoLigado() ? (
           <PortaDoRitual />
         ) : (
           <Landing />

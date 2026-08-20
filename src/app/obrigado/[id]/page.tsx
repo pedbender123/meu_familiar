@@ -53,14 +53,17 @@ export default function Obrigado({ params }: { params: Promise<{ id: string }> }
         if (dados.status === 'entregue') {
           clearInterval(poll);
           /**
-           * Vai para a OFERTA, não direto para a revelação.
+           * O destino vem do SERVIDOR (`dados.destino`).
            *
-           * Ir direto entregava o produto e fazia a plataforma desaparecer: a
-           * pessoa lia o familiar, fechava a aba, e nunca ficava sabendo do
-           * Oráculo nem do calendário. Este é o único momento de atenção
-           * total dela — e a revelação continua a um clique dali.
+           * No modelo novo é a oferta de três degraus — o único momento de
+           * atenção total da pessoa, com a revelação a um clique dali. No
+           * modelo antigo é a revelação direto, porque ela pagou por isso.
+           *
+           * Quem decide é o interruptor, no servidor: assim virar a chave não
+           * precisa de deploy, e o navegador nunca fica com a regra velha
+           * congelada no pacote.
            */
-          router.push(`/oferta/${id}`);
+          router.push(dados.destino ?? `/revelacao/${id}`);
           return;
         }
 
