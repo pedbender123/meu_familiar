@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useState } from 'react';
 import { marcar } from '@/lib/marcar';
 import { MARCO_DO_DEGRAU } from '@/nucleo/oferta-degraus';
@@ -193,19 +192,29 @@ export function OfertaDepoisDoRitual({
         )}
       </section>
 
-      {/* ── A saída, do mesmo tamanho ──────────────────────────────────── */}
-      <div className="w-full flex flex-col items-center gap-3 pt-2 border-t border-pergaminho/10">
-        <Link
-          href={`/revelacao/${pedidoId}`}
-          className="mt-5 font-corpo text-base px-8 py-3.5 rounded-full border border-pergaminho/30 text-pergaminho hover:border-pergaminho/60 hover:bg-pergaminho/[0.04] transition-all"
-        >
-          Ver o meu familiar agora
-        </Link>
-        <p className="font-corpo text-xs text-pergaminho/40 text-center max-w-[36ch] leading-relaxed">
-          O nome e a imagem dele são seus, de graça. Dá para voltar aqui
-          depois, de dentro do seu Bruxário.
-        </p>
-      </div>
+      {/*
+        ── Nenhum indício do grátis nesta tela ─────────────────────────────
+
+        Havia aqui um botão grande de "ver o meu familiar agora", com a
+        justificativa de não trair a promessa da landing. A promessa é outra:
+        o RITUAL é de graça, e ele já aconteceu — a pessoa atravessou 26
+        cenas e a leitura sobre ela está escrita. Isso é o produto.
+
+        Esta tela existe para vender. Oferecer uma saída gratuita ao lado dos
+        preços é ensinar que o preço é opcional, e quem sai por ali quase
+        nunca volta pagando. O funil é de VENDAS — quem chegou até aqui já
+        provou interesse atravessando o ritual inteiro.
+
+        O que é de graça continua de graça e continua sendo entregue: o nome e
+        a imagem do familiar chegam por e-mail, e o acesso à conta gratuita
+        chega depois, também por e-mail (`scripts/acesso-gratis.ts`). Fica em
+        letra miúda porque é informação verdadeira que a pessoa precisa ter —
+        não porque é uma oferta concorrente.
+      */}
+      <p className="font-corpo text-[11px] text-pergaminho/35 text-center max-w-[40ch] leading-relaxed pt-2 border-t border-pergaminho/10 mt-2">
+        O nome e a imagem do seu familiar vão para o seu e-mail de qualquer
+        forma. A leitura escrita sobre você é o que abre acima.
+      </p>
     </div>
   );
 }

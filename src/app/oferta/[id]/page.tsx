@@ -95,8 +95,7 @@ export default async function Oferta({
               )}
             </div>
             <p className="font-corpo font-light text-sm text-pergaminho/55 max-w-[38ch] leading-relaxed">
-              O nome e a imagem dele são seus. O que ele tem a dizer está
-              escrito — e é isso que abre abaixo.
+              A leitura sobre você já está escrita. Falta abrir.
             </p>
           </header>
 
