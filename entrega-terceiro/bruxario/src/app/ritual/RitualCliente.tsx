@@ -114,12 +114,6 @@ export function RitualCliente({
    * que ela decidiu terminar.
    *
    * ── O que se perde, e foi decisão explícita ───────────────────────────
-   *
-   * O passo "guardar progresso" sumiu, e com ele o lembrete de rascunho
-   * (`scripts/lembrar-rascunho.ts`) para este funil: sem e-mail no meio, quem
-   * abandona na cena 12 não deixa endereço nenhum, e as respostas se perdem.
-   * A troca foi aceita — o e-mail passa a ser pedido uma vez só, no fim, e
-   * quem chegar até lá vale mais do que quem seria resgatado.
    */
   const etapas: Etapa[] = useMemo(
     () => [

@@ -1,4 +1,3 @@
-import { MARCA } from '@/lib/marca';
 import Link from 'next/link';
 
 /**
@@ -38,7 +37,7 @@ export function RodapeLegal() {
           </svg>
         </a>
         <a
-          href={`https://tiktok.com/@${MARCA.arroba}`}
+          href="https://tiktok.com/@bruxario_"
           target="_blank"
           rel="noopener noreferrer"
           aria-label="Bruxário no TikTok"
@@ -49,7 +48,7 @@ export function RodapeLegal() {
             <path d="M14 4c.4 2.2 2 3.7 4.5 4" />
           </svg>
         </a>
-        <span className="font-corpo text-xs text-pergaminho/35">{`@${MARCA.arroba}`}</span>
+        <span className="font-corpo text-xs text-pergaminho/35">@bruxario_</span>
       </div>
 
       <div className="flex items-center gap-4 flex-wrap justify-center">

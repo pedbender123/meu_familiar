@@ -14,15 +14,10 @@
  */
 export const LEGAL = {
   /** Nome civil de quem responde pelo tratamento dos dados. */
-  /**
-   * **PREENCHER.** Nome civil (ou razão social) de quem responde pelo
-   * tratamento dos dados. A LGPD exige que o controlador seja identificável
-   * (art. 41) — sem isto no ar, as páginas legais não cumprem a lei.
-   */
-  controlador: process.env.LEGAL_CONTROLADOR ?? '[PREENCHER: nome do responsável]',
+  controlador: 'Pedro Bender Randon',
   /** Pessoa física por enquanto (ver a nota de versão no fim das páginas). */
   natureza: 'pessoa física',
-  site: process.env.LEGAL_SITE ?? '[PREENCHER: domínio]',
+  site: 'bruxario.com.br',
   canalDeContato: '/contato',
   /**
    * Idade mínima. **Escolha de projeto, não de lei.**
@@ -84,7 +79,7 @@ export const TERCEIROS = [
     fora: false,
   },
   {
-    nome: process.env.LEGAL_HOSPEDAGEM ?? '[PREENCHER: hospedagem]',
+    nome: 'Hostinger',
     para: 'hospedar o site e o banco de dados',
     oQue: 'tudo que fica guardado',
     fora: false,

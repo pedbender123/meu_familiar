@@ -426,7 +426,7 @@ export async function gerarPdf(
     y -= 12;
   }
   y -= 8;
-  centralizar(pagina, 'bruxario.com.br/entrar', y, fontes.corpo, 10, COR.ouro);
+  centralizar(pagina, 'bruxario.com.br', y, fontes.corpo, 10, COR.ouro);
   y -= 26;
   centralizar(pagina, '@bruxario_', y, fontes.corpo, 8, COR.escritaFraca);
 

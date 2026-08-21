@@ -506,7 +506,7 @@ function garantirColunas() {
    * Quando este pedido teve InitiateCheckout/Purchase mandados pra Meta via
    * Conversions API (server-to-server), em vez de só o pixel do navegador.
    *
-   * Existe pro backfill (`scripts/backfill-pixel.ts`) ser idempotente: sem
+   * Existe para o reenvio de eventos ser idempotente: sem
    * isto, rodar o script duas vezes manda o mesmo Purchase duas vezes pro
    * Ads Manager, inflando o valor de conversão real.
    */
@@ -679,7 +679,6 @@ export function criarPedido(p: {
   origem?: string | null;
   visitante?: string | null;
   variante?: string | null;
-  /** Ver `lib/rastreio.ts` — quem trouxe, qual peça, e como foi decidido. */
   campanha_id?: string | null;
   peca_id?: string | null;
   atribuicao?: string | null;

@@ -1,10 +1,5 @@
 import sharp from 'sharp';
-import { MARCA } from './marca';
 
-/** O rodapé impresso na arte: `@perfil · dominio`, ou só o domínio. */
-function assinaturaDaMarca(): string {
-  return MARCA.arroba ? `@${MARCA.arroba} · ${MARCA.dominio}` : MARCA.dominio;
-}
 import path from 'path';
 import fs from 'fs';
 import type { Familiar, LuaId } from './familiares';
@@ -159,7 +154,7 @@ async function compor(
     .join('\n')}
 
   <text x="${centroX}" y="${yRodape}" font-family="Sora" font-weight="300" font-size="${largura * 0.02}"
-        letter-spacing="${largura * 0.006}" fill="${CORES.pergaminho}" opacity="0.55" text-anchor="middle">${assinaturaDaMarca()}</text>
+        letter-spacing="${largura * 0.006}" fill="${CORES.pergaminho}" opacity="0.55" text-anchor="middle">@bruxario_ · bruxario.com.br</text>
 </svg>`;
 
   const glifoY = Math.round(yGlifos - glifoTamanho / 2);

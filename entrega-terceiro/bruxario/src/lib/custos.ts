@@ -10,7 +10,7 @@
  * nunca "valor faturado".
  *
  * O número que NÃO é estimativa é a taxa do Mercado Pago — aquela vem lida da
- * resposta dele, por venda, e está em `pagamento.ts`.
+ * resposta dele, por venda.
  *
  * ── Onde mexer quando o preço mudar ───────────────────────────────────────
  *

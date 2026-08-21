@@ -24,9 +24,9 @@ declare global {
  *
  * ── `eventId` e a dedupe com o Conversions API ────────────────────────────
  *
- * `src/lib/capi.ts` manda o MESMO evento de servidor pra servidor, com
+ * O servidor manda o MESMO evento pela Conversions API, com
  * `event_id` no formato `${pedidoId}:purchase` / `${pedidoId}:checkout`
- * (mesma convenção usada por `scripts/backfill-pixel.ts`) — e a Meta só
+ * — e a Meta só
  * deduplica quando o `eventID` do navegador bate com o `event_id` do CAPI.
  * Chamar `evento()` sem passar `eventId` nos eventos que também passam pelo
  * CAPI conta a MESMA compra duas vezes no Ads Manager. `Lead`, que não tem

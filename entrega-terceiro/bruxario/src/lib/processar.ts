@@ -9,7 +9,7 @@ import { gerarPdf } from './pdf';
 import { gerarNarracao, textoDaLeituraParaNarrar } from './narracao';
 import { pastaDoPedido } from './caminhos';
 import { centavosDeNarracao } from './custos';
-import { enviarContaCriada, enviarCompraConfirmada, enviarRevelacao } from './email';
+import { enviarCompraConfirmada, enviarRevelacao } from './email';
 import {
   garantirConta,
   buscarConta,

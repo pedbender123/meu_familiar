@@ -19,18 +19,6 @@ export interface CidadeEscolhida {
 /**
  * A cidade de nascimento por **busca**, sem escolher o estado antes.
  *
- * ── Por que este componente existe ao lado de `EscolhaDeCidade` ───────────
- *
- * O outro pede o estado primeiro e só então lista os municípios dele. Isso
- * funciona bem numa tela dedicada dentro da conta, onde a pessoa já decidiu
- * ficar: são duas escolhas curtas e nenhuma digitação.
- *
- * No fim do ritual o custo se inverte. Ali a pessoa acabou de atravessar 26
- * cenas e está a um botão do familiar dela — dois seletores encadeados são
- * dois momentos de "espera, qual mesmo?", e cada um é uma chance de fechar a
- * aba no último passo. Digitar as três primeiras letras e tocar no resultado
- * é um gesto só.
- *
  * ── Buscar em todos os estados de uma vez ─────────────────────────────────
  *
  * São 5.571 nomes; filtrar a lista inteira em memória a cada tecla é

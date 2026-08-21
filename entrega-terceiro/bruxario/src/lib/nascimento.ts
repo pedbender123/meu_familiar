@@ -1,7 +1,7 @@
 /**
  * Constantes dos dados de nascimento — sem banco, sem servidor.
  *
- * Mora separado de `src/nucleo/perfil-astral.ts` de propósito: aquele importa
+ * Mora separado do que lê o banco de propósito: aquele importa
  * `db`, e o formulário que pede a hora é um componente de cliente. Importar o
  * módulo do banco a partir do navegador arrasta `better-sqlite3` para o bundle
  * e quebra o build inteiro — este arquivo existe para ser seguro dos dois
