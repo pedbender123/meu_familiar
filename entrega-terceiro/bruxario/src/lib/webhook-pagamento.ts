@@ -1,6 +1,7 @@
 import {
   buscarPedido,
   buscarPedidoPorPagamentoId,
+  buscarPedidoAguardandoPorEmail,
   atualizarPedido,
   registrarEvento,
 } from './db';
@@ -45,6 +46,45 @@ export interface ResultadoNotificacao {
  * mudou de lugar, para o teste exercitar exatamente o que roda em produção
  * em vez de uma cópia que pode divergir do real com o tempo.
  */
+/**
+ * Acha o pedido de uma venda, por todos os caminhos possíveis.
+ *
+ * ── Por que três tentativas e não uma ─────────────────────────────────────
+ *
+ * A venda pode nascer de dois jeitos, e eles guardam a referência em lugares
+ * diferentes:
+ *
+ *  1. **Pelo nosso checkout** — a transação já nasce com `pagamento_id`
+ *     gravado no pedido, então a primeira busca resolve.
+ *  2. **Pelo checkout hospedado do DirectPag** (o modo "área de membros
+ *     externa") — aqui o `pagamento_id` nunca foi gravado, e o que liga a
+ *     venda ao pedido é a referência externa.
+ *
+ * A terceira tentativa, pelo e-mail, é a rede de segurança: se a referência
+ * se perder no caminho — e ela se perde, porque nem toda plataforma repassa
+ * campo customizado — sobra o endereço de quem comprou. Ele acha o pedido
+ * mais recente daquela pessoa que ainda está esperando pagamento.
+ *
+ * É deliberadamente a ÚLTIMA opção e só olha pedidos em
+ * `aguardando_pagamento`: casar por e-mail é palpite, e um palpite não pode
+ * sobrescrever um pedido já entregue.
+ */
+function acharPedidoDaVenda(resultado: ResultadoPagamento) {
+  const porPagamento = buscarPedidoPorPagamentoId(resultado.idExterno);
+  if (porPagamento) return porPagamento;
+
+  if (resultado.referenciaExterna) {
+    const porReferencia = buscarPedido(resultado.referenciaExterna);
+    if (porReferencia) return porReferencia;
+  }
+
+  if (resultado.emailDoPagador) {
+    return buscarPedidoAguardandoPorEmail(resultado.emailDoPagador);
+  }
+
+  return undefined;
+}
+
 export async function processarNotificacaoDePagamento(
   resultado: ResultadoPagamento
 ): Promise<ResultadoNotificacao> {
@@ -63,12 +103,26 @@ export async function processarNotificacaoDePagamento(
   // Casa por `pagamento_id` (gravado na criação) ou pela referência externa,
   // que é o nosso pedidoId — o segundo cobre a notificação que chega antes
   // de a resposta síncrona ter sido salva.
-  const pedido =
-    buscarPedidoPorPagamentoId(resultado.idExterno) ??
-    (resultado.referenciaExterna ? buscarPedido(resultado.referenciaExterna) : undefined);
+  const pedido = acharPedidoDaVenda(resultado);
 
   if (!pedido) {
+    /**
+     * Pagamento sem pedido é **dinheiro recebido e produto não entregue**.
+     * Vira anomalia alta em vez de só um aviso no log: é o tipo de coisa que
+     * ninguém descobre olhando gráfico, só quando a pessoa reclama — e a
+     * essa altura já passaram dias.
+     *
+     * `npm run reconciliar` varre o gateway e reprocessa estes casos.
+     */
     console.warn(`[webhook] pagamento ${resultado.idExterno} sem pedido correspondente`);
+    checarEmLinha('pagamento_orfao', () => ({
+      invariante: 'pagamento_orfao',
+      severidade: 'alto' as const,
+      entidadeTipo: 'pedido',
+      entidadeId: resultado.idExterno,
+      esperado: 'todo pagamento confirmado casa com um pedido',
+      encontrado: `transação ${resultado.idExterno} paga sem pedido correspondente`,
+    }));
     return { desfecho: 'sem_pedido' };
   }
 

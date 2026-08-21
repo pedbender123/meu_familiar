@@ -839,6 +839,26 @@ export function buscarPedidoPorCodigoCurto(codigo: string): Pedido | undefined {
     .get(limpo) as Pedido | undefined;
 }
 
+/**
+ * O pedido mais recente de um e-mail que ainda espera pagamento.
+ *
+ * Última rede do webhook quando a referência externa não volta no postback —
+ * ver `acharPedidoDaVenda`. Só olha `aguardando_pagamento` de propósito:
+ * casar venda por e-mail é palpite, e palpite não pode tocar pedido já
+ * entregue.
+ */
+export function buscarPedidoAguardandoPorEmail(email: string): Pedido | undefined {
+  const alvo = email.trim().toLowerCase();
+  if (!alvo) return undefined;
+  return db
+    .prepare(
+      `SELECT * FROM pedidos
+        WHERE lower(email) = ? AND status = 'aguardando_pagamento'
+        ORDER BY criado_em DESC LIMIT 1`
+    )
+    .get(alvo) as Pedido | undefined;
+}
+
 export function registrarEvento(tipo: string, pedidoId?: string) {
   db.prepare(
     `INSERT INTO eventos (tipo, pedido_id, criado_em) VALUES (?, ?, ?)`

@@ -3,17 +3,38 @@ import { pagamento } from '@/nucleo/checkouts/directpag';
 import { processarNotificacaoDePagamento } from '@/lib/webhook-pagamento';
 
 /**
- * Webhook do Mercado Pago — **a única fonte de verdade sobre pagamento**
- * (SPEC 10.6). O retorno do navegador não prova nada, e a resposta síncrona do
- * POST /v1/payments também não: um Pix volta `pending` e só vira `approved`
- * quando a pessoa efetivamente paga.
+ * O postback do DirectPag — **a única fonte de verdade sobre pagamento**.
  *
- * Três regras do SPEC implementadas aqui:
- *  - validar a assinatura de todo webhook recebido
- *  - idempotência: o MP reenvia o mesmo evento várias vezes
- *  - o status vem de uma **consulta à API**, nunca do corpo da notificação.
- *    O corpo carrega só o `data.id`; aceitar um status vindo no corpo seria
- *    deixar qualquer um liberar acesso forjando um POST.
+ * O retorno do navegador não prova nada, e a resposta síncrona da criação da
+ * transação também não: um Pix nasce `pending` e só vira `paid` quando a
+ * pessoa efetivamente paga.
+ *
+ * ── O corpo da notificação é um AVISO, não um fato ────────────────────────
+ *
+ * O DirectPag **não assina o postback**: não há HMAC, não há header assinado,
+ * a documentação não descreve verificação nenhuma. Quem descobrir esta URL
+ * pode postar o que quiser.
+ *
+ * Por isso daqui só se aproveita **o id da transação**. O status real vem de
+ * `consultarPagamento`, que é uma chamada NOSSA à API deles, autenticada com
+ * o nosso token. Uma notificação forjada não entrega nada, porque quem decide
+ * é a resposta do gateway — não quem bateu na porta.
+ *
+ * Aceitar o status vindo no corpo seria deixar qualquer um liberar produto
+ * com um `curl`.
+ *
+ * ── Aceita os dois formatos ───────────────────────────────────────────────
+ *
+ * O id chega em `data.id`, em `hash`, em `transaction.hash` ou na query,
+ * dependendo de como a venda nasceu — pela nossa API ou pelo checkout
+ * hospedado deles. Ler os quatro custa nada e evita a pior falha possível:
+ * alguém pagar e o postback ser descartado por causa do nome de um campo.
+ *
+ * ── Idempotência ──────────────────────────────────────────────────────────
+ *
+ * O DirectPag reenvia. `processarNotificacaoDePagamento` só age na primeira
+ * transição de `aguardando_pagamento`, então o reenvio não gera segunda
+ * entrega nem segundo evento de pixel.
  */
 export async function POST(req: NextRequest) {
   const dataIdQuery = req.nextUrl.searchParams.get('data.id');
@@ -24,30 +45,36 @@ export async function POST(req: NextRequest) {
   try {
     const corpo = await req.json();
 
-    // `merchant_order` e outros tipos chegam no mesmo endpoint. Reconhecer sem
-    // processar — devolver erro faria o MP retentar algo que nunca vai mudar.
-    const tipo = corpo?.type ?? corpo?.topic;
-    if (tipo !== 'payment') return NextResponse.json({ ok: true });
-
-    const idPagamento = String(corpo?.data?.id ?? dataIdQuery ?? '');
+    /**
+     * O id da transação, de onde ele vier.
+     *
+     * `200 ok` quando não há id: devolver erro faria o gateway retentar para
+     * sempre uma notificação que nunca vai ter o que processar.
+     */
+    const idPagamento = String(
+      corpo?.hash ??
+        corpo?.transaction?.hash ??
+        corpo?.data?.hash ??
+        corpo?.data?.id ??
+        dataIdQuery ??
+        ''
+    ).trim();
     if (!idPagamento) return NextResponse.json({ ok: true });
 
     const resultado = await pagamento.consultarPagamento(idPagamento);
     if (!resultado) {
-      // Não deu para confirmar. 500 faz o MP retentar, que é o que queremos —
-      // melhor uma retentativa que uma venda paga sem entrega.
+      // Não deu para confirmar. 500 faz o gateway retentar, que é o que se
+      // quer — melhor uma retentativa a mais que uma venda paga sem entrega.
       return NextResponse.json({ erro: 'indisponível' }, { status: 500 });
     }
 
-    // O que fazer com o resultado — status, idempotência, atualizar o pedido,
-    // disparar a entrega — mora em webhook-pagamento.ts, testado à parte
-    // (src/lib/webhook-pagamento.test.ts) sem precisar de servidor HTTP.
-    //
-    // O `await` aqui só espera a parte SÍNCRONA (checar status, achar o
-    // pedido, gravar `pago`). A entrega em si (`resultado.entrega`, dentro da
-    // função) roda em segundo plano sem `await` — ignorada de propósito, para
-    // este handler responder rápido ao Mercado Pago em vez de segurar a
-    // resposta pelo tempo que a geração levar.
+    /**
+     * O `await` espera só a parte SÍNCRONA: checar status, achar o pedido,
+     * gravar `pago`. A geração roda em segundo plano, sem `await`, de
+     * propósito — segurar a resposta pelo tempo que a IA e o PDF levam faria
+     * o gateway considerar o postback falho e retentar em cima de uma entrega
+     * que já está acontecendo.
+     */
     await processarNotificacaoDePagamento(resultado);
 
     return NextResponse.json({ ok: true });

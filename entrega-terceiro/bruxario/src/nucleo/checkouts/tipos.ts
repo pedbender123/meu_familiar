@@ -75,6 +75,14 @@ export interface ResultadoPagamento {
   taxaCentavos: number | null;
   liquidoCentavos: number | null;
   metodo: string | null;
+  /**
+   * O e-mail de quem pagou, como o gateway o conhece.
+   *
+   * É a última rede para achar o pedido quando a venda nasce no checkout
+   * hospedado e a referência externa não volta no postback. Ver
+   * `acharPedidoDaVenda` em `lib/webhook-pagamento.ts`.
+   */
+  emailDoPagador?: string | null;
   /** Só em Pix: código copia-e-cola e imagem do QR. */
   pix?: { copiaECola: string; qrBase64: string };
   /** Só em boleto: o PDF para imprimir. */

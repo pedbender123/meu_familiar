@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "reprocessar": "tsx scripts/reprocessar.ts",
-    "test": "dir=$(mktemp -d) && BRUXARIO_DIR_DADOS=\"$dir\" tsx --test --test-concurrency=1 \"src/**/*.test.ts\"; codigo=$?; rm -rf \"$dir\"; exit $codigo",
+    "test": "dir=$(mktemp -d) && BRUXARIO_DIR_DADOS=\"$dir\" DIRECTPAG_OFFER_HASH=of_teste tsx --test --test-concurrency=1 \"src/**/*.test.ts\"; codigo=$?; rm -rf \"$dir\"; exit $codigo",
     "lembrar-carrinho": "tsx scripts/lembrar-carrinho.ts",
     "semear-mural": "tsx scripts/semear-mural.ts",
     "gerar-og": "tsx scripts/gerar-og.ts",

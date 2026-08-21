@@ -98,3 +98,55 @@ Levantado da documentação oficial, para não haver surpresa:
 | Tokenização de cartão | Ver a seção 4 |
 | Sandbox documentado | Teste com valor baixo em produção |
 | Endpoint de assinatura recorrente na API pública | Recorrência existe no painel (`payment_type`), mas não há endpoint documentado para criar, consultar ou cancelar — nem evento de renovação. Irrelevante nesta versão, que é produto único |
+
+---
+
+## Os dois jeitos de vender, e por que os dois funcionam
+
+O sistema aceita a venda nascendo de duas formas. Não é preciso escolher no
+código — o webhook resolve as duas.
+
+### A · Checkout aqui dentro (padrão)
+
+A pessoa nunca sai do site. O formulário coleta nome, e-mail, telefone e CPF,
+e a transação é criada pela API com `external_reference = pedidoId`.
+
+**A favor:** a pessoa não é jogada numa tela de terceiro no momento mais
+frágil do funil. É a razão de o projeto ter saído do Asaas.
+
+### B · Checkout hospedado do DirectPag
+
+O funil manda a pessoa para a página de checkout deles. O produto precisa
+estar como **Área de membros externa**, e a entrega acontece pelo postback.
+
+**A favor:** nenhum dado de pagamento passa por este servidor, e o cartão
+deixa de ser um problema de conformidade.
+
+**Contra:** a pessoa sai do site, e a atribuição do pixel fica pior.
+
+### Como o webhook aceita os dois
+
+`acharPedidoDaVenda` (`src/lib/webhook-pagamento.ts`) tenta, nesta ordem:
+
+1. **pelo `pagamento_id`** já gravado no pedido — resolve o caso A
+2. **pela referência externa** que voltou no postback — resolve o caso B
+3. **pelo e-mail do pagador**, achando o pedido mais recente daquela pessoa
+   que ainda está em `aguardando_pagamento`
+
+A terceira é rede de segurança e é deliberadamente a última: casar venda por
+e-mail é palpite, e palpite não pode tocar pedido já entregue — por isso ela
+só olha pedidos que ainda esperam pagamento.
+
+Quando nenhuma das três acha, o pagamento vira **anomalia alta**
+(`pagamento_orfao`) em vez de uma linha de log. Dinheiro recebido sem produto
+entregue é o pior desfecho do sistema, e ninguém descobre isso olhando
+gráfico — só quando a pessoa reclama, dias depois.
+
+## Conferir que nada ficou órfão
+
+```
+npm run reconciliar -- --horas=48
+```
+
+Compara o que o DirectPag registrou como pago com o que este banco tem, e
+reprocessa o que faltou. Vale um cron diário.

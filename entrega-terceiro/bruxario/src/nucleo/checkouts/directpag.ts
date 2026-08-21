@@ -105,6 +105,7 @@ interface RespostaDirectPag<T> {
 
 interface TransacaoDirectPag {
   hash: string;
+  customer?: { email?: string } | null;
   status: string;
   amount?: number;
   payment_method?: string;
@@ -183,6 +184,7 @@ function traduzir(t: TransacaoDirectPag): ResultadoPagamento {
     taxaCentavos: t.fee ?? null,
     liquidoCentavos: t.net_amount ?? null,
     metodo: t.payment_method ?? null,
+    emailDoPagador: t.customer?.email ?? null,
     ...(t.pix_code
       ? { pix: { copiaECola: t.pix_code, qrBase64: t.qr_code ?? '' } }
       : {}),

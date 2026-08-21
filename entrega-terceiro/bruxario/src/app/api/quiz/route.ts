@@ -260,10 +260,6 @@ export async function POST(req: NextRequest) {
     console.error('[api/quiz] mensagem do familiar falhou:', erro);
   }
 
-  // O rascunho já virou pedido: o lembrete de "você parou no meio" não pode
-  // mais sair para esta pessoa.
-  const visitante = req.cookies.get('bx_v')?.value;
-  if (visitante) rascunhoVirouPedido(visitante);
 
 
   return NextResponse.json({ id: pedidoId });

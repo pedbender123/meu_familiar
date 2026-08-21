@@ -1,7 +1,6 @@
 import { sessaoAtual } from '@/lib/sessao-servidor';
-import { contatosAbertos, comentariosPendentes } from '@/lib/db';
+import { contatosAbertos } from '@/lib/db';
 import { Shell, type Area } from '@/components/painel/Shell';
-import { listarEnvios } from '@/lib/remarketing';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,8 +39,6 @@ export default async function LayoutDoPainel({
   // As contagens que viram bolinha no menu. São duas consultas leves e dizem
   // "tem coisa te esperando" sem exigir que você abra cada área para olhar.
   const abertos = contatosAbertos().length;
-  const pendentes = comentariosPendentes().length;
-  const rascunhosPendentes = listarEnvios('rascunho').length;
 
   const areas: Area[] = [
     { href: '/painel/central', rotulo: 'Central', icone: 'grafico' },
@@ -55,10 +52,9 @@ export default async function LayoutDoPainel({
       não vai voltar.
     */
     { href: '/painel/assinantes', rotulo: 'Assinantes', icone: 'moeda' },
-    { href: '/painel/remarketing', rotulo: 'Remarketing', icone: 'megafone', alerta: rascunhosPendentes },
     { href: '/painel/financeiro', rotulo: 'Financeiro', icone: 'moeda' },
     { href: '/painel/cupons', rotulo: 'Cupons', icone: 'etiqueta' },
-    { href: '/painel/contatos', rotulo: 'Contatos & Mural', icone: 'carta', alerta: abertos + pendentes },
+    { href: '/painel/contatos', rotulo: 'Contatos', icone: 'carta', alerta: abertos },
     { href: '/painel/marcacoes', rotulo: 'Marcações', icone: 'estrela' },
   ];
 

@@ -14,8 +14,6 @@ import { RodapeLegal } from '@/components/RodapeLegal';
 import { AvisoDeExpiracao, AcessoExpirado } from '@/components/AvisoDeExpiracao';
 import { linkPublicoExpirou, produtoDe } from '@/lib/produtos';
 import { sessaoAtual } from '@/lib/sessao-servidor';
-import { comentarioDoPedido } from '@/lib/db';
-import { PedidoDeOpiniao } from '@/components/PedidoDeOpiniao';
 import { RelatorioCompleto, type Perfil } from '@/components/RelatorioCompleto';
 import { TocaAudio } from '@/components/TocaAudio';
 import { buscarConta } from '@/lib/autenticacao';
@@ -255,9 +253,6 @@ export default async function Revelacao({
         de fato enviar (a rota confere a sessão). Sem isso, o mural viraria
         caixa de texto pública para qualquer um que receba o link.
       */}
-      {ehADona && sessao?.tipo === 'conta' && (
-        <PedidoDeOpiniao pedidoId={id} jaComentou={!!comentarioDoPedido(id)} />
-      )}
     </>
   );
 }
