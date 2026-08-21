@@ -219,3 +219,36 @@ export function alternarCupom(codigo: string, ativo: boolean): void {
     normalizarCodigo(codigo)
   );
 }
+
+/**
+ * Quanto dinheiro este pedido trouxe de verdade.
+ *
+ * ── Por que não é `bruto ?? precoDoPedido` ────────────────────────────────
+ *
+ * Era, e o resultado foi receita inventada. Um pedido pode estar `entregue`
+ * sem ter passado pelo gateway — cupom de 100%, amostra, ou a falha de 21/08
+ * em que o preço zerado fez a entrega pular a cobrança. Nesses casos
+ * `bruto_centavos` é nulo, e cair no preço de tabela transforma uma entrega
+ * gratuita em R$ 9,80 de faturamento que nunca entrou.
+ *
+ * O que separa os dois casos é o `pagamento_id`: ele só existe quando houve
+ * uma cobrança de verdade no gateway. Sem ele, a receita é zero — e o preço de
+ * tabela só entra como recurso para pedidos ANTIGOS, de antes de `bruto_centavos`
+ * existir, que têm o id do pagamento mas não o valor.
+ *
+ * Errar aqui é pior do que parece: este número alimenta o relatório por
+ * campanha, e campanha com receita inflada é verba de anúncio empurrada para
+ * o criativo errado.
+ */
+export function receitaDoPedido(pedido: {
+  produto: string;
+  desconto_percentual: number | null;
+  bruto_centavos?: number | null;
+  pagamento_id?: string | null;
+}): number {
+  if (pedido.bruto_centavos !== null && pedido.bruto_centavos !== undefined) {
+    return pedido.bruto_centavos;
+  }
+  if (!pedido.pagamento_id) return 0;
+  return precoDoPedido(pedido).finalCentavos;
+}

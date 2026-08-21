@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { randomUUID } from 'crypto';
 import { BANCO } from './caminhos';
-import { precoDoPedido } from './cupons';
+import { precoDoPedido, receitaDoPedido } from './cupons';
 
 const db = new Database(BANCO);
 
@@ -421,7 +421,7 @@ export function relatorioDoPeriodo(
   for (const p of entregues) {
     // O bruto guardado vem do MP; quando falta (pedido por cupom de 100%,
     // provedor fake), cai no preço calculado — que é o que de fato valia.
-    const bruto = p.bruto_centavos ?? precoDoPedido(p).finalCentavos;
+    const bruto = receitaDoPedido(p);
     brutoCentavos += bruto;
     taxaCentavos += p.taxa_centavos ?? 0;
     liquidoCentavos += p.liquido_centavos ?? bruto - (p.taxa_centavos ?? 0);
@@ -459,7 +459,7 @@ export function relatorioDoPeriodo(
         statusPedido: pedido?.status ?? null,
         pagouCentavos:
           pedido && pedido.status === 'entregue'
-            ? pedido.bruto_centavos ?? precoDoPedido(pedido).finalCentavos
+            ? receitaDoPedido(pedido)
             : null,
       };
     })

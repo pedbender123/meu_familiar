@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { randomUUID } from 'crypto';
 import { BANCO } from './caminhos';
-import { precoDoPedido } from './cupons';
+import { precoDoPedido, receitaDoPedido } from './cupons';
 
 const db = new Database(BANCO);
 
@@ -138,7 +138,7 @@ export function consolidado(de?: string, ate?: string): Consolidado {
   };
 
   for (const p of pagos) {
-    const bruto = p.bruto_centavos ?? precoDoPedido(p).finalCentavos;
+    const bruto = receitaDoPedido(p);
     const taxa = p.taxa_centavos ?? 0;
     const ia = p.custo_ia_centavos ?? 0;
     brutoCentavos += bruto;

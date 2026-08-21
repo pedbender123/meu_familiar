@@ -5,7 +5,7 @@ import { contatos, listarEnvios } from '@/lib/remarketing';
 import db from '@/lib/db';
 import { FAMILIARES, type FamiliarId } from '@/lib/familiares';
 import { ITENS } from '@/lib/quiz/itens';
-import { precoDoPedido } from '@/lib/cupons';
+import { precoDoPedido, receitaDoPedido } from '@/lib/cupons';
 import { dataHoraBr } from '@/lib/periodo';
 import { Bloco, Cartao, brl, OURO, VERDE, VERMELHO } from '@/components/painel/GraficosPeriodo';
 
@@ -141,7 +141,7 @@ export default async function FichaDaPessoa({
                       {p.status}
                     </td>
                     <td className="px-2.5 py-1.5 tabular-nums whitespace-nowrap">
-                      {brl(p.bruto_centavos ?? precoDoPedido(p).finalCentavos)}
+                      {brl(receitaDoPedido(p))}
                     </td>
                     <td className="px-2.5 py-1.5">
                       {p.metodo_pagamento ?? p.metodo_tentado ?? '—'}

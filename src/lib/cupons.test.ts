@@ -1,6 +1,6 @@
-import test from 'node:test';
+import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { PISO_COBRAVEL_CENTAVOS, normalizarCodigo, precoComDesconto } from './cupons';
+import { PISO_COBRAVEL_CENTAVOS, normalizarCodigo, precoComDesconto, receitaDoPedido } from './cupons';
 import { PRODUTOS, type Produto } from './produtos';
 
 /**
@@ -104,4 +104,75 @@ test('sem cupom, o preço é exatamente o de tabela', () => {
       produto.precoCentavos < PISO_COBRAVEL_CENTAVOS
     );
   }
+});
+
+describe('receita de verdade', () => {
+  /**
+   * A regra que faltava em 21/08: pedido entregue sem cobrança não é receita.
+   *
+   * Duas leituras saíram de graça por um preço zerado, e o painel passou a
+   * contá-las como R$ 9,80 cada. Receita inflada não é só um número errado na
+   * tela — ela alimenta o relatório por campanha, e campanha com receita
+   * inflada é verba de anúncio empurrada para o criativo errado.
+   */
+  test('entrega sem pagamento no gateway vale ZERO', () => {
+    assert.equal(
+      receitaDoPedido({
+        produto: 'revelacao',
+        desconto_percentual: null,
+        bruto_centavos: null,
+        pagamento_id: null,
+      }),
+      0
+    );
+  });
+
+  test('o valor cobrado de verdade manda, quando existe', () => {
+    assert.equal(
+      receitaDoPedido({
+        produto: 'revelacao',
+        desconto_percentual: 20,
+        bruto_centavos: 784,
+        pagamento_id: 'mp-1',
+      }),
+      784
+    );
+  });
+
+  /** Pedidos antigos, de antes de `bruto_centavos` existir. */
+  test('com pagamento mas sem valor, cai no preço de tabela', () => {
+    assert.equal(
+      receitaDoPedido({
+        produto: 'revelacao',
+        desconto_percentual: null,
+        bruto_centavos: null,
+        pagamento_id: 'mp-antigo',
+      }),
+      980
+    );
+  });
+
+  test('cupom de 100% com pagamento registrado continua valendo zero', () => {
+    assert.equal(
+      receitaDoPedido({
+        produto: 'revelacao',
+        desconto_percentual: 100,
+        bruto_centavos: null,
+        pagamento_id: 'mp-2',
+      }),
+      0
+    );
+  });
+
+  test('bruto zero é zero, não "sem informação"', () => {
+    assert.equal(
+      receitaDoPedido({
+        produto: 'revelacao',
+        desconto_percentual: null,
+        bruto_centavos: 0,
+        pagamento_id: 'mp-3',
+      }),
+      0
+    );
+  });
 });

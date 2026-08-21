@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { createHmac, randomUUID } from 'crypto';
 import { BANCO } from './caminhos';
-import { precoDoPedido } from './cupons';
+import { precoDoPedido, receitaDoPedido } from './cupons';
 import type { ProdutoId } from './produtos';
 
 const db = new Database(BANCO);
@@ -250,7 +250,7 @@ export function contatos(filtro?: {
     if (p.pagamento_id || p.metodo_tentado) c.abriuCheckout = true;
     if (p.status === 'entregue') {
       if (!c.comprou.includes(p.produto)) c.comprou.push(p.produto);
-      c.gastouCentavos += p.bruto_centavos ?? precoDoPedido(p).finalCentavos;
+      c.gastouCentavos += receitaDoPedido(p);
       c.abriuCheckout = true;
     }
   }

@@ -3,7 +3,7 @@ import Link from 'next/link';
 import db from '@/lib/db';
 import { sessaoAtual } from '@/lib/sessao-servidor';
 import { PRODUTOS, precoFormatado, type ProdutoId } from '@/lib/produtos';
-import { precoDoPedido } from '@/lib/cupons';
+import { precoDoPedido, receitaDoPedido } from '@/lib/cupons';
 import { BotaoEstornar } from '@/components/BotaoEstornar';
 import { Bloco, Cartao, brl, OURO, VERMELHO } from '@/components/painel/GraficosPeriodo';
 import { dataHoraBr } from '@/lib/periodo';
@@ -47,7 +47,7 @@ export default async function Pedidos() {
   }[];
 
   const bruto = pagos.reduce(
-    (s, p) => s + (p.bruto_centavos ?? precoDoPedido(p).finalCentavos),
+    (s, p) => s + (receitaDoPedido(p)),
     0
   );
   const taxas = pagos.reduce((s, p) => s + (p.taxa_centavos ?? 0), 0);
@@ -140,7 +140,7 @@ export default async function Pedidos() {
               {recentes.map((p) => {
                 const produto = PRODUTOS[p.produto];
                 const podeEstornar = p.status === 'entregue' || p.status === 'pago';
-                const valor = p.bruto_centavos ?? precoDoPedido(p).finalCentavos;
+                const valor = receitaDoPedido(p);
                 return (
                   <tr key={p.id} className="border-t hover:bg-pergaminho/[0.03]"
                     style={{ borderColor: 'var(--admin-borda)' }}>
