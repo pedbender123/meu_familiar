@@ -29,6 +29,9 @@ db.exec(`
     expira_em TEXT,
     pago_em TEXT,
     lembrete_em TEXT,
+    melhoria_pagamento_id TEXT,
+    melhoria_paga_em TEXT,
+    melhoria_bruto_centavos INTEGER,
     acesso_gratis_em TEXT,
     exemplo INTEGER NOT NULL DEFAULT 0,
     leitura_json TEXT,
@@ -88,6 +91,9 @@ db.exec(`
     variante TEXT,
     virou_pedido INTEGER NOT NULL DEFAULT 0,
     lembrete_em TEXT,
+    melhoria_pagamento_id TEXT,
+    melhoria_paga_em TEXT,
+    melhoria_bruto_centavos INTEGER,
     criado_em TEXT NOT NULL,
     atualizado_em TEXT NOT NULL
   );
@@ -383,6 +389,9 @@ function garantirColunas() {
   // Recuperação de carrinho: marca quando o lembrete saiu, para não mandar
   // duas vezes. Sem isso, rodar o job de novo vira spam.
   adicionarColunaSeFaltar('lembrete_em', 'TEXT');
+  adicionarColunaSeFaltar('melhoria_pagamento_id', 'TEXT');
+  adicionarColunaSeFaltar('melhoria_paga_em', 'TEXT');
+  adicionarColunaSeFaltar('melhoria_bruto_centavos', 'INTEGER');
   adicionarColunaSeFaltar('acesso_gratis_em', 'TEXT');
   // Marca as revelações que somos NÓS que geramos para a vitrine. Sem esta
   // coluna não dá para separar amostra de cliente na hora de contar receita
@@ -584,6 +593,10 @@ export interface Pedido {
   expira_em: string | null;
   pago_em: string | null;
   lembrete_em: string | null;
+  /** A segunda cobrança: a troca da Revelação pela Completa após a entrega. */
+  melhoria_pagamento_id: string | null;
+  melhoria_paga_em: string | null;
+  melhoria_bruto_centavos: number | null;
   /**
    * Quando a chave da plataforma foi entregue **de graça** (o cron das horas
    * seguintes), e não pelo caminho do pagamento.

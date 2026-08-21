@@ -31,7 +31,8 @@
     "resumo-do-dia": "tsx scripts/resumo-do-dia.ts",
     "leitura-esperando": "tsx scripts/leitura-esperando.ts",
     "guia-semanal": "tsx scripts/guia-semanal.ts",
-    "modelo-novo": "tsx scripts/modelo-novo.ts"
+    "modelo-novo": "tsx scripts/modelo-novo.ts",
+    "oferecer-melhoria": "tsx scripts/oferecer-melhoria.ts"
   },
   "dependencies": {
     "@google/genai": "^2.16.0",

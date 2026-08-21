@@ -23,10 +23,11 @@ import m021 from './021_equipe_do_painel';
 import m022 from './022_avisos_enviados';
 import m023 from './023_guias_semanais';
 import m024 from './024_identidade_do_visitante';
+import m025 from './025_melhoria_apos_entrega';
 
 /**
  * A ordem de execução. Só se acrescenta ao fim — nunca reordena, nunca edita
  * uma migração já aplicada em produção. Uma migração errada se corrige com
  * uma migração nova que desfaz o efeito, não editando a antiga.
  */
-export const MIGRACOES: Migracao[] = [m001, m002, m003, m004, m005, m006, m007, m008, m009, m010, m011, m012, m013, m014, m015, m016, m017, m018, m019, m020, m021, m022, m023, m024];
+export const MIGRACOES: Migracao[] = [m001, m002, m003, m004, m005, m006, m007, m008, m009, m010, m011, m012, m013, m014, m015, m016, m017, m018, m019, m020, m021, m022, m023, m024, m025];

@@ -16,6 +16,7 @@ import { checarEmLinha } from '../nucleo/sentinela/emLinha';
 import { checarValorCobrado } from '../nucleo/sentinela/invariantes/financeiro';
 import { registrarCompra } from '../nucleo/eventos-meta';
 import { entregarChaveDaPlataforma, nomeDaConta } from './acesso-plataforma';
+import { buscarPedidoPorMelhoria, confirmarMelhoria } from '../nucleo/melhoria';
 
 export type DesfechoNotificacao =
   | 'nao_libera_acesso'
@@ -129,6 +130,25 @@ export async function processarNotificacaoDePagamento(
     }
 
     return { desfecho: 'assinatura_confirmada' };
+  }
+
+  /**
+   * **A melhoria vem antes**, e a ordem aqui não é estética.
+   *
+   * O pedido de uma melhoria já está `entregue` e já tem `pagamento_id` — o da
+   * compra original. Se a busca normal rodasse primeiro, ela acharia esse
+   * pedido, veria que ele não está mais em `aguardando_pagamento`, e a
+   * idempotência descartaria a notificação como reenvio.
+   *
+   * O resultado seria uma pessoa que pagou a melhoria e continuou com a
+   * leitura curta — sem nenhum erro em log, porque tecnicamente nada falhou.
+   */
+  const daMelhoria = buscarPedidoPorMelhoria(resultado.idExterno);
+  if (daMelhoria) {
+    const aplicou = await confirmarMelhoria(daMelhoria.id, {
+      brutoCentavos: resultado.brutoCentavos,
+    });
+    return { desfecho: aplicou ? 'processado' : 'ja_processado' };
   }
 
   // Casa por `pagamento_id` (gravado na criação) ou pela referência externa,

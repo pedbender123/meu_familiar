@@ -79,6 +79,7 @@ export function CheckoutMercadoPago({
    * para de cobrar direito.
    */
   base = 'pedido',
+  caminho = 'pagamento',
   destino,
 }: {
   pedidoId: string;
@@ -93,6 +94,15 @@ export function CheckoutMercadoPago({
   cupom?: { codigo: string; descontoPercentual: number; cheioEmReais: number };
   /** `pedido` = funil do ritual; `cobranca` = assinatura de plano. */
   base?: 'pedido' | 'cobranca';
+  /**
+   * A rota que recebe o pagamento. `pagamento` é a compra do funil;
+   * `melhorar` é a troca da Revelação pela Completa depois da entrega.
+   *
+   * Existe porque o Brick é o mesmo nos dois casos — duplicar o componente
+   * para mudar uma palavra na URL criaria dois checkouts que divergem, e o
+   * tipo de divergência que só se descobre quando um deles para de cobrar.
+   */
+  caminho?: 'pagamento' | 'melhorar';
   /** Para onde ir quando confirmar. Padrão: a tela de obrigado do pedido. */
   destino?: string;
   /** Quando não é `producao`, a tela precisa dizer isso em voz alta. */
@@ -178,7 +188,7 @@ export function CheckoutMercadoPago({
               // Estava declarado em MARCOS e nunca disparava. É o degrau
               // "apertou pagar" — distinto de "abriu o checkout".
               marcar('pagamento_tentado');
-              const resposta = await fetch(`/api/${base}/${pedidoId}/pagamento`, {
+              const resposta = await fetch(`/api/${base}/${pedidoId}/${caminho}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ formData }),

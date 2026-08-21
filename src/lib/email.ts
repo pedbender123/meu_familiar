@@ -1235,3 +1235,65 @@ export async function enviarGuiaSemanal(params: {
       .join('\n\n')}\n\nO dia da semana: ${guia.destaque}\n\n${guia.fechamento}\n\n${url}`,
   });
 }
+
+/**
+ * A oferta de melhoria, mandada depois da entrega.
+ *
+ * ── Por que ela funciona ──────────────────────────────────────────────────
+ *
+ * Quem recebe já leu o que comprou. A pergunta deixou de ser "isso vale a
+ * pena?" e virou "quero mais disso?" — e a segunda é incomparavelmente mais
+ * fácil de responder com sim.
+ *
+ * Por isso o e-mail não explica o produto de novo nem repete a promessa da
+ * venda: ele diz o que ficou de fora e quanto custa ver. Quem gostou entende
+ * na primeira linha; quem não gostou não vai ser convencido por parágrafo
+ * nenhum.
+ */
+export async function enviarOfertaDeMelhoria(params: {
+  email: string;
+  nome: string;
+  nomeFamiliar: string;
+  url: string;
+  precoCentavos: number;
+}): Promise<void> {
+  const { email, nome, nomeFamiliar, url, precoCentavos } = params;
+  const primeiro = nome.trim().split(/\s+/)[0] || '';
+  const preco = (precoCentavos / 100).toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  });
+
+  const html = moldura(`
+    <p style="margin:0 0 18px;font-size:22px;font-style:italic;color:#2E2438;">
+      ${primeiro ? `${primeiro}, ${nomeFamiliar}` : nomeFamiliar} não terminou de falar.
+    </p>
+    <p style="margin:0 0 22px;font-size:15px;line-height:1.7;">
+      O que você recebeu foi a leitura curta. Existe a completa — o dobro do
+      texto, os gráficos do que as 26 cenas mediram em você, e a voz dele
+      narrando tudo.
+    </p>
+    <table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:14px;color:#3C3145;">
+      <tr><td style="padding:3px 0;">· o relatório longo, com os quatro eixos do seu perfil</td></tr>
+      <tr><td style="padding:3px 0;">· os gráficos do que o teste mediu</td></tr>
+      <tr><td style="padding:3px 0;">· a leitura narrada em áudio</td></tr>
+      <tr><td style="padding:3px 0;">· um novo PDF, com tudo isso dentro</td></tr>
+    </table>
+    <p style="margin:22px 0 8px;font-size:15px;line-height:1.7;">
+      Por <strong>${preco}</strong>.
+    </p>
+    <p style="margin:0 0 22px;">${botao(url, `Desbloquear por ${preco}`)}</p>
+    <p style="margin:0;font-family:Arial,sans-serif;font-size:12px;line-height:1.6;color:#6B5F72;">
+      O que você já recebeu continua seu, com ou sem isto.
+    </p>
+  `);
+
+  await enviar({
+    para: email,
+    assunto: primeiro
+      ? `${primeiro}, ${nomeFamiliar} não terminou de falar`
+      : `${nomeFamiliar} não terminou de falar`,
+    html,
+    texto: `A leitura completa — relatório longo, gráficos e narração — por ${preco}: ${url}`,
+  });
+}
