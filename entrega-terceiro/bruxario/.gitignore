@@ -46,8 +46,3 @@ next-env.d.ts
 *.png
 !/public/**/*.png
 !/src/assets/**/*.png
-
-# A versão reduzida para entrega a terceiro: gerada, não versionada.
-entrega-terceiro/bruxario/node_modules
-entrega-terceiro/bruxario/.next
-entrega-terceiro/bruxario/var
