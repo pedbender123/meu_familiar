@@ -22,7 +22,7 @@ import { gerarVeu } from '@/lib/arte';
 import { coordenadaDoEstado } from '@/lib/coordenadas';
 import { virouLead } from '@/lib/identidade';
 import { registrarLead } from '@/nucleo/eventos-meta';
-
+import { produtoVigente } from '@/lib/modelo-de-venda';
 /**
  * Fecha o ritual: pontua, decide o familiar e cria o pedido.
  *
@@ -105,7 +105,18 @@ export async function POST(req: NextRequest) {
   const { signoSol, signoLua } = calcularSignos(dataNascimento, horaNascimento);
   const lua = calcularFaseDaLua(dataNascimento, horaNascimento);
 
-  const produtoEscolhido = produtoDe(
+  /**
+   * **O preço vem do MODELO VIGENTE, não da tabela estática.**
+   *
+   * `produtos.ts` tem a Revelação zerada — é o modelo novo, que ainda está
+   * desligado. Lendo dali, `preco.gratis` fica verdadeiro e esta rota entrega
+   * o produto sem passar pelo gateway: foi assim que duas pessoas receberam
+   * de graça o que a campanha estava vendendo, em 21/08.
+   *
+   * Toda decisão de preço passa por `produtoVigente`. Ler `PRODUTOS` direto
+   * para cobrar é o erro que este comentário existe para impedir.
+   */
+  const produtoEscolhido = produtoVigente(
     ehProdutoValido(produto) ? produto : PRODUTO_PADRAO
   );
 

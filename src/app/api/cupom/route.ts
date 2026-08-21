@@ -6,6 +6,7 @@ import {
 } from '@/lib/cupons';
 import { PRODUTO_PADRAO, ehProdutoValido, produtoDe } from '@/lib/produtos';
 import { excedeuLimite } from '@/lib/rate-limit';
+import { produtoVigente } from '@/lib/modelo-de-venda';
 
 /**
  * Confere um cupom e devolve o preço que ele deixa.
@@ -46,7 +47,9 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const produto = produtoDe(produtoId);
+  // Mesmo motivo do /api/quiz: o preço de tela tem que ser o vigente, senão
+  // a oferta anuncia grátis um produto que o gateway vai cobrar.
+  const produto = produtoVigente(produtoId);
   const preco = precoComDesconto(produto, resultado.cupom.desconto_percentual);
 
   return NextResponse.json({

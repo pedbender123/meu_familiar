@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { buscarPedido } from '@/lib/db';
-import { produtoDe } from '@/lib/produtos';
-import { destinoDepoisDaEntrega } from '@/lib/modelo-de-venda';
+import { produtoDe, type ProdutoId } from '@/lib/produtos';
+import { destinoDepoisDaEntrega, precoVigenteCentavos } from '@/lib/modelo-de-venda';
+import { precoDoPedido } from '@/lib/cupons';
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -31,7 +32,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     // Para o Purchase do Pixel disparar em /obrigado — a mesma aba que pagou,
     // sem depender de sessão logada. Mesmo cálculo de valor usado em
     // /revelacao/[id] (bruto cobrado de verdade, com cupom já aplicado).
-    valorCentavos: pedido.bruto_centavos ?? produtoDe(pedido.produto).precoCentavos,
+    valorCentavos: pedido.bruto_centavos ?? precoDoPedido(pedido).finalCentavos,
     exemplo: pedido.exemplo === 1,
   });
 }

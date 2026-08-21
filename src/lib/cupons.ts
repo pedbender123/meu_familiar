@@ -1,5 +1,6 @@
 import db from './db';
 import { PRODUTOS, type Produto, type ProdutoId } from './produtos';
+import { precoVigenteCentavos } from './modelo-de-venda';
 
 /**
  * Cupons de desconto.
@@ -141,9 +142,18 @@ export function precoDoPedido(pedido: {
   produto: string;
   desconto_percentual: number | null;
 }): PrecoComDesconto {
-  const produto =
-    PRODUTOS[pedido.produto as ProdutoId] ?? PRODUTOS.revelacao;
-  return precoComDesconto(produto, pedido.desconto_percentual ?? 0);
+  /**
+   * O preço VIGENTE, não o da tabela estática.
+   *
+   * `PRODUTOS.revelacao` está zerado porque o modelo novo a transformou na
+   * porta de entrada. Enquanto o interruptor estiver desligado, ela custa o
+   * que a campanha está vendendo — e ler `PRODUTOS` direto aqui foi
+   * exatamente o que entregou duas leituras de graça em 21/08.
+   */
+  return precoComDesconto(
+    { precoCentavos: precoVigenteCentavos(pedido.produto as ProdutoId) },
+    pedido.desconto_percentual ?? 0
+  );
 }
 
 /**
