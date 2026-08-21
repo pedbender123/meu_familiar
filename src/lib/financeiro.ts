@@ -63,6 +63,8 @@ export interface Consolidado {
   investidoEmCampanhasCentavos: number;
   lucroCentavos: number;
   vendas: number;
+  /** Toda entrega, inclusive gratuita. `vendas` conta só o que gerou receita. */
+  entregas: number;
   ticketMedioCentavos: number;
   porCategoria: { categoria: string; centavos: number }[];
   porMes: {
@@ -101,7 +103,12 @@ export function consolidado(de?: string, ate?: string): Consolidado {
   const pagos = db
     .prepare(
       `SELECT produto, desconto_percentual, bruto_centavos, taxa_centavos,
-              liquido_centavos, custo_ia_centavos, pago_em, criado_em
+              liquido_centavos, custo_ia_centavos, pago_em, criado_em,
+              -- Sem esta coluna, \`receitaDoPedido\` não distingue "entregue sem
+              -- cobranca de cobrado sem valor gravado, e devolve zero
+              -- para tudo. É a diferença entre o painel mostrar o faturamento
+              -- e mostrar nada.
+              pagamento_id
          FROM pedidos
         WHERE status = 'entregue' AND exemplo = 0 ${filtroPedido}`
     )
@@ -112,6 +119,7 @@ export function consolidado(de?: string, ate?: string): Consolidado {
     taxa_centavos: number | null;
     liquido_centavos: number | null;
     custo_ia_centavos: number;
+    pagamento_id: string | null;
     pago_em: string | null;
     criado_em: string;
   }[];
@@ -149,7 +157,16 @@ export function consolidado(de?: string, ate?: string): Consolidado {
     m.brutoCentavos += bruto;
     m.taxaCentavos += taxa;
     m.custoIaCentavos += ia;
-    m.vendas += 1;
+    /**
+     * **Venda é o que trouxe dinheiro.**
+     *
+     * Contar toda entrega como venda inflava o número em 12 — cupons de 100%,
+     * amostras e a falha de preço de 21/08 apareciam ao lado das compras de
+     * verdade. E é sobre esse número que a taxa de conversão da campanha é
+     * calculada: entrega gratuita contada como venda faz o anúncio parecer o
+     * dobro de eficiente do que é.
+     */
+    if (bruto > 0) m.vendas += 1;
   }
 
   let despesasCentavos = 0;
@@ -174,7 +191,10 @@ export function consolidado(de?: string, ate?: string): Consolidado {
     despesasCentavos,
     investidoEmCampanhasCentavos,
     lucroCentavos: brutoCentavos - taxaCentavos - custoIaCentavos - despesasCentavos,
-    vendas: pagos.length,
+    /** Só as que trouxeram dinheiro — ver a nota em `m.vendas` acima. */
+    vendas: pagos.filter((p) => receitaDoPedido(p) > 0).length,
+    /** Toda entrega, inclusive as gratuitas. É o volume, não a receita. */
+    entregas: pagos.length,
     ticketMedioCentavos: pagos.length > 0 ? Math.round(brutoCentavos / pagos.length) : 0,
     porCategoria: [...categorias]
       .map(([categoria, centavos]) => ({ categoria, centavos }))

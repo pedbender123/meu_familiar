@@ -384,7 +384,11 @@ export function relatorioDoPeriodo(
       `SELECT id, visitante, nome, email, familiar, status, produto,
               desconto_percentual, respostas_json, bruto_centavos, taxa_centavos,
               liquido_centavos, custo_ia_centavos, origem, criado_em,
-              metodo_tentado, metodo_pagamento, motivo_recusa
+              metodo_tentado, metodo_pagamento, motivo_recusa,
+              -- Necessário para receitaDoPedido distinguir entrega gratuita
+              -- de cobrança sem valor gravado. Sem ela, toda campanha aparece
+              -- com receita zero.
+              pagamento_id
          FROM pedidos
         WHERE exemplo = 0 AND criado_em >= @de AND criado_em < @ate`
     )
@@ -397,6 +401,7 @@ export function relatorioDoPeriodo(
     status: string;
     produto: string;
     desconto_percentual: number | null;
+    pagamento_id: string | null;
     respostas_json: string;
     bruto_centavos: number | null;
     taxa_centavos: number | null;
@@ -419,8 +424,11 @@ export function relatorioDoPeriodo(
   let taxaCentavos = 0;
   let liquidoCentavos = 0;
   for (const p of entregues) {
-    // O bruto guardado vem do MP; quando falta (pedido por cupom de 100%,
-    // provedor fake), cai no preço calculado — que é o que de fato valia.
+    /**
+     * Só conta o que entrou de verdade. Entrega gratuita — cupom de 100%,
+     * amostra, falha de preço — vale zero, e inflar isso aqui empurra verba
+     * de anúncio para o criativo errado.
+     */
     const bruto = receitaDoPedido(p);
     brutoCentavos += bruto;
     taxaCentavos += p.taxa_centavos ?? 0;
