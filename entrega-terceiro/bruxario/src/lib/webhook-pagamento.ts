@@ -9,6 +9,7 @@ import { statusLiberaAcesso } from '../nucleo/checkouts/directpag';
 import type { ResultadoPagamento } from '../nucleo/checkouts/tipos';
 import { calcularExpiracao, produtoDe } from './produtos';
 import { aposPagamento } from './processar';
+import { reportarVenda } from './reportar-venda';
 
 export type DesfechoNotificacao =
   | 'nao_libera_acesso'
@@ -138,6 +139,21 @@ export async function processarNotificacaoDePagamento(
     metodo_pagamento: resultado.metodo,
   });
   registrarEvento('pagamento_confirmado', pedido.id);
+
+  /**
+   * A venda confirmada vai para a Utmify. É o envio que fecha o relatório de
+   * campanha: `waiting_payment` saiu quando a cobrança abriu, e este marca
+   * quem de fato pagou.
+   *
+   * Sem `await` de propósito — este handler precisa responder rápido ao
+   * gateway, e uma linha de relatório atrasada é melhor que uma notificação
+   * que o gateway considera falha e retenta.
+   */
+  void reportarVenda(buscarPedido(pedido.id)!, 'paid', {
+    taxaCentavos: resultado.taxaCentavos,
+    metodo: resultado.metodo,
+    aprovadoEm: pagoEm,
+  });
 
 
   /**

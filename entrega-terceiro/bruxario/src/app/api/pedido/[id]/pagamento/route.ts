@@ -5,6 +5,7 @@ import type { MetodoDePagamento } from '@/nucleo/checkouts/tipos';
 import { calcularExpiracao, produtoDe } from '@/lib/produtos';
 import { aposPagamento } from '@/lib/processar';
 import { excedeuLimite, LIMITES } from '@/lib/rate-limit';
+import { reportarVenda } from '@/lib/reportar-venda';
 
 /**
  * Cria a cobrança no DirectPag e devolve o que a tela precisa mostrar.
@@ -124,6 +125,17 @@ export async function POST(
       ...(resultado.pix ? { pix_copia_e_cola: resultado.pix.copiaECola } : {}),
     });
     registrarEvento(`pagamento_criado_${resultado.status}`, id);
+
+    /**
+     * A Utmify recebe o pedido AQUI, como `waiting_payment`.
+     *
+     * Sem este envio ela só veria as vendas concluídas — e taxa de conversão
+     * por campanha precisa dos dois lados: quem chegou ao checkout e quem
+     * pagou. Sem `await`: o relatório não pode segurar a resposta da compra.
+     */
+    void reportarVenda(buscarPedido(id)!, 'waiting_payment', {
+      metodo: resultado.metodo ?? metodo,
+    });
 
     // Cartão aprovado: quem confirma de verdade é o webhook, mas mandar a
     // pessoa pra tela de espera já é correto — /obrigado faz poll até

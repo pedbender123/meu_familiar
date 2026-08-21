@@ -154,6 +154,13 @@ export async function POST(req: NextRequest) {
     // venda por causa de um parâmetro de UI é o pior desfecho possível.
     produto: produtoEscolhido.id,
     desconto_percentual: descontoPercentual,
+    /**
+     * Os UTMs e o IP viajam para dentro do pedido porque a Utmify é avisada
+     * pelo SERVIDOR, quando o pagamento confirma — e nesse momento não há
+     * navegador para perguntar de onde a pessoa veio.
+     */
+    utm_json: corpo?.utm && typeof corpo.utm === 'object' ? JSON.stringify(corpo.utm) : null,
+    ip_comprador: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
     perfil_json: perfilJson,
     desempatado_pela_pessoa: desempatadoPelaPessoa ? 1 : 0,
   });

@@ -29,6 +29,8 @@ db.exec(`
     expira_em TEXT,
     pago_em TEXT,
     lembrete_em TEXT,
+    utm_json TEXT,
+    ip_comprador TEXT,
     acesso_gratis_em TEXT,
     exemplo INTEGER NOT NULL DEFAULT 0,
     leitura_json TEXT,
@@ -88,6 +90,8 @@ db.exec(`
     variante TEXT,
     virou_pedido INTEGER NOT NULL DEFAULT 0,
     lembrete_em TEXT,
+    utm_json TEXT,
+    ip_comprador TEXT,
     criado_em TEXT NOT NULL,
     atualizado_em TEXT NOT NULL
   );
@@ -140,7 +144,6 @@ db.exec(`
   -- Comentário do comprador sobre a própria revelação.
   --
   -- A coluna aprovado começa em 0 e separa "alguém escreveu" de "está na
-  -- vitrine". Mural público sem moderação é convite para a primeira pessoa
   -- mal-intencionada escrever qualquer coisa na sua página de vendas.
   CREATE TABLE IF NOT EXISTS comentarios (
     id TEXT PRIMARY KEY,
@@ -241,7 +244,6 @@ db.exec(`
   --
   -- Aqui cada chegada vira uma LINHA. A jornada inteira fica legível: veio
   -- pelo vídeo 02 do Instagram, sumiu, voltou pelo e-mail de resgate, fechou
-  -- pelo remarketing. Nenhuma dessas informações cabia numa string.
   --
   -- ── "conta_aquisicao" é o campo que conserta o número ─────────────────
   --
@@ -584,6 +586,10 @@ export interface Pedido {
   expira_em: string | null;
   pago_em: string | null;
   lembrete_em: string | null;
+  /** Os UTMs da chegada, em JSON. Repassados à Utmify quando a venda confirma. */
+  utm_json: string | null;
+  /** O IP de quem comprou — a Utmify usa para deduplicar visitante. */
+  ip_comprador: string | null;
   /**
    * Quando a chave da plataforma foi entregue **de graça** (o cron das horas
    * seguintes), e não pelo caminho do pagamento.
@@ -679,6 +685,9 @@ export function criarPedido(p: {
   atribuicao?: string | null;
   indicado_por?: string | null;
   funil?: string | null;
+  /** Os UTMs da chegada, para a Utmify saber de qual campanha veio. */
+  utm_json?: string | null;
+  ip_comprador?: string | null;
 }) {
   const agora = new Date().toISOString();
   db.prepare(
@@ -686,11 +695,11 @@ export function criarPedido(p: {
       (id, nome, email, respostas_json, familiar, lua, signo_sol, signo_lua, produto,
        perfil_json, desempatado_pela_pessoa, cupom, desconto_percentual,
        origem, visitante, variante, campanha_id, peca_id, atribuicao,
-       indicado_por, funil, status, criado_em, atualizado_em)
+       indicado_por, funil, utm_json, ip_comprador, status, criado_em, atualizado_em)
      VALUES (@id, @nome, @email, @respostas_json, @familiar, @lua, @signo_sol, @signo_lua, @produto,
        @perfil_json, @desempatado_pela_pessoa, @cupom, @desconto_percentual,
        @origem, @visitante, @variante, @campanha_id, @peca_id, @atribuicao,
-       @indicado_por, @funil, 'aguardando_pagamento', @agora, @agora)`
+       @indicado_por, @funil, @utm_json, @ip_comprador, 'aguardando_pagamento', @agora, @agora)`
   ).run({
     perfil_json: null,
     desempatado_pela_pessoa: 0,
@@ -698,6 +707,8 @@ export function criarPedido(p: {
     desconto_percentual: null,
     origem: null,
     visitante: null,
+    utm_json: null,
+    ip_comprador: null,
     variante: null,
     campanha_id: null,
     peca_id: null,

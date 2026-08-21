@@ -10,8 +10,7 @@
     "reprocessar": "tsx scripts/reprocessar.ts",
     "test": "dir=$(mktemp -d) && BRUXARIO_DIR_DADOS=\"$dir\" DIRECTPAG_OFFER_HASH=of_teste tsx --test --test-concurrency=1 \"src/**/*.test.ts\"; codigo=$?; rm -rf \"$dir\"; exit $codigo",
     "gerar-og": "tsx scripts/gerar-og.ts",
-    "migrar": "tsx scripts/migrar.ts",
-    "licenca": "tsx scripts/licenca.ts"
+    "migrar": "tsx scripts/migrar.ts"
   },
   "dependencies": {
     "@google/genai": "^2.16.0",

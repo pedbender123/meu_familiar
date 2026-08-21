@@ -144,7 +144,6 @@ export function Oferta({
         'A leitura narrada em áudio, na voz do seu familiar',
         'Os gráficos do que o teste mediu: os quatro eixos e a sua posição entre os doze',
         'Seu perfil com link permanente — o da Revelação sai do ar em uma semana',
-        `${PRODUTOS.completa.perguntasOraculo} perguntas ao Oráculo do seu familiar`,
       ],
       destaque: true,
     },

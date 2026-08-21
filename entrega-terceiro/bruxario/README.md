@@ -29,6 +29,7 @@ npm start
 | `ADMIN_EMAIL` | painel inacessível |
 | `BASE_URL` | links do e-mail quebrados |
 | `NEXT_PUBLIC_META_PIXEL_ID` | anúncio sem medição |
+| `NEXT_PUBLIC_UTMIFY_PIXEL_ID` + `UTMIFY_API_TOKEN` | não sabe qual campanha vendeu — ver `docs/UTMIFY.md` |
 
 **Sem `DIRECTPAG_API_TOKEN` o checkout entra em modo de teste:** aprova sem
 cobrar. Dá para atravessar o funil inteiro em desenvolvimento.
@@ -81,7 +82,18 @@ npm test
 
 Rodam num banco temporário — não tocam o de desenvolvimento.
 
+## Rastreio de campanha
+
+O pixel da Meta dispara `PageView`, `Lead` e `Purchase` — este último com
+`event_id` estável por pedido, para a mesma venda aberta em dois aparelhos
+contar uma vez só.
+
+A Utmify recebe o pedido duas vezes: `waiting_payment` quando a cobrança abre
+e `paid` quando o dinheiro entra. Os UTMs da URL do anúncio ficam gravados no
+pedido, porque quem reporta a venda é o servidor e ele acontece horas depois,
+sem navegador por perto.
+
 ## Documentos
 
-- `docs/DIRECTPAG.md` — conectar o gateway, e o que a API dele não faz
-- `LICENCA.md` — o mecanismo de licença
+- `docs/DIRECTPAG.md` — conectar o gateway
+- `docs/UTMIFY.md` — conectar o rastreio de campanha

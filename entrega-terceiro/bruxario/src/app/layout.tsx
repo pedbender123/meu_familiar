@@ -4,8 +4,7 @@ import { Suspense } from "react";
 import "./globals.css";
 import { AudioAmbiente } from "@/components/AudioAmbiente";
 import { MetaPixel } from "@/components/MetaPixel";
-import { estadoDaLicenca } from '@/lib/licenca';
-import { FaixaDaLicenca } from '@/components/FaixaDaLicenca';
+import { ScriptUtmify } from '@/components/ScriptUtmify';
 
 const cormorant = localFont({
   src: "../assets/fonts/CormorantGaramond.woff2",
@@ -56,22 +55,11 @@ export const metadata: Metadata = {
   },
 };
 
-/**
- * A licença é conferida AQUI, e não no proxy.
- *
- * O proxy roda no runtime Edge e é atravessado por toda requisição, inclusive
- * imagem e arquivo estático — pendurar uma checagem de rede ali custaria
- * latência em tudo. O layout roda uma vez por página, no Node, e é onde o
- * resultado pode ser guardado em memória entre requisições.
- *
- * Ver `lib/licenca.ts` e `LICENCA.md`.
- */
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const licenca = await estadoDaLicenca();
 
   return (
     <html
@@ -80,42 +68,18 @@ export default async function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         {/*
-          Suspense obrigatório: Farejador e MetaPixel usam useSearchParams, e
-          sem a fronteira o Next força a página inteira a renderizar no
-          cliente — o que derrubaria a geração estática de /termos e
-          /privacidade.
+          Suspense obrigatório: o MetaPixel usa `useSearchParams`, e sem a
+          fronteira o Next força a página inteira a renderizar no cliente — o
+          que derrubaria a geração estática de /termos e /privacidade.
         */}
         <Suspense fallback={null}>
           <MetaPixel />
+          <ScriptUtmify />
         </Suspense>
         <AudioAmbiente />
-        {licenca.estado === 'avisando' && (
-          <FaixaDaLicenca mensagem={licenca.mensagem} />
-        )}
-        {licenca.estado === 'suspensa' ? <Suspensa mensagem={licenca.mensagem} /> : children}
+        {children}
       </body>
     </html>
   );
 }
 
-/**
- * A tela de suspensão, embutida no layout.
- *
- * Não é um `redirect`: redirecionar deixaria a rota original acessível para
- * quem soubesse chamá-la direto, e o painel administrativo precisa continuar
- * abrindo — quem assumiu a operação tem que conseguir ver os pedidos e falar
- * com quem comprou mesmo com a licença suspensa.
- */
-function Suspensa({ mensagem }: { mensagem?: string }) {
-  return (
-    <main className="flex-1 flex flex-col items-center justify-center px-6 py-24 gap-4 text-center">
-      <h1 className="font-display italic text-3xl text-pergaminho max-w-[24ch] text-balance">
-        Este site está temporariamente indisponível.
-      </h1>
-      <p className="font-corpo font-light text-sm text-pergaminho/55 max-w-[38ch] leading-relaxed">
-        {mensagem ??
-          'Volte em algumas horas. Se você fez uma compra e precisa de ajuda, responda o e-mail que recebeu.'}
-      </p>
-    </main>
-  );
-}

@@ -49,6 +49,26 @@ interface Empate {
   entre: { familiar: string; nome: string; chamado: string }[];
 }
 
+/**
+ * Os parâmetros de campanha da URL, no vocabulário da Utmify.
+ *
+ * `src` e `sck` entram porque algumas plataformas de anúncio usam esses nomes
+ * em vez de `utm_*` — ler os dois custa nada e evita perder a origem.
+ */
+function lerUtms(): Record<string, string> {
+  if (typeof window === 'undefined') return {};
+  const busca = new URLSearchParams(window.location.search);
+  const chaves = [
+    'src', 'sck', 'utm_source', 'utm_campaign', 'utm_medium', 'utm_content', 'utm_term',
+  ];
+  const achados: Record<string, string> = {};
+  for (const chave of chaves) {
+    const valor = busca.get(chave);
+    if (valor) achados[chave] = valor.slice(0, 120);
+  }
+  return achados;
+}
+
 export function RitualCliente({
   itens,
   ordemDasOpcoes,
@@ -220,6 +240,15 @@ export function RitualCliente({
           estadoNascimento: cidade?.estado,
           email,
           produto: produtoPadrao,
+          /**
+           * Os UTMs da URL do anúncio, lidos aqui e gravados no pedido.
+           *
+           * É o servidor que vai reportar a venda à Utmify, horas depois,
+           * quando o pagamento confirmar — e nessa hora não há aba aberta
+           * para consultar. Se eles não viajarem agora, a campanha que trouxe
+           * a pessoa se perde.
+           */
+          utm: lerUtms(),
           ...(desempate ? { desempate } : {}),
         }),
       });

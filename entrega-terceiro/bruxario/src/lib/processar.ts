@@ -248,7 +248,7 @@ export async function processarPedido(pedidoId: string): Promise<void> {
     }
 
     /**
-     * Amostras do mural não recebem e-mail nem viram conta.
+     * Amostras internas não recebem e-mail.
      *
      * O endereço delas (`amostra+...@bruxario.com.br`) não existe, então cada
      * envio voltaria como bounce — e **bounce derruba a reputação do
