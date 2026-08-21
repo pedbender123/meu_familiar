@@ -1,4 +1,4 @@
-import { precoComDesconto } from '../../lib/cupons';
+import { precoComDesconto } from '../../lib/preco';
 import type {
   Cobravel,
   DadosCriacao,

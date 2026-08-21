@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { Suspense } from "react";
 import "./globals.css";
-import { Farejador } from "@/components/Farejador";
 import { AudioAmbiente } from "@/components/AudioAmbiente";
 import { MetaPixel } from "@/components/MetaPixel";
 import { estadoDaLicenca } from '@/lib/licenca';
@@ -87,7 +86,6 @@ export default async function RootLayout({
           /privacidade.
         */}
         <Suspense fallback={null}>
-          <Farejador />
           <MetaPixel />
         </Suspense>
         <AudioAmbiente />

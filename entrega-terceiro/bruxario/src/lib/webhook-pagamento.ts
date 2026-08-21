@@ -8,9 +8,6 @@ import {
 import { statusLiberaAcesso } from '../nucleo/checkouts/directpag';
 import type { ResultadoPagamento } from '../nucleo/checkouts/tipos';
 import { calcularExpiracao, produtoDe } from './produtos';
-import { checarEmLinha } from '../nucleo/sentinela/emLinha';
-import { checarValorCobrado } from '../nucleo/sentinela/invariantes/financeiro';
-import { enfileirarEventoCapi } from './fila-capi';
 import { aposPagamento } from './processar';
 
 export type DesfechoNotificacao =
@@ -115,14 +112,6 @@ export async function processarNotificacaoDePagamento(
      * `npm run reconciliar` varre o gateway e reprocessa estes casos.
      */
     console.warn(`[webhook] pagamento ${resultado.idExterno} sem pedido correspondente`);
-    checarEmLinha('pagamento_orfao', () => ({
-      invariante: 'pagamento_orfao',
-      severidade: 'alto' as const,
-      entidadeTipo: 'pedido',
-      entidadeId: resultado.idExterno,
-      esperado: 'todo pagamento confirmado casa com um pedido',
-      encontrado: `transação ${resultado.idExterno} paga sem pedido correspondente`,
-    }));
     return { desfecho: 'sem_pedido' };
   }
 
@@ -150,10 +139,6 @@ export async function processarNotificacaoDePagamento(
   });
   registrarEvento('pagamento_confirmado', pedido.id);
 
-  // Vigilância em linha: confere, no instante em que o pagamento é gravado,
-  // se o valor bate com produto e cupom (docs/reestruturacao.md §5). Falha
-  // aberto — nunca atrasa nem derruba a entrega.
-  checarEmLinha('valor_cobrado', () => checarValorCobrado(buscarPedido(pedido.id)!));
 
   /**
    * **A venda é contada AQUI, e só aqui.**
@@ -175,16 +160,6 @@ export async function processarNotificacaoDePagamento(
    * Só enfileira com o pixel configurado: sem ele a fila acumularia eventos
    * que nunca vão sair.
    */
-  if (process.env.NEXT_PUBLIC_META_PIXEL_ID) {
-    enfileirarEventoCapi({
-      pedidoId: pedido.id,
-      nome: 'Purchase',
-      quando: pagoEm,
-      email: pedido.email || undefined,
-      valorEmReais: resultado.brutoCentavos !== null ? resultado.brutoCentavos / 100 : undefined,
-      eventId: `${pedido.id}:purchase`,
-    });
-  }
 
   // Sem `await` de propósito — ver o comentário em `ResultadoNotificacao.entrega`.
   const entrega = aposPagamento(pedido.id);

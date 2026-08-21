@@ -2,8 +2,7 @@
 
 import { useState } from 'react';
 import { PRODUTOS } from '@/lib/produtos';
-import type { PrecoComDesconto } from '@/lib/cupons';
-import { marcar } from '@/lib/marcar';
+import type { PrecoFinal } from '@/lib/preco';
 
 /**
  * As duas opções, depois da revelação parcial.
@@ -42,7 +41,7 @@ export function Oferta({
 }: {
   pedidoId: string;
   descontoPercentual: number;
-  precos: { revelacao: PrecoComDesconto; completa: PrecoComDesconto };
+  precos: { revelacao: PrecoFinal; completa: PrecoFinal };
   /** Sete dos doze familiares são femininos — o texto tem que concordar. */
   generoDoFamiliar?: 'm' | 'f';
 }) {
@@ -62,8 +61,6 @@ export function Oferta({
     setIndo(produto);
     // Dois marcos: o genérico (compatível com o histórico) e o do plano
     // escolhido — sem o segundo, não dá para saber qual dos dois puxa gente.
-    marcar('pagamento_aberto');
-    marcar(produto === 'completa' ? 'plano_completa' : 'plano_revelacao');
     try {
       const r = await fetch(`/api/pedido/${pedidoId}/escolher`, {
         method: 'POST',

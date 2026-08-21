@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { marcar } from '@/lib/marcar';
 import { BuscaDeCidade, type CidadeEscolhida } from '@/components/funil/BuscaDeCidade';
 import { evento } from '@/lib/pixel';
 import { LinhaDeProgresso } from '@/components/LinhaDeProgresso';
@@ -155,60 +154,18 @@ export function RitualCliente({
     ? itens.findIndex((i) => i.id === atual.item!.id) + 1
     : 0;
 
-  const abriu = useRef(false);
-  useEffect(() => {
-    if (abriu.current) return;
-    abriu.current = true;
-    marcar('ritual_aberto');
-    if (daLanding) marcar('cena', 1);
-  }, [daLanding]);
-
   /**
-   * Um marco por campo do formulário final, na primeira vez que ele fica
-   * válido.
+   * `Lead` no pixel, uma vez por ritual.
    *
-   * Antes eram marcos de ETAPA — "chegou na tela do nome". Com os três campos
-   * numa tela só isso viraria um marco só, e a curva de desistência do último
-   * passo (a parte mais cara do funil, onde a pessoa já investiu 26 cenas)
-   * ficaria cega. Marcar por preenchimento diz qual campo trava.
-   *
-   * A ordem bate com a de `MARCOS` em `analitica.ts`: cena → nome → data →
-   * hora → e-mail. `plano_visto` não está aqui: ele é marcado na tela de
-   * revelação parcial, que é onde a oferta passou a viver.
+   * É o único evento que sai daqui: a pessoa deixou um endereço, então há
+   * alguém para o anúncio otimizar. O `Purchase` sai da tela de obrigado, com
+   * `event_id`, e a compra é confirmada pelo webhook.
    */
-  const marcados = useRef(new Set<string>());
-  function marcarUmaVez(marco: Parameters<typeof marcar>[0]) {
-    if (marcados.current.has(marco)) return;
-    marcados.current.add(marco);
-    marcar(marco);
-  }
+  const jaMarcouLead = useRef(false);
   useEffect(() => {
-    if (nome.trim()) marcarUmaVez('nome_ok');
-  }, [nome]);
-  useEffect(() => {
-    if (dataNascimento) marcarUmaVez('data_ok');
-  }, [dataNascimento]);
-  useEffect(() => {
-    if (horaNascimento) marcarUmaVez('hora_ok');
-  }, [horaNascimento]);
-  useEffect(() => {
-    if (email.includes('@')) {
-      marcarUmaVez('email_ok');
-      /*
-        `Lead` no navegador, uma vez por carregamento.
-
-        O servidor também enfileira este evento quando o pedido nasce, com o
-        mesmo peso — mas sem token de Conversions API ele não sai, e sem este
-        disparo a campanha ficaria sem nenhum sinal de lead para otimizar.
-
-        `marcados` garante uma vez por sessão de ritual; recarregar a página
-        conta de novo, o que é aceitável para um evento de topo de funil.
-      */
-      if (!marcados.current.has('lead')) {
-        marcados.current.add('lead');
-        evento('Lead');
-      }
-    }
+    if (jaMarcouLead.current || !email.includes('@')) return;
+    jaMarcouLead.current = true;
+    evento('Lead');
   }, [email]);
 
   function escolher(indiceOriginal: number, posicaoNaTela: number) {
@@ -217,7 +174,6 @@ export function RitualCliente({
     setEscolhaVisivel(posicaoNaTela);
     const respostasAtualizadas = { ...respostas, [atual.item.id]: indiceOriginal };
     setRespostas(respostasAtualizadas);
-    marcar('cena', numeroDaCena);
 
     // A pausa existe para a tinta assentar na opção escolhida antes de virar.
     // Sem ela a tela pula e a escolha não é confirmada visualmente.
@@ -282,7 +238,6 @@ export function RitualCliente({
         return;
       }
 
-      marcar('pedido_criado');
 
       // Cupom de 100%: não há o que cobrar, o servidor já liberou o pedido.
       /**

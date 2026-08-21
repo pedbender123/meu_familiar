@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Flame } from 'lucide-react';
 
 /**
- * Modo sem gateway: usado quando não há `MP_ACCESS_TOKEN`/chave pública
+ * Modo sem gateway: usado quando não há `DIRECTPAG_API_TOKEN`
  * configurados. Aprova na hora e segue o pipeline inteiro
  * (quiz → leitura → artes → link), que é como o projeto foi desenvolvido antes
  * de existir credencial de pagamento — e continua sendo o jeito de testar o
@@ -12,11 +12,8 @@ import { Flame } from 'lucide-react';
  */
 export function PagamentoFake({
   pedidoId,
-  /** `pedido` = funil do ritual; `cobranca` = assinatura. Ver CheckoutMercadoPago. */
-  base = 'pedido',
 }: {
   pedidoId: string;
-  base?: 'pedido' | 'cobranca';
 }) {
   // Já começa "enviando": a confirmação dispara sozinha ao montar, então esse
   // é o estado real na primeira renderização. Setar isso dentro do efeito
@@ -26,7 +23,7 @@ export function PagamentoFake({
 
   const confirmar = useCallback(async () => {
     try {
-      const resposta = await fetch(`/api/${base}/${pedidoId}/pagamento`, {
+      const resposta = await fetch(`/api/pedido/${pedidoId}/pagamento`, {
         method: 'POST',
       });
       const dados = await resposta.json();

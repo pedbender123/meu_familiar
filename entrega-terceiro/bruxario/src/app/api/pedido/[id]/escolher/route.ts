@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { atualizarPedido, buscarPedido, registrarEvento } from '@/lib/db';
 import { calcularExpiracao, ehProdutoValido, produtoDe } from '@/lib/produtos';
-import { precoComDesconto, validarCupom } from '@/lib/cupons';
-import { CUPOM_DE_LANCAMENTO } from '@/lib/lancamento';
+import { precoComDesconto } from '@/lib/preco';
 import { aposPagamento } from '@/lib/processar';
 import { excedeuLimite } from '@/lib/rate-limit';
-import { produtoVigente } from '@/lib/modelo-de-venda';
 
 /**
  * A escolha do plano, feita na tela de revelação parcial.
@@ -59,32 +57,14 @@ export async function POST(
    * interruptor estiver desligado, ela precisa custar o que a campanha está
    * vendendo — senão o funil entrega de graça o que o anúncio cobra.
    */
-  const produto = produtoVigente(corpo.produto);
+  const produto = produtoDe(corpo.produto);
 
-  /**
-   * O cupom digitado ganha do de lançamento quando é melhor.
-   *
-   * Não é generosidade: um amigo com o código de 100% que caísse nos 20% de
-   * lançamento por ordem de avaliação teria sido cobrado por engano, e é o tipo
-   * de erro que só aparece na fatura de alguém.
-   */
-  const manual = typeof corpo.cupom === 'string' ? validarCupom(corpo.cupom) : null;
-  const lancamento = validarCupom(CUPOM_DE_LANCAMENTO);
-
-  const candidatos = [manual, lancamento].filter(
-    (c): c is Extract<typeof lancamento, { ok: true }> => !!c && c.ok
-  );
-  const melhor = candidatos.sort(
-    (a, b) => b.cupom.desconto_percentual - a.cupom.desconto_percentual
-  )[0];
-
-  const desconto = melhor ? melhor.cupom.desconto_percentual : 0;
+  const desconto = 0;
   const preco = precoComDesconto(produto, desconto);
 
   atualizarPedido(id, {
     produto: produto.id,
-    cupom: melhor ? melhor.cupom.codigo : null,
-    desconto_percentual: melhor ? desconto : null,
+    desconto_percentual: null,
   });
 
   /**

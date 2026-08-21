@@ -9,17 +9,8 @@
     "lint": "eslint",
     "reprocessar": "tsx scripts/reprocessar.ts",
     "test": "dir=$(mktemp -d) && BRUXARIO_DIR_DADOS=\"$dir\" DIRECTPAG_OFFER_HASH=of_teste tsx --test --test-concurrency=1 \"src/**/*.test.ts\"; codigo=$?; rm -rf \"$dir\"; exit $codigo",
-    "lembrar-carrinho": "tsx scripts/lembrar-carrinho.ts",
-    "semear-mural": "tsx scripts/semear-mural.ts",
     "gerar-og": "tsx scripts/gerar-og.ts",
-    "resgatar-ritual": "tsx scripts/resgatar-ritual.ts",
-    "backup": "tsx scripts/backup.ts",
     "migrar": "tsx scripts/migrar.ts",
-    "ensaio": "tsx scripts/ensaio.ts",
-    "sentinela": "tsx scripts/sentinela.ts",
-    "capi": "tsx scripts/processar-fila-capi.ts",
-    "reconciliar": "tsx scripts/reconciliar.ts",
-    "alarmes": "tsx scripts/alarmes.ts",
     "licenca": "tsx scripts/licenca.ts"
   },
   "dependencies": {

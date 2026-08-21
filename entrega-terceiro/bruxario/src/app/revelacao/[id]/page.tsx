@@ -17,7 +17,6 @@ import { sessaoAtual } from '@/lib/sessao-servidor';
 import { RelatorioCompleto, type Perfil } from '@/components/RelatorioCompleto';
 import { TocaAudio } from '@/components/TocaAudio';
 import { buscarConta } from '@/lib/autenticacao';
-import { MarcaCompra } from '@/components/MarcaCompra';
 
 /**
  * Metadados por revelação: o card mostra o familiar DA PESSOA.
@@ -123,22 +122,6 @@ export default async function Revelacao({
     <>
       <PoeiraNaLuz />
 
-      {/*
-        Só a DONA dispara `Purchase` — este link é compartilhável, e quem
-        recebe de outra pessoa vê a mesma página sem ter comprado nada. Sem
-        essa guarda, cada visualização de quem recebeu o link contaria como
-        uma nova venda. `exemplo` também fica de fora: é amostra nossa para o
-        mural, não cliente de verdade.
-
-        O `event_id` dentro de `MarcaCompra` é o que faz este disparo e o de
-        `/obrigado` serem o mesmo acontecimento aos olhos da Meta.
-      */}
-      {ehADona && !pedido.exemplo && (
-        <MarcaCompra
-          pedidoId={id}
-          valorEmReais={(pedido.bruto_centavos ?? produto.precoCentavos) / 100}
-        />
-      )}
 
       {/*
         A composição segue a regra da estética: o que é grimório vai DENTRO da

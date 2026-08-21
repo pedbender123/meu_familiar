@@ -2,10 +2,9 @@ import { notFound, redirect } from 'next/navigation';
 import { buscarPedido } from '@/lib/db';
 import { pagamentoEhFake } from '@/nucleo/checkouts/directpag';
 import { produtoDe } from '@/lib/produtos';
-import { precoDoPedido } from '@/lib/cupons';
+import { precoDoPedido } from '@/lib/preco';
 import { CheckoutDirectPag } from '@/components/CheckoutDirectPag';
 import { PagamentoFake } from '@/components/PagamentoFake';
-import { MarcoDoCheckout } from '@/components/MarcoDoCheckout';
 import { FAMILIARES, type FamiliarId } from '@/lib/familiares';
 
 /**
@@ -28,14 +27,12 @@ export default async function Pagamento({
   if (pedido.status !== 'aguardando_pagamento') redirect(`/obrigado/${id}`);
 
   const produto = produtoDe(pedido.produto);
-  // O valor exibido sai da MESMA função que monta a cobrança no Mercado Pago,
-  // lendo o cupom gravado no pedido. Não existe caminho em que a tela mostre
-  // um preço e o cartão seja debitado por outro.
+  // O valor exibido sai da MESMA função que monta a cobrança no gateway. Não
+  // existe caminho em que a tela mostre um preço e a cobrança saia por outro.
   const preco = precoDoPedido(pedido);
 
   return (
     <main className="flex-1 flex flex-col items-center justify-center px-6 py-16">
-      <MarcoDoCheckout pedidoId={id} valorEmReais={preco.finalCentavos / 100} />
       {pagamentoEhFake() ? (
         <PagamentoFake pedidoId={id} />
       ) : (

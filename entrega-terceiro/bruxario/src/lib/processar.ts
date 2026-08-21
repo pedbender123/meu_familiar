@@ -9,7 +9,6 @@ import { gerarPdf } from './pdf';
 import { gerarNarracao, textoDaLeituraParaNarrar } from './narracao';
 import { pastaDoPedido } from './caminhos';
 import { centavosDeNarracao } from './custos';
-import { registrarUsoDeCupom } from './cupons';
 import { enviarContaCriada, enviarCompraConfirmada, enviarRevelacao } from './email';
 import {
   garantirConta,
@@ -245,7 +244,6 @@ export async function processarPedido(pedidoId: string): Promise<void> {
     // flag no pedido é o que impede reprocessamento e webhook repetido de
     // contarem o mesmo pedido duas vezes.
     if (pedido.cupom && !pedido.cupom_contabilizado) {
-      registrarUsoDeCupom(pedido.cupom);
       atualizarPedido(pedidoId, { cupom_contabilizado: 1 });
     }
 

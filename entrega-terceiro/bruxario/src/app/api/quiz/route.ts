@@ -9,17 +9,16 @@ import {
 } from '@/lib/db';
 import { validarEmail, validarNome } from '@/lib/validacao';
 import { calcularExpiracao, ehProdutoValido, PRODUTO_PADRAO, produtoDe } from '@/lib/produtos';
-import { precoComDesconto, validarCupom } from '@/lib/cupons';
-import { atribuicaoDoPedido } from '@/lib/rastreio';
+import { precoComDesconto } from '@/lib/preco';
 import { processarPedido, descreverPerfil } from '@/lib/processar';
 import { excedeuLimite } from '@/lib/rate-limit';
 import { ITENS } from '@/lib/quiz/itens';
 import { pontuar, type Respostas } from '@/lib/quiz/pontuacao';
 import { aplicarDesempate, opcoesDeDesempate } from '@/lib/quiz/desempate';
 import { FAMILIARES, type FamiliarId } from '@/lib/familiares';
-import { gerarMensagemDoFamiliar } from '@/lib/teaser';
 import { gerarVeu } from '@/lib/arte';
 import { coordenadaDoEstado } from '@/lib/coordenadas';
+import { gerarMensagemDoFamiliar } from '@/lib/teaser';
 
 /**
  * Fecha o ritual: pontua, decide o familiar e cria o pedido.
@@ -107,15 +106,7 @@ export async function POST(req: NextRequest) {
     ehProdutoValido(produto) ? produto : PRODUTO_PADRAO
   );
 
-  // O cupom é revalidado AQUI, contra o banco, mesmo que a tela já tenha
-  // conferido. A checagem da tela é conveniência visual; esta é a que decide
-  // o preço. Cupom inválido não derruba a venda — o pedido nasce sem desconto.
-  const conferido = typeof cupom === 'string' && cupom.trim()
-    ? validarCupom(cupom)
-    : null;
-  const descontoPercentual = conferido?.ok
-    ? conferido.cupom.desconto_percentual
-    : null;
+  const descontoPercentual: number | null = null;
   const preco = precoComDesconto(produtoEscolhido, descontoPercentual ?? 0);
 
   // SPEC 0.8: os 12 escores salvos, não só o vencedor. Extraído para
@@ -162,16 +153,7 @@ export async function POST(req: NextRequest) {
     // Produto inválido cai no padrão em vez de recusar o pedido: perder a
     // venda por causa de um parâmetro de UI é o pior desfecho possível.
     produto: produtoEscolhido.id,
-    cupom: conferido?.ok ? conferido.cupom.codigo : null,
     desconto_percentual: descontoPercentual,
-    // A origem vem do cookie gravado na PRIMEIRA visita, não de um campo do
-    // formulário: assim a venda é creditada a quem trouxe a pessoa, mesmo que
-    // ela tenha voltado dias depois digitando o endereço.
-    // Origem, campanha, peça e COMO o crédito foi decidido — tudo de uma vez.
-    // Ver `atribuicaoDoPedido`: primeiro toque vence, e-mail transacional não
-    // rouba crédito, remarketing é a única exceção que sobrescreve.
-    ...atribuicaoDoPedido(req.cookies),
-    visitante: req.cookies.get('bx_v')?.value ?? null,
     perfil_json: perfilJson,
     desempatado_pela_pessoa: desempatadoPelaPessoa ? 1 : 0,
   });

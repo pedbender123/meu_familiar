@@ -1,32 +1,18 @@
+import Link from 'next/link';
 import { sessaoAtual } from '@/lib/sessao-servidor';
-import { contatosAbertos } from '@/lib/db';
-import { Shell, type Area } from '@/components/painel/Shell';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * A moldura de toda a área administrativa.
+ * A moldura do painel — deliberadamente pequena.
  *
- * ── Por que a tela de entrar não recebe o shell ───────────────────────────
+ * O painel aqui serve a uma pergunta só: *"as vendas estão chegando e sendo
+ * entregues?"*. Não é ferramenta de análise, não mede campanha e não gerencia
+ * catálogo — quem quiser isso conecta o que preferir por fora.
  *
- * Ela é o único lugar do `/painel` que existe SEM sessão — desenhar a barra
- * lateral ali seria mostrar o menu de uma casa em que a pessoa ainda não
- * entrou. Sem sessão, o layout some e cada página cuida de si (a de entrar se
- * desenha inteira; as outras redirecionam).
- *
- * ── O script que evita o piscar ───────────────────────────────────────────
- *
- * O tema vive no `localStorage`, que só existe no navegador. Sem este script
- * o servidor mandaria sempre o escuro e quem escolheu claro veria a tela
- * trocar de cor depois de pintada. Ele roda antes da primeira pintura, é
- * minúsculo, e falha em silêncio se o storage estiver bloqueado.
+ * Sem sessão o layout some e cada página cuida de si: a de entrar se desenha
+ * inteira, as outras redirecionam.
  */
-const SCRIPT_DO_TEMA = `try{
-  var t = localStorage.getItem('bx_admin_tema');
-  if (t !== 'claro' && t !== 'escuro') t = 'escuro';
-  document.currentScript.parentElement.setAttribute('data-tema', t);
-}catch(e){}`;
-
 export default async function LayoutDoPainel({
   children,
 }: {
@@ -35,42 +21,25 @@ export default async function LayoutDoPainel({
   const sessao = await sessaoAtual();
   if (!sessao || sessao.tipo !== 'admin') return <>{children}</>;
 
-
-  // As contagens que viram bolinha no menu. São duas consultas leves e dizem
-  // "tem coisa te esperando" sem exigir que você abra cada área para olhar.
-  const abertos = contatosAbertos().length;
-
-  const areas: Area[] = [
-    { href: '/painel/central', rotulo: 'Central', icone: 'grafico' },
-    { href: '/painel/campanhas', rotulo: 'Campanhas', icone: 'alvo' },
-    { href: '/painel/rastreio', rotulo: 'Rastreio', icone: 'grafico' },
-    { href: '/painel/pedidos', rotulo: 'Pedidos', icone: 'caixa' },
-    /*
-      Assinantes fica ao lado de Pedidos porque são as duas metades da receita
-      — a que aconteceu uma vez e a que se repete. Separadas de propósito:
-      somar as duas na mesma tela é como se comemora um mês excepcional que
-      não vai voltar.
-    */
-    { href: '/painel/assinantes', rotulo: 'Assinantes', icone: 'moeda' },
-    { href: '/painel/financeiro', rotulo: 'Financeiro', icone: 'moeda' },
-    { href: '/painel/cupons', rotulo: 'Cupons', icone: 'etiqueta' },
-    { href: '/painel/contatos', rotulo: 'Contatos', icone: 'carta', alerta: abertos },
-    { href: '/painel/marcacoes', rotulo: 'Marcações', icone: 'estrela' },
-  ];
-
   return (
-    /*
-      `suppressHydrationWarning` porque o script abaixo TROCA `data-tema` antes
-      de o React hidratar: o servidor mandou "escuro", o script pôs "claro", e
-      o React acusaria divergência de atributo. A divergência é intencional —
-      é exatamente assim que o piscar de tema é evitado — e vale só para este
-      atributo, neste nó.
-    */
-    <div className="admin" data-tema="escuro" suppressHydrationWarning>
-      <script dangerouslySetInnerHTML={{ __html: SCRIPT_DO_TEMA }} />
-      <Shell areas={areas} email={sessao.email}>
-        {children}
-      </Shell>
+    <div className="min-h-screen flex flex-col bg-tinta">
+      <header className="flex items-center justify-between gap-4 px-5 py-4 border-b border-pergaminho/10">
+        <Link
+          href="/painel/pedidos"
+          className="font-corpo text-[0.62rem] tracking-[0.24em] uppercase text-vela"
+        >
+          Painel
+        </Link>
+        <div className="flex items-center gap-4">
+          <span className="font-corpo text-xs text-pergaminho/40">{sessao.email}</span>
+          <form action="/api/auth/sair" method="post">
+            <button className="font-corpo text-xs text-pergaminho/40 hover:text-pergaminho transition">
+              sair
+            </button>
+          </form>
+        </div>
+      </header>
+      <main className="flex-1 px-5 py-6">{children}</main>
     </div>
   );
 }

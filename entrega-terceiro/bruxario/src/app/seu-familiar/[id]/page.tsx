@@ -3,18 +3,15 @@ import { notFound, redirect } from 'next/navigation';
 import { PoeiraNaLuz } from '@/components/PoeiraNaLuz';
 import { RodapeLegal } from '@/components/RodapeLegal';
 import { Oferta } from '@/components/Oferta';
-import { MarcoDaOferta } from '@/components/MarcoDaOferta';
 import { SigiloFamiliar } from '@/components/SigiloFamiliar';
 import { BlocoRevelado } from '@/components/TextoEscrito';
 import { buscarPedido } from '@/lib/db';
 import { PRODUTOS } from '@/lib/produtos';
-import { precoComDesconto, validarCupom } from '@/lib/cupons';
-import { CUPOM_DE_LANCAMENTO } from '@/lib/lancamento';
+import { precoComDesconto } from '@/lib/preco';
 import { FAMILIARES, type FamiliarId } from '@/lib/familiares';
 import { GRUPOS, ehGrupo } from '@/lib/quiz/grupos';
 import { TOTAL_DE_ITENS } from '@/lib/quiz/itens';
 import type { Eixo } from '@/lib/quiz/eixos';
-import { produtoVigente } from '@/lib/modelo-de-venda';
 
 export const metadata = {
   title: 'Alguém atravessou por você — Bruxário',
@@ -65,15 +62,13 @@ export default async function SeuFamiliar({
   const grupo = ehGrupo(pedido.grupo) ? GRUPOS[pedido.grupo] : null;
   const familiar = FAMILIARES[pedido.familiar as FamiliarId];
 
-  const lancamento = validarCupom(CUPOM_DE_LANCAMENTO);
-  const desconto = lancamento.ok ? lancamento.cupom.desconto_percentual : 0;
+  const desconto = 0;
 
   const tracos = tracosDoPerfil(pedido.perfil_json);
 
   return (
     <>
       <PoeiraNaLuz />
-      <MarcoDaOferta />
       <main className="quarto-de-vela relative z-10 flex-1 flex flex-col items-center gap-10 sm:gap-12 px-5 py-12">
         {/* ── a chegada ── */}
         <section className="w-full max-w-md flex flex-col items-center gap-5 text-center">
@@ -175,8 +170,8 @@ export default async function SeuFamiliar({
           pedidoId={id}
           descontoPercentual={desconto}
           precos={{
-            revelacao: precoComDesconto(produtoVigente('revelacao'), desconto),
-            completa: precoComDesconto(produtoVigente('completa'), desconto),
+            revelacao: precoComDesconto(PRODUTOS.revelacao, desconto),
+            completa: precoComDesconto(PRODUTOS.completa, desconto),
           }}
           {...(pedido.ritual_completo === 1
             ? { generoDoFamiliar: familiar.genero }
