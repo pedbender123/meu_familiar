@@ -50,13 +50,93 @@ export function gatewayPadrao(): NomeDoGateway {
 }
 
 /**
+ * Quem cobra ESTA campanha.
+ *
+ * ── Por que a campanha decide ─────────────────────────────────────────────
+ *
+ * Duas campanhas rodando ao mesmo tempo podem precisar cair em contas
+ * diferentes — a do dono numa, a da agência noutra. Sem isto, a única forma
+ * de separar seria dois sites.
+ *
+ * O link do anúncio já carrega a origem (`utm_campaign`), ela já é gravada no
+ * pedido (`utm_json`) no momento da tentativa de pagamento, e o pedido é lido
+ * tanto pela tela de checkout quanto pela rota que cobra. Então a informação
+ * já estava toda lá; só faltava alguém perguntar.
+ *
+ * ── O formato ─────────────────────────────────────────────────────────────
+ *
+ *     GATEWAY_POR_CAMPANHA=agencia:wiven,black:mercadopago
+ *
+ * A comparação é por **trecho contido, sem acento de maiúscula**: a chave
+ * `agencia` pega `agencia-familiar-agosto` e `AGENCIA_frio`. O nome que a
+ * Meta devolve raramente é o que se digitou no gerenciador — exigir igualdade
+ * exata faria a regra falhar em silêncio, e falhar em silêncio aqui significa
+ * dinheiro caindo na conta errada.
+ *
+ * Em compensação, chave curta demais pega o que não devia. `ag` casaria com
+ * `viagem`. **Use o nome inteiro da campanha, ou um pedaço que só ela tenha.**
+ *
+ * A primeira chave que casar ganha; a ordem do `.env` é a ordem da decisão.
+ */
+export function gatewayDaCampanha(
+  campanha: string | null | undefined
+): NomeDoGateway | undefined {
+  const alvo = campanha?.trim().toLowerCase();
+  if (!alvo) return undefined;
+
+  for (const par of (process.env.GATEWAY_POR_CAMPANHA ?? '').split(',')) {
+    const corte = par.lastIndexOf(':');
+    if (corte < 1) continue;
+    const chave = par.slice(0, corte).trim().toLowerCase();
+    const nome = normalizar(par.slice(corte + 1));
+    if (chave && nome && alvo.includes(chave)) return nome;
+  }
+  return undefined;
+}
+
+/**
+ * A campanha de um pedido, como ela ficou gravada.
+ *
+ * `utm_campaign` primeiro, `utm_source` depois. O segundo cobre o caso do
+ * anúncio que só marca a rede — vale menos, mas separar "veio de algum
+ * anúncio" de "não veio de anúncio nenhum" já é o bastante para rotear.
+ */
+export function campanhaDoPedido(pedido: { utm_json?: string | null }): string | null {
+  if (!pedido.utm_json) return null;
+  try {
+    const utm = JSON.parse(pedido.utm_json) as Record<string, string>;
+    return utm.utm_campaign?.trim() || utm.utm_source?.trim() || null;
+  } catch {
+    // UTM malformado não pode impedir a cobrança — cai no gateway padrão.
+    return null;
+  }
+}
+
+/**
  * O gateway de um meio específico, considerando as sobreposições.
  *
- * A Cakto só é oferecida se houver credencial: pedir Cakto sem
+ * ── A ordem de quem manda ─────────────────────────────────────────────────
+ *
+ *   1. a **campanha** do pedido (`GATEWAY_POR_CAMPANHA`)
+ *   2. o meio (`GATEWAY_PIX` / `GATEWAY_CARTAO`)
+ *   3. o padrão (`GATEWAY`)
+ *   4. Mercado Pago
+ *
+ * A campanha vem primeiro porque é a regra mais específica que existe: ela
+ * fala de UMA origem de tráfego, enquanto as outras falam do site inteiro.
+ * Quem escreve "esta campanha vai para a Wiven" não espera que um
+ * `GATEWAY_PIX` global mude isso pelas costas.
+ *
+ * Um gateway sem credencial nunca é oferecido: pedir Cakto sem
  * `CAKTO_CLIENT_ID` cairia em erro na hora de cobrar, e o sintoma seria uma
  * venda perdida em vez de um aviso no log.
  */
-export function gatewayDe(meio: MeioDePagamento): NomeDoGateway {
+export function gatewayDe(
+  meio: MeioDePagamento,
+  campanha?: string | null
+): NomeDoGateway {
+  const daCampanha = gatewayDaCampanha(campanha);
+
   const especifico =
     meio === 'pix'
       ? normalizar(process.env.GATEWAY_PIX)
@@ -64,7 +144,7 @@ export function gatewayDe(meio: MeioDePagamento): NomeDoGateway {
         ? normalizar(process.env.GATEWAY_CARTAO)
         : undefined;
 
-  const escolhido = especifico ?? gatewayPadrao();
+  const escolhido = daCampanha ?? especifico ?? gatewayPadrao();
 
   if (escolhido === 'cakto' && !caktoConfigurada()) {
     console.warn(
@@ -111,8 +191,11 @@ export function provedorDe(nome: NomeDoGateway): ProvedorPagamento {
 }
 
 /** O provedor que deve cobrar um meio, já resolvido. */
-export function provedorPara(meio: MeioDePagamento): ProvedorPagamento {
-  return provedorDe(gatewayDe(meio));
+export function provedorPara(
+  meio: MeioDePagamento,
+  campanha?: string | null
+): ProvedorPagamento {
+  return provedorDe(gatewayDe(meio, campanha));
 }
 
 /**

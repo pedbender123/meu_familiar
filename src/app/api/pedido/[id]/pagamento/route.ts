@@ -5,7 +5,7 @@ import {
   statusLiberaAcesso,
   type FormDataBrick,
 } from '@/nucleo/checkouts/mercadopago';
-import { provedorPara, gatewayDe, meioDe } from '@/nucleo/checkouts/gateway';
+import { provedorPara, gatewayDe, meioDe, campanhaDoPedido } from '@/nucleo/checkouts/gateway';
 import type { DadosCaktoDoFront } from '@/nucleo/checkouts/cakto';
 import type { DadosCriacaoWiven } from '@/nucleo/checkouts/wiven';
 import { reportarVenda } from '@/lib/reportar-venda';
@@ -109,8 +109,23 @@ export async function POST(
    * rollback uma variável de ambiente em vez de um deploy.
    */
   const meio = meioDe(cakto?.metodo ?? wiven?.meio ?? form.payment_method_id);
-  const nomeDoGateway = gatewayDe(meio);
-  const provedor = provedorPara(meio);
+
+  /**
+   * A campanha sai do UTM do pedido, e não do corpo desta requisição.
+   *
+   * O corpo vem do navegador. Deixar o cliente dizer de qual campanha ele veio
+   * seria deixar o cliente escolher em qual conta o dinheiro cai — e a
+   * primeira pessoa a descobrir isso não seria um cliente.
+   *
+   * O UTM do pedido, sim, foi gravado por nós na primeira visita. Nos casos
+   * em que ele ainda não existe (a gravação acontece logo abaixo), o `utm`
+   * recém-chegado serve de reforço: os dois vêm da mesma sessão.
+   */
+  const campanha =
+    campanhaDoPedido(pedido) ?? utm?.utm_campaign?.trim() ?? utm?.utm_source?.trim() ?? null;
+
+  const nomeDoGateway = gatewayDe(meio, campanha);
+  const provedor = provedorPara(meio, campanha);
 
   /**
    * **A tentativa é gravada ANTES de a cobrança sair.**
