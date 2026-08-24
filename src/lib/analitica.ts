@@ -466,11 +466,23 @@ export function registrarVisita(v: {
   origem: string | null;
   referencia: string | null;
   dispositivo: string | null;
+  /**
+   * A campanha DESTE toque, não a que levou o crédito.
+   *
+   * O pedido guarda um crédito só; aqui fica a sequência. Quem clicou na
+   * campanha A na terça e na B na quinta deixa duas linhas, e "de qual link
+   * essa venda veio mesmo?" passa a ter resposta em vez de opinião — o que
+   * importa agora que a campanha escolhe em qual conta o dinheiro cai.
+   */
+  campanha_id?: string | null;
+  peca_id?: string | null;
 }): void {
   db.prepare(
-    `INSERT INTO visitas (visitante, caminho, origem, referencia, dispositivo, criado_em)
-     VALUES (@visitante, @caminho, @origem, @referencia, @dispositivo, @agora)`
-  ).run({ ...v, agora: new Date().toISOString() });
+    `INSERT INTO visitas
+      (visitante, caminho, origem, referencia, dispositivo, campanha_id, peca_id, criado_em)
+     VALUES (@visitante, @caminho, @origem, @referencia, @dispositivo,
+       @campanha_id, @peca_id, @agora)`
+  ).run({ campanha_id: null, peca_id: null, ...v, agora: new Date().toISOString() });
 }
 
 /* ── marcos da jornada ─────────────────────────────────────────────────── */

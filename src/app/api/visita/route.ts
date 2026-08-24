@@ -188,6 +188,10 @@ export async function POST(req: NextRequest) {
       // identificadores do outro site, e o domínio já responde a pergunta.
       referencia: dominioDe(corpo.referencia),
       dispositivo,
+      // O toque, não o crédito: `deveSubstituir` pode recusar este clique, e
+      // é justamente o clique recusado que se quer poder auditar depois.
+      campanha_id: campanha?.id ?? null,
+      peca_id: peca?.id ?? null,
     });
   } catch (erro) {
     // Analítica nunca pode derrubar o site. Falhou, perdeu-se um ponto.
