@@ -215,12 +215,70 @@ export interface SplitWiven {
 /** O teto: sempre sobra algo para a conta que cobrou. */
 const MAXIMO_REPASSADO = 0.99;
 
+/**
+ * A taxa da Wiven, para o split ser calculado sobre o que realmente entra.
+ *
+ * Faixa de R$ 0–10 mil/mês: **5,99% + R$ 1,99**. Configurável porque a faixa
+ * muda com o volume (4,99% + R$ 1,49 até 100 mil), e uma taxa desatualizada
+ * aqui vira repasse maior do que o combinado — silenciosamente.
+ */
+function taxaEstimadaCentavos(precoCentavos: number): number {
+  const percentual = Number(process.env.WIVEN_TAXA_PERCENTUAL ?? '5.99');
+  const fixaCentavos = Number(process.env.WIVEN_TAXA_FIXA_CENTAVOS ?? '199');
+  const pct = Number.isFinite(percentual) ? percentual : 5.99;
+  const fixa = Number.isFinite(fixaCentavos) ? fixaCentavos : 199;
+  return Math.ceil((precoCentavos * pct) / 100) + fixa;
+}
+
+/**
+ * Sobre quanto as porcentagens incidem.
+ *
+ * ── Por que o padrão é o LÍQUIDO ──────────────────────────────────────────
+ *
+ * Um acordo de 40/40/20 quer dizer que cada um leva sua fatia **do que
+ * sobrou**, não do que o cliente pagou. E a diferença aqui é brutal: numa
+ * venda de R$ 9,80 a Wiven leva R$ 2,58 — 26%.
+ *
+ * Calculado sobre o bruto, quem cobra paga a taxa inteira sozinho: mandaria
+ * R$ 3,92 + R$ 1,96 aos outros dois e ficaria com R$ 3,92 − R$ 2,58 = R$ 1,34.
+ * Os 40% dele viram 14% na prática, e os outros dois recebem cheio.
+ *
+ * Sobre o líquido, a conta fecha: líquido R$ 7,22, fatias de R$ 2,88 e
+ * R$ 1,44 saem como split, e quem cobrou fica com 9,80 − 4,32 − 2,58 =
+ * R$ 2,90. Os três levam a fatia combinada, e a taxa é dividida na mesma
+ * proporção.
+ *
+ * `WIVEN_SPLIT_BASE=bruto` volta ao cálculo sobre o valor cheio, para o caso
+ * de o acordo ser esse.
+ */
+function baseDoSplit(precoCentavos: number): number {
+  if (process.env.WIVEN_SPLIT_BASE === 'bruto') return precoCentavos;
+  return precoCentavos - taxaEstimadaCentavos(precoCentavos);
+}
+
 export function splitsDe(precoCentavos: number): SplitWiven[] {
   const bruto = (process.env.WIVEN_SPLITS ?? '').trim();
   if (!bruto || precoCentavos <= 0) return [];
 
+  /**
+   * Base não-positiva acontece de verdade: no upgrade de R$ 4,90 a taxa é
+   * R$ 2,28 — quase metade. Se um dia o preço ficar abaixo da taxa, dividir
+   * um número negativo geraria split negativo, e o gateway recusaria a
+   * cobrança. Quem cobrou absorve, e a venda acontece.
+   */
+  const base = baseDoSplit(precoCentavos);
+  if (base <= 0) {
+    console.warn(
+      `[wiven] sem split em cobrança de ${precoCentavos} centavos: ` +
+        'a taxa come o valor inteiro.'
+    );
+    return [];
+  }
+
   const partes: SplitWiven[] = [];
   let repassadoCentavos = 0;
+  // O teto continua sobre o PREÇO, não sobre a base: é o preço que o gateway
+  // compara com a soma dos splits ao recusar a cobrança.
   const teto = Math.floor(precoCentavos * MAXIMO_REPASSADO);
 
   for (const par of bruto.split(',')) {
@@ -232,7 +290,7 @@ export function splitsDe(precoCentavos: number): SplitWiven[] {
     if (!produtor) continue;
     if (!Number.isFinite(percentual) || percentual <= 0 || percentual >= 100) continue;
 
-    const centavos = Math.floor((precoCentavos * percentual) / 100);
+    const centavos = Math.floor((base * percentual) / 100);
     if (centavos <= 0) continue;
 
     /**

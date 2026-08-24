@@ -529,36 +529,64 @@ describe('a Wiven entrega o mesmo evento duas vezes', () => {
 });
 
 describe('o split da venda', () => {
-  const g = process.env.WIVEN_SPLITS;
+  const g = { ...process.env };
+  const usar = (splits: string, base?: string) => {
+    process.env.WIVEN_SPLITS = splits;
+    if (base === undefined) delete process.env.WIVEN_SPLIT_BASE;
+    else process.env.WIVEN_SPLIT_BASE = base;
+  };
   const restaurar = () => {
-    if (g === undefined) delete process.env.WIVEN_SPLITS;
-    else process.env.WIVEN_SPLITS = g;
+    for (const k of ['WIVEN_SPLITS', 'WIVEN_SPLIT_BASE', 'WIVEN_TAXA_PERCENTUAL', 'WIVEN_TAXA_FIXA_CENTAVOS']) {
+      if (g[k] === undefined) delete process.env[k];
+      else process.env[k] = g[k];
+    }
   };
 
   /**
    * O formato veio da validação da própria API: `producerId` string
    * obrigatória, `amount` number obrigatório. `amount` é VALOR em reais, não
-   * percentual — por isso a conta é feita aqui, sobre o preço cobrado.
+   * percentual — por isso a conta é feita aqui.
    */
-  test('cada porcentagem vira valor em reais', () => {
-    process.env.WIVEN_SPLITS = 'prod_a:40,prod_b:20';
+  test('a porcentagem incide sobre o LÍQUIDO, não sobre o que o cliente pagou', () => {
+    usar('joao:40,pedro:20');
+    // 9,80 − (5,99% + 1,99) = 9,80 − 2,58 = 7,22 de líquido
     assert.deepEqual(splitsDe(980), [
-      { producerId: 'prod_a', amount: 3.92 },
-      { producerId: 'prod_b', amount: 1.96 },
+      { producerId: 'joao', amount: 2.88 },
+      { producerId: 'pedro', amount: 1.44 },
     ]);
     restaurar();
   });
 
   /**
-   * O split TIRA da transação; o resto fica com quem cobrou. Num acordo
-   * 40/40/20 em que quem cobra é uma das partes, só DUAS entradas são
-   * configuradas — a terceira é o resto.
+   * ── A conta que justifica tudo isto ────────────────────────────────────
+   *
+   * Num acordo 40/40/20, cada um leva sua fatia DO QUE SOBROU. Sobre o bruto,
+   * quem cobra pagaria a taxa inteira sozinho: mandaria 3,92 + 1,96 e ficaria
+   * com 3,92 − 2,58 = 1,34. Os 40% dele viravam 14% na prática.
+   *
+   * Sobre o líquido a conta fecha, com no máximo um centavo de diferença por
+   * causa do arredondamento para baixo.
    */
-  test('o resto sobra para a conta que cobrou', () => {
-    process.env.WIVEN_SPLITS = 'prod_a:40,prod_b:20';
-    const total = splitsDe(1890).reduce((s, p) => s + p.amount, 0);
-    assert.equal(Number(total.toFixed(2)), 11.34);
-    assert.equal(Number((18.9 - total).toFixed(2)), 7.56, 'sobram 40% para quem cobrou');
+  test('quem cobrou fica com a própria fatia depois da taxa', () => {
+    usar('joao:40,pedro:20');
+    const preco = 980;
+    const taxa = 258;
+    const repassado = splitsDe(preco).reduce((soma, p) => soma + Math.round(p.amount * 100), 0);
+    const sobraDeQuemCobrou = preco - repassado - taxa;
+    const fatiaJusta = Math.floor((preco - taxa) * 0.4);
+    assert.ok(
+      Math.abs(sobraDeQuemCobrou - fatiaJusta) <= 2,
+      `quem cobrou ficou com ${sobraDeQuemCobrou}, a fatia justa é ${fatiaJusta}`
+    );
+    restaurar();
+  });
+
+  test('WIVEN_SPLIT_BASE=bruto volta ao valor cheio', () => {
+    usar('joao:40,pedro:20', 'bruto');
+    assert.deepEqual(splitsDe(980), [
+      { producerId: 'joao', amount: 3.92 },
+      { producerId: 'pedro', amount: 1.96 },
+    ]);
     restaurar();
   });
 
@@ -568,9 +596,32 @@ describe('o split da venda', () => {
    * arredondamento é muito pior que centavo a menos repassado.
    */
   test('arredonda para baixo, nunca para cima', () => {
-    process.env.WIVEN_SPLITS = 'prod_a:33';
+    usar('joao:33', 'bruto');
     // 490 * 33 / 100 = 161,7 → 161, nunca 162
     assert.equal(splitsDe(490)[0].amount, 1.61);
+    restaurar();
+  });
+
+  /**
+   * Acontece de verdade: no upgrade de R$ 4,90 a taxa é R$ 2,28 — quase
+   * metade. Se o preço ficar abaixo da taxa, dividir número negativo geraria
+   * split negativo e o gateway recusaria a cobrança. Quem cobrou absorve, e a
+   * venda acontece.
+   */
+  test('preço menor que a taxa não gera split negativo', () => {
+    usar('joao:40,pedro:20');
+    assert.deepEqual(splitsDe(100), []);
+    assert.deepEqual(splitsDe(199), []);
+    restaurar();
+  });
+
+  test('o upgrade de 4,90 ainda divide o que sobra', () => {
+    usar('joao:40,pedro:20');
+    // 4,90 − (0,30 + 1,99) = 2,61 de líquido
+    const r = splitsDe(490);
+    assert.equal(r.length, 2);
+    assert.ok(r[0].amount > 0 && r[1].amount > 0);
+    assert.ok(r[0].amount + r[1].amount < 4.9);
     restaurar();
   });
 
@@ -579,24 +630,33 @@ describe('o split da venda', () => {
    * erro de configuração que só apareceria na primeira venda recusada.
    */
   test('a soma tem teto, e o excesso é descartado com aviso', () => {
-    process.env.WIVEN_SPLITS = 'prod_a:60,prod_b:60';
+    usar('a:60,b:60', 'bruto');
     const r = splitsDe(1000);
     assert.equal(r.length, 1, 'a segunda entrada não cabe');
-    assert.equal(r[0].producerId, 'prod_a');
+    assert.equal(r[0].producerId, 'a');
     restaurar();
   });
 
   test('sem configuração, sem split', () => {
-    delete process.env.WIVEN_SPLITS;
+    usar('');
     assert.deepEqual(splitsDe(980), []);
-    process.env.WIVEN_SPLITS = '   ';
+    usar('   ');
     assert.deepEqual(splitsDe(980), []);
     restaurar();
   });
 
   test('entrada malformada é ignorada, não derruba as outras', () => {
-    process.env.WIVEN_SPLITS = 'lixo,prod_a:40,:30,prod_c:abc,prod_d:0';
-    assert.deepEqual(splitsDe(980), [{ producerId: 'prod_a', amount: 3.92 }]);
+    usar('lixo,joao:40,:30,c:abc,d:0', 'bruto');
+    assert.deepEqual(splitsDe(980), [{ producerId: 'joao', amount: 3.92 }]);
+    restaurar();
+  });
+
+  /** A faixa de taxa muda com o volume; desatualizada aqui vira repasse errado. */
+  test('a taxa é configurável', () => {
+    usar('joao:50', undefined);
+    process.env.WIVEN_TAXA_PERCENTUAL = '0';
+    process.env.WIVEN_TAXA_FIXA_CENTAVOS = '0';
+    assert.deepEqual(splitsDe(1000), [{ producerId: 'joao', amount: 5 }]);
     restaurar();
   });
 
@@ -605,3 +665,4 @@ describe('o split da venda', () => {
     assert.match(fonte, /\.\.\.\(splits\.length \? \{ splits \} : \{\}\)/);
   });
 });
+
