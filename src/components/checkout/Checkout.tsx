@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { QrCode, CreditCard } from 'lucide-react';
 import { CheckoutMercadoPago } from './MercadoPago';
 import { CheckoutCaktoPix } from './Cakto';
+import { CheckoutWiven } from './Wiven';
 import { marcar } from '@/lib/marcar';
 
 /**
@@ -37,7 +38,7 @@ import { marcar } from '@/lib/marcar';
 export type MeioEscolhido = 'pix' | 'cartao';
 
 /** Quem cobra cada meio. Vem do servidor, resolvido por `gatewayDe()`. */
-export type GatewayDoMeio = 'mercadopago' | 'cakto';
+export type GatewayDoMeio = 'mercadopago' | 'cakto' | 'wiven';
 
 export function Checkout({
   pedidoId,
@@ -74,6 +75,7 @@ export function Checkout({
   destino?: string;
 }) {
   const [meio, setMeio] = useState<MeioEscolhido>('pix');
+  const gatewayDoMeio = meio === 'pix' ? gatewayPix : gatewayCartao;
 
   function escolher(novo: MeioEscolhido) {
     if (novo === meio) return;
@@ -117,7 +119,23 @@ export function Checkout({
         Quem pediu menos movimento no sistema não recebe nenhum.
       */}
       <div key={`painel-${meio}`} className="painel-do-checkout">
-      {meio === 'pix' && gatewayPix === 'cakto' ? (
+      {/*
+        A tabela de despacho. Um gateway novo é uma linha aqui e uma no
+        `provedorDe` — nada mais no caminho da compra precisa saber que ele
+        existe.
+      */}
+      {gatewayDoMeio === 'wiven' ? (
+        <CheckoutWiven
+          key={`wiven-${meio}`}
+          pedidoId={pedidoId}
+          meio={meio}
+          valorEmReais={valorEmReais}
+          nome={nome}
+          cpf={cpf}
+          itens={itens}
+          destino={destino}
+        />
+      ) : meio === 'pix' && gatewayPix === 'cakto' ? (
         <CheckoutCaktoPix
           key="pix-cakto"
           pedidoId={pedidoId}

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Flame, Copy, Check } from 'lucide-react';
+import { utmsDaSessao } from './utms';
 
 /**
  * Pix pela Cakto.
@@ -40,27 +41,6 @@ function fingerprintDoDispositivo(): string {
     // Pior que estável, melhor que cobrança recusada por campo vazio.
     return `fp_${crypto.randomUUID()}`;
   }
-}
-
-/**
- * Os UTMs que o script da Utmify guardou, ou os da URL atual.
- *
- * Vão junto da cobrança para caírem também no painel da Cakto — a Utmify
- * recebe pelo servidor, mas ter a origem nos dois lugares é o que permite
- * conferir um contra o outro quando os números não baterem.
- */
-function utmsDaSessao(): Record<string, string> {
-  const utm: Record<string, string> = {};
-  try {
-    const params = new URLSearchParams(window.location.search);
-    for (const chave of ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content']) {
-      const valor = params.get(chave) ?? localStorage.getItem(`bruxario:${chave}`);
-      if (valor) utm[chave] = valor;
-    }
-  } catch {
-    // Sem UTM a venda acontece igual; ela só aparece como direta no relatório.
-  }
-  return utm;
 }
 
 interface PixGerado {

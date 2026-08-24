@@ -362,27 +362,140 @@ export class ProvedorWiven implements ProvedorPagamento {
   }
 
   /**
-   * ── Ainda não implementados ─────────────────────────────────────────────
+   * `GET /gateway/transactions`, por `id` ou por `clientIdentifier`.
    *
-   * Consulta, estorno e listagem por período dependem de documentação que
-   * ainda não chegou. Lançar é melhor que devolver `null`: `null` faria a
-   * reconciliação concluir em silêncio que não há nada a reconciliar, e o
-   * painel financeiro mostraria zero como se fosse resposta.
+   * `clientIdentifier` é o nosso `identifier` de volta — a documentação diz
+   * "corresponde ao valor enviado por você na criação". É o que torna a
+   * consulta útil quando o webhook chegou sem `identifier`.
    *
-   * Nada disso bloqueia a primeira venda — bloqueiam o pós-venda, e o
-   * `gateway.ts` não roteia para cá enquanto o webhook não existir.
+   * ── Cuidado com o dinheiro aqui ───────────────────────────────────────
+   *
+   * Este endpoint tem o TERCEIRO vocabulário de dinheiro da Wiven:
+   * `chargeAmount` é "valor pago pelo cliente" e `amount` é "o valor que você
+   * vai receber". Nenhum dos dois é a taxa, e não há campo de taxa nenhum.
+   *
+   * Então a taxa fica `null` de propósito. Inventá-la a partir da diferença
+   * entre os dois seria chutar: a diferença existe por juros de parcelamento
+   * do checkout interno, não pela nossa taxa. Quem sabe a taxa é o webhook,
+   * pelo `commissionAmount`, e é de lá que o painel financeiro se alimenta.
    */
-  async consultarPagamento(_idExterno: string): Promise<ResultadoPagamento | null> {
-    throw new Error('[wiven] consulta ainda não implementada — falta a documentação do GET');
+  async consultarPagamento(idExterno: string): Promise<ResultadoPagamento | null> {
+    try {
+      const resposta = await chamar(`/gateway/transactions?id=${encodeURIComponent(idExterno)}`);
+      if (!resposta.ok) {
+        console.error(`[wiven] consulta a ${idExterno} falhou (${resposta.status})`);
+        return null;
+      }
+
+      const corpo = (await resposta.json()) as RespostaConsultaWiven | RespostaConsultaWiven[];
+      // "Buscar transações", no plural — mas com `id` volta uma só. Aceita as
+      // duas formas em vez de apostar em qual delas a rota devolve hoje.
+      const t = Array.isArray(corpo) ? corpo[0] : corpo;
+      if (!t?.id) return null;
+
+      return traduzirConsulta(t);
+    } catch (erro) {
+      console.error(`[wiven] consulta a ${idExterno} lançou:`, erro);
+      return null;
+    }
   }
 
-  async estornar(_idExterno: string): Promise<{ ok: boolean; erro?: string }> {
-    return { ok: false, erro: '[wiven] estorno ainda não implementado' };
+  /**
+   * `POST /gateway/producer/refunds`.
+   *
+   * **Não é estorno imediato: é solicitação.** A resposta volta `PENDING` e
+   * "entra em análise". Diferente do Mercado Pago, onde o estorno é o fato.
+   *
+   * Quem chama isto (o botão do painel) precisa saber: `ok: true` aqui
+   * significa "pedido registrado", não "dinheiro devolvido".
+   */
+  async estornar(idExterno: string): Promise<{ ok: boolean; erro?: string }> {
+    try {
+      const resposta = await chamar('/gateway/producer/refunds', {
+        method: 'POST',
+        body: JSON.stringify({
+          transactionId: idExterno,
+          reason: 'Estorno solicitado pelo painel do Bruxário',
+        }),
+      });
+
+      if (resposta.ok) return { ok: true };
+
+      const texto = await resposta.text();
+
+      /**
+       * 422 com reembolso já existente **não é falha**.
+       *
+       * O botão do painel pode ser clicado duas vezes, e a segunda tentativa
+       * devolver erro faria alguém achar que o estorno não aconteceu e ir
+       * mexer no gateway à mão. O desfecho desejado já está de pé.
+       */
+      if (resposta.status === 422 && /reembolso/i.test(texto)) {
+        return { ok: true };
+      }
+
+      return { ok: false, erro: `[wiven] estorno recusado (${resposta.status}): ${texto}` };
+    } catch (erro) {
+      return { ok: false, erro: `[wiven] estorno lançou: ${String(erro)}` };
+    }
   }
 
+  /**
+   * ── Não dá para implementar, e o silêncio seria pior ────────────────────
+   *
+   * `GET /gateway/transactions` aceita `id` e `clientIdentifier`. **Não
+   * aceita intervalo de datas.** A alternativa seria consultar uma a uma as
+   * nossas vendas do período — que é exatamente o padrão que a documentação
+   * deles desencoraja no item "Polling bloqueado".
+   *
+   * Devolver `[]` seria a saída fácil e a pior: a reconciliação concluiria em
+   * silêncio que a Wiven não tem nenhum pagamento aprovado no período, e
+   * marcaria como suspeita toda venda que o webhook gravou direito. Um alarme
+   * que grita errado é pior que alarme nenhum — quem apaga o alarme uma vez
+   * apaga sempre.
+   *
+   * Então lança. Reconciliação que não pode rodar precisa dizer isso.
+   */
   async listarPagosNoPeriodo(_desde: Date, _ate: Date): Promise<PagamentoResumido[]> {
-    throw new Error('[wiven] listagem ainda não implementada — falta a documentação');
+    throw new Error(
+      '[wiven] a API não filtra transações por período — reconciliação indisponível'
+    );
   }
+}
+
+/* ── a consulta ───────────────────────────────────────────────────────────*/
+
+export interface RespostaConsultaWiven {
+  id?: string;
+  clientIdentifier?: string | null;
+  status?: string;
+  paymentMethod?: string;
+  /** "Valor que você vai receber". */
+  amount?: number;
+  /** "Valor pago pelo cliente" — é este que vale como bruto da venda. */
+  chargeAmount?: number;
+  statusDescription?: string | null;
+  errorDescription?: string | null;
+  payedAt?: string | null;
+  refundedAt?: string | null;
+  pixInformation?: { qrCode?: string; image?: string; base64?: string } | null;
+}
+
+export function traduzirConsulta(t: RespostaConsultaWiven): ResultadoPagamento {
+  return {
+    idExterno: t.id ?? '',
+    status: traduzirStatus(t.status),
+    statusDetalhe: t.statusDescription ?? t.errorDescription ?? '',
+    referenciaExterna: pedidoDoIdentificador(t.clientIdentifier),
+    brutoCentavos: emCentavos(t.chargeAmount) ?? emCentavos(t.amount),
+    // Não existe campo de taxa nesta rota. Ver o comentário em `consultarPagamento`.
+    taxaCentavos: null,
+    liquidoCentavos: null,
+    metodo: t.paymentMethod === 'PIX' ? 'pix' : (t.paymentMethod?.toLowerCase() ?? null),
+    pix: t.pixInformation?.qrCode
+      ? { copiaECola: t.pixInformation.qrCode, qrBase64: '', qrUrl: t.pixInformation.image }
+      : undefined,
+  };
 }
 
 /* ── o corpo do webhook ───────────────────────────────────────────────────*/

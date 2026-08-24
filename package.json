@@ -20,6 +20,7 @@
     "migrar": "tsx scripts/migrar.ts",
     "cakto-setup": "tsx scripts/cakto-setup.ts",
     "cakto-fumaca": "tsx scripts/cakto-fumaca.ts",
+    "wiven-fumaca": "tsx scripts/wiven-fumaca.ts",
     "ensaio": "tsx scripts/ensaio.ts",
     "sentinela": "tsx scripts/sentinela.ts",
     "capi": "tsx scripts/processar-fila-capi.ts",

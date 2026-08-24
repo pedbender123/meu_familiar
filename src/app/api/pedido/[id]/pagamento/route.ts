@@ -7,6 +7,7 @@ import {
 } from '@/nucleo/checkouts/mercadopago';
 import { provedorPara, gatewayDe, meioDe } from '@/nucleo/checkouts/gateway';
 import type { DadosCaktoDoFront } from '@/nucleo/checkouts/cakto';
+import type { DadosCriacaoWiven } from '@/nucleo/checkouts/wiven';
 import { reportarVenda } from '@/lib/reportar-venda';
 import { calcularExpiracao, produtoDe } from '@/lib/produtos';
 import { produtoVigenteDe } from '@/lib/modelo-de-venda';
@@ -70,18 +71,28 @@ export async function POST(
 
   let form: FormDataBrick;
   let cakto: DadosCaktoDoFront | undefined;
+  let wiven: DadosCriacaoWiven['wiven'] | undefined;
+  let utm: Record<string, string> | undefined;
   try {
     const corpo = await req.json();
     /**
-     * Dois fronts, um endpoint.
+     * Três fronts, um endpoint.
      *
-     * O Payment Brick manda `{ formData }`; a nossa tela de Pix da Cakto manda
-     * `{ cakto }`. Quem decidir o gateway a partir daqui precisa saber qual
-     * dos dois chegou — e não dá para adivinhar pelo `payment_method_id`,
-     * porque a Cakto não manda esse campo.
+     * O Payment Brick manda `{ formData }`; a tela da Cakto manda `{ cakto }`;
+     * a da Wiven manda `{ wiven }`. Quem decidir o gateway a partir daqui
+     * precisa saber qual dos três chegou — e não dá para adivinhar pelo
+     * `payment_method_id`, porque nem Cakto nem Wiven mandam esse campo.
      */
     cakto = corpo?.cakto;
-    form = corpo?.formData ?? (cakto ? { payment_method_id: cakto.metodo } : corpo);
+    wiven = corpo?.wiven;
+    utm = cakto?.utm ?? corpo?.utm;
+    form =
+      corpo?.formData ??
+      (cakto
+        ? { payment_method_id: cakto.metodo }
+        : wiven
+          ? { payment_method_id: wiven.meio === 'pix' ? 'pix' : 'credit_card' }
+          : corpo);
     if (!form?.payment_method_id) throw new Error('payment_method_id ausente');
   } catch {
     return NextResponse.json(
@@ -97,7 +108,7 @@ export async function POST(
    * `.env` e reiniciar passa a valer sem rebuild — que é o que torna o
    * rollback uma variável de ambiente em vez de um deploy.
    */
-  const meio = meioDe(cakto?.metodo ?? form.payment_method_id);
+  const meio = meioDe(cakto?.metodo ?? wiven?.meio ?? form.payment_method_id);
   const nomeDoGateway = gatewayDe(meio);
   const provedor = provedorPara(meio);
 
@@ -121,7 +132,9 @@ export async function POST(
     // saber a quem pedir estorno, e o que a reconciliação usa para saber
     // contra qual extrato comparar.
     gateway: nomeDoGateway,
-    ...(cakto?.telefone ? { telefone: cakto.telefone } : {}),
+    ...(cakto?.telefone || wiven?.telefone
+      ? { telefone: cakto?.telefone ?? wiven?.telefone }
+      : {}),
     /**
      * UTMs e IP, gravados no pedido.
      *
@@ -132,9 +145,7 @@ export async function POST(
      * `ip_comprador` sai do cabeçalho e não do corpo: IP mandado pelo cliente
      * é IP escolhido pelo cliente.
      */
-    ...(cakto?.utm && Object.keys(cakto.utm).length
-      ? { utm_json: JSON.stringify(cakto.utm) }
-      : {}),
+    ...(utm && Object.keys(utm).length ? { utm_json: JSON.stringify(utm) } : {}),
     ip_comprador: ip === 'local' ? null : ip.split(',')[0].trim(),
   });
   registrarEvento('pagamento_tentado', id);
@@ -144,6 +155,16 @@ export async function POST(
       form,
       // Ignorado pelo Mercado Pago; é o que a Cakto precisa para cobrar.
       ...(cakto ? { cakto: { ...cakto, cupomCodigo: pedido.cupom ?? undefined } } : {}),
+      /**
+       * O IP vem do CABEÇALHO, sobrescrevendo o que o front mandar.
+       *
+       * A Wiven exige `clientIp` no cartão e usa isso no antifraude. IP
+       * mandado pelo cliente é IP escolhido pelo cliente — e num campo que
+       * alimenta antifraude isso é exatamente o que não pode acontecer.
+       */
+      ...(wiven
+        ? { wiven: { ...wiven, ip: ip === 'local' ? '127.0.0.1' : ip.split(',')[0].trim() } }
+        : {}),
       /**
        * `produtoVigente`, nunca `produtoDe`.
        *
@@ -216,6 +237,8 @@ export async function POST(
             pix: {
               copiaECola: resultado.pix.copiaECola,
               qrBase64: resultado.pix.qrBase64,
+              // A Wiven deprecou o base64 e manda uma URL. Ver `wiven.ts`.
+              qrUrl: resultado.pix.qrUrl,
             },
           }
         : {}),

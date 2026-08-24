@@ -203,14 +203,65 @@ describe('o cartão só passa', () => {
 });
 
 describe('nasce desligado', () => {
+  const fonte = codigoDe('src/nucleo/checkouts/gateway.ts');
+
   /**
-   * Enquanto o webhook não existir, nada pode rotear para cá: sem webhook
-   * nada libera acesso, e uma venda cobrada que nunca entrega é pior que uma
-   * venda não feita.
+   * O padrão é Mercado Pago. Esquecer de configurar não pode mandar dinheiro
+   * para um gateway que ninguém testou.
    */
-  test('o roteador ainda não conhece o nome wiven', () => {
-    const fonte = codigoDe('src/nucleo/checkouts/gateway.ts');
-    assert.doesNotMatch(fonte, /wiven/i);
+  test('a Wiven só cobra quando alguém pede por nome', () => {
+    assert.match(fonte, /normalizar\(process\.env\.GATEWAY\) \?\? 'mercadopago'/);
+  });
+
+  /**
+   * ── A checagem que evita o pior desfecho possível ───────────────────────
+   *
+   * As chaves da API bastam para CRIAR a cobrança. Mas quem libera acesso é
+   * o webhook, e `/api/webhook/wiven` recusa tudo sem `WIVEN_WEBHOOK_TOKEN`.
+   *
+   * Uma Wiven configurada pela metade — chaves sim, token não — cobraria
+   * normalmente e nunca entregaria. Dinheiro na conta, cliente sem produto, e
+   * o único vestígio num log de webhook que ninguém abre. Configuração pela
+   * metade tem que falhar na porta de entrada.
+   */
+  test('sem token de webhook, a Wiven não cobra', () => {
+    assert.match(fonte, /escolhido === 'wiven' && !tokenDoWebhook\(\)/);
+  });
+
+  test('sem chaves de API, a Wiven não cobra', () => {
+    assert.match(fonte, /escolhido === 'wiven' && !wivenConfigurada\(\)/);
+  });
+
+  /** Os dois desvios caem no Mercado Pago, nunca num erro na cara de quem compra. */
+  test('todo desvio volta para o Mercado Pago', () => {
+    const trechos = fonte.split("escolhido === 'wiven'").slice(1);
+    assert.equal(trechos.length, 2);
+    for (const t of trechos) assert.match(t, /return 'mercadopago';/);
+  });
+});
+
+describe('o cartão da Wiven não deixa rastro no navegador', () => {
+  const fonte = codigoDe('src/components/checkout/Wiven.tsx');
+
+  /**
+   * Não há tokenização: os campos vivem em estado de React e morrem com a
+   * aba. Persistir qualquer um deles colocaria PAN no disco de quem comprou.
+   */
+  test('nada é gravado em storage nem em cookie', () => {
+    assert.doesNotMatch(fonte, /localStorage|sessionStorage|document\.cookie/);
+  });
+
+  /**
+   * Etapa escondida por CSS ainda é campo tabulável, e o leitor de tela
+   * anunciaria treze campos onde a tela mostra quatro.
+   */
+  test('a etapa não visível fica fora do DOM', () => {
+    assert.match(fonte, /if \(!visivel\) return null;/);
+  });
+
+  /** Serviço de CEP fora do ar não pode virar venda perdida. */
+  test('o CEP que falha libera os campos à mão', () => {
+    assert.match(fonte, /cepFalhou/);
   });
 });
 

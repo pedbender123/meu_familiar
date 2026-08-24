@@ -1,5 +1,6 @@
 import { pagamento as mercadopago, type ProvedorPagamento } from './mercadopago';
 import { ProvedorCakto, caktoConfigurada } from './cakto';
+import { ProvedorWiven, wivenConfigurada, tokenDoWebhook } from './wiven';
 
 /**
  * Quem cobra.
@@ -25,16 +26,19 @@ import { ProvedorCakto, caktoConfigurada } from './cakto';
  * volta ao Mercado Pago sem desistir do resto.
  */
 
-export type NomeDoGateway = 'mercadopago' | 'cakto';
+export type NomeDoGateway = 'mercadopago' | 'cakto' | 'wiven';
 
 /** Como o front nomeia o meio, já normalizado. */
 export type MeioDePagamento = 'pix' | 'cartao' | 'boleto';
 
 const caktoInstancia = new ProvedorCakto();
+const wivenInstancia = new ProvedorWiven();
+
+const NOMES: readonly NomeDoGateway[] = ['mercadopago', 'cakto', 'wiven'];
 
 function normalizar(valor: string | undefined): NomeDoGateway | undefined {
-  const limpo = valor?.trim().toLowerCase();
-  return limpo === 'cakto' || limpo === 'mercadopago' ? limpo : undefined;
+  const limpo = valor?.trim().toLowerCase() as NomeDoGateway | undefined;
+  return limpo && NOMES.includes(limpo) ? limpo : undefined;
 }
 
 /**
@@ -69,11 +73,41 @@ export function gatewayDe(meio: MeioDePagamento): NomeDoGateway {
     return 'mercadopago';
   }
 
+  if (escolhido === 'wiven' && !wivenConfigurada()) {
+    console.warn(
+      `[gateway] ${meio} pedia Wiven, mas falta WIVEN_PUBLIC_KEY/SECRET — usando Mercado Pago.`
+    );
+    return 'mercadopago';
+  }
+
+  /**
+   * **Sem token de webhook, a Wiven não cobra.**
+   *
+   * As chaves da API bastam para criar a cobrança — e é justamente por isso
+   * que esta checagem existe. A rota `/api/webhook/wiven` recusa tudo quando
+   * `WIVEN_WEBHOOK_TOKEN` está vazio; então uma Wiven só com as chaves da API
+   * cobraria normalmente e **nunca entregaria**, porque só o webhook libera
+   * acesso. Dinheiro na conta, cliente sem produto, e o log da rota de
+   * webhook num arquivo que ninguém abre.
+   *
+   * Configuração pela metade tem que falhar na porta de entrada, não na porta
+   * de saída.
+   */
+  if (escolhido === 'wiven' && !tokenDoWebhook()) {
+    console.warn(
+      `[gateway] ${meio} pedia Wiven, mas falta WIVEN_WEBHOOK_TOKEN — ` +
+        'cobraria sem nunca entregar. Usando Mercado Pago.'
+    );
+    return 'mercadopago';
+  }
+
   return escolhido;
 }
 
 export function provedorDe(nome: NomeDoGateway): ProvedorPagamento {
-  return nome === 'cakto' ? caktoInstancia : mercadopago;
+  if (nome === 'cakto') return caktoInstancia;
+  if (nome === 'wiven') return wivenInstancia;
+  return mercadopago;
 }
 
 /** O provedor que deve cobrar um meio, já resolvido. */
@@ -85,7 +119,8 @@ export function provedorPara(meio: MeioDePagamento): ProvedorPagamento {
  * De onde o front nomeia o meio para o nosso vocabulário.
  *
  * O Brick manda `payment_method_id` com a bandeira (`master`, `visa`) ou
- * `pix`; a Cakto manda `credit_card`/`threeDs`/`pix`. Os dois desembocam aqui.
+ * `pix`; a Cakto manda `credit_card`/`threeDs`/`pix`; a Wiven manda
+ * `CREDIT_CARD`/`PIX`/`BOLETO`. Todos desembocam aqui.
  */
 export function meioDe(bruto: string | undefined): MeioDePagamento {
   const v = (bruto ?? '').toLowerCase();
