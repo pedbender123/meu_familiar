@@ -437,3 +437,45 @@ describe('para onde a Wiven avisa', () => {
     restaurar();
   });
 });
+
+describe('o cache de borda da Wiven', () => {
+  const fonte = codigoDe('src/nucleo/checkouts/wiven.ts');
+
+  /**
+   * Medido em produção, 24/08, com um Pix de R$ 5 pago de verdade:
+   * `GET /gateway/transactions` responde por CloudFront com
+   * `x-cache: Hit from cloudfront` e `age: 511`. Numa rota que responde
+   * "esta pessoa pagou?".
+   *
+   * E a chave do cache inclui o `Accept-Encoding`: `curl` (sem compressão)
+   * via `COMPLETED` enquanto o `fetch` do Node (que pede gzip) via `PENDING`
+   * — mesma URL, mesma máquina, mesmo segundo.
+   */
+  test('toda leitura leva um parâmetro que nunca se repete', () => {
+    assert.match(fonte, /function furarCache/);
+    assert.match(fonte, /ehLeitura \? furarCache\(caminho\) : caminho/);
+  });
+
+  /** `Cache-Control: no-cache` foi testado contra a API real e é ignorado. */
+  test('não se confia em cabeçalho de cache', () => {
+    assert.doesNotMatch(fonte, /'Cache-Control'/);
+  });
+
+  /**
+   * Só em GET. Sujar o corpo de uma cobrança com parâmetro de conveniência é
+   * convite para o gateway recusar a transação.
+   */
+  test('a cobrança não é suja com parâmetro de cache', () => {
+    assert.match(fonte, /!init\.method \|\| init\.method\.toUpperCase\(\) === 'GET'/);
+  });
+
+  test('o parâmetro muda a cada chamada', () => {
+    assert.match(fonte, /Date\.now\(\)/);
+    assert.match(fonte, /Math\.random\(\)/);
+  });
+
+  /** URL que já tem query não pode ganhar um segundo `?`. */
+  test('o separador respeita a query que já existe', () => {
+    assert.match(fonte, /caminho\.includes\('\?'\) \? '&' : '\?'/);
+  });
+});

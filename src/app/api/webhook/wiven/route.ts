@@ -68,11 +68,35 @@ export async function POST(req: NextRequest) {
 
   /* Porta 1: o token. */
   if (!tokenConfere(corpo?.token, esperado)) {
-    console.warn('[webhook/wiven] token não confere');
+    /**
+     * O diagnóstico que faltava na primeira noite.
+     *
+     * "token não confere" sozinho não distingue as três causas possíveis:
+     * corpo sem token nenhum, token de OUTRA origem (a Wiven entrega o mesmo
+     * evento no webhook do painel e no `callbackUrl` da transação, e não é
+     * óbvio que os dois carreguem a mesma credencial), ou o token certo com
+     * espaço sobrando de quando foi colado no `.env`.
+     *
+     * Então vai o bastante para separar os três — **tamanho e evento, nunca
+     * o valor**. Um token inteiro no log é um token vazado: log roda para
+     * arquivo, arquivo entra em backup, e backup sai da máquina.
+     */
+    const recebido = corpo?.token;
+    console.warn(
+      `[webhook/wiven] token não confere — evento=${corpo?.event ?? '?'} ` +
+        `recebido=${typeof recebido === 'string' ? `${recebido.length} chars` : typeof recebido} ` +
+        `esperado=${esperado.length} chars ` +
+        `transacao=${corpo?.transaction?.id ?? '?'}`
+    );
     return NextResponse.json({ erro: 'não autorizado' }, { status: 401 });
   }
 
   const resultado = traduzirWebhook(corpo);
+
+  console.log(
+    `[webhook/wiven] ${corpo.event ?? '?'} → ${resultado.status} ` +
+      `transacao=${resultado.idExterno} pedido=${resultado.referenciaExterna ?? '(sem identifier)'}`
+  );
 
   if (!resultado.idExterno) {
     // Sem id não há o que processar, e retentar não muda nada — a Wiven

@@ -99,9 +99,37 @@ export function urlDeCallback(): string {
   return `${base}${CAMINHO_DO_WEBHOOK}`;
 }
 
+/**
+ * Fura o cache de borda da Wiven.
+ *
+ * ── O bug que isto contorna (descoberto em 24/08, com dinheiro real) ──────
+ *
+ * `GET /gateway/transactions` passa por **CloudFront, e é cacheado**. Medido:
+ * `x-cache: Hit from cloudfront`, `age: 511`. Numa rota que responde "esta
+ * pessoa pagou?".
+ *
+ * Pior: a chave do cache inclui o `Accept-Encoding`. O `curl`, que por padrão
+ * não pede compressão, recebia `COMPLETED`; o `fetch` do Node, que pede gzip,
+ * recebia `PENDING` — **a mesma URL, na mesma máquina, no mesmo segundo,
+ * respondendo coisas diferentes**. Um Pix pago há oito minutos aparecia como
+ * pendente para o nosso código e como pago para o curl.
+ *
+ * `Cache-Control: no-cache` foi testado e **é ignorado**. O que funciona é
+ * mudar a chave do cache: um parâmetro que nunca se repete garante `Miss`.
+ *
+ * Só em GET. POST não é cacheado, e sujar o corpo de uma cobrança com
+ * parâmetro de conveniência é convite para o gateway recusar.
+ */
+function furarCache(caminho: string): string {
+  const separador = caminho.includes('?') ? '&' : '?';
+  return `${caminho}${separador}_=${Date.now()}${Math.random().toString(36).slice(2, 8)}`;
+}
+
 async function chamar(caminho: string, init: RequestInit = {}): Promise<Response> {
   const { publica, secreta } = chaves();
-  return fetch(`${BASE}${caminho}`, {
+  const ehLeitura = !init.method || init.method.toUpperCase() === 'GET';
+
+  return fetch(`${BASE}${ehLeitura ? furarCache(caminho) : caminho}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
@@ -109,6 +137,8 @@ async function chamar(caminho: string, init: RequestInit = {}): Promise<Response
       'x-secret-key': secreta,
       ...(init.headers ?? {}),
     },
+    // Não resolve o CloudFront, mas impede o cache do próprio Node por cima.
+    cache: 'no-store',
     // Compra travada em 40s é compra perdida — o mesmo limite do Mercado Pago.
     signal: AbortSignal.timeout(8000),
   });
