@@ -50,6 +50,8 @@ export interface ParametrosDeRastreio {
 
 export interface PedidoParaUtmify {
   orderId: string;
+  /** Quem cobrou este pedido. Vira o `platform` do relatório dela. */
+  plataforma?: string;
   status: StatusUtmify;
   metodo: MetodoUtmify;
   criadoEm: Date;
@@ -88,7 +90,15 @@ export async function reportarPedido(pedido: PedidoParaUtmify): Promise<boolean>
 
   const corpo = {
     orderId: pedido.orderId,
-    platform: process.env.UTMIFY_PLATAFORMA ?? 'Cakto',
+    /**
+     * Quem cobrou de verdade, vindo do pedido — não uma constante.
+     *
+     * Era `process.env.UTMIFY_PLATAFORMA ?? 'Cakto'`, de quando a Cakto era o
+     * plano. Com o Mercado Pago cobrando, TODA venda aparecia no painel da
+     * Utmify como se fosse da Cakto, que nunca cobrou um centavo. Um painel
+     * que existe para conferir não pode mentir sobre a origem do dinheiro.
+     */
+    platform: pedido.plataforma ?? process.env.UTMIFY_PLATAFORMA ?? 'MercadoPago',
     paymentMethod: pedido.metodo,
     status: pedido.status,
     createdAt: emUtc(pedido.criadoEm),

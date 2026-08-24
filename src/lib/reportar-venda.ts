@@ -23,6 +23,47 @@ import {
  * Rastreio quebrado é um relatório com buraco; rastreio que lança é uma venda
  * perdida. As duas chamadas acontecem em caminhos que mexem com dinheiro.
  */
+/**
+ * Quem já avisa a Utmify sozinho.
+ *
+ * ── O risco de contar a mesma venda duas vezes ────────────────────────────
+ *
+ * A conta da Wiven é ligada à Utmify **por dentro**: venda paga por lá chega
+ * no painel sem ninguém do nosso lado fazer nada. Se a gente reportar
+ * também, a mesma venda entra por dois caminhos.
+ *
+ * E ela **não é deduplicada**: a Utmify agrupa por `orderId`, e o id que a
+ * Wiven manda é o dela, não o nosso `pedidoId`. Seriam dois pedidos
+ * distintos, com o mesmo dinheiro — receita inflada, ROAS inflado, e uma
+ * campanha escalada por um número que não existe. É o oposto do motivo pelo
+ * qual a Utmify entrou aqui, que era ter uma segunda via CONFERÍVEL.
+ *
+ * Mercado Pago e Cakto não têm essa ligação: nesses, quem reporta somos nós.
+ *
+ * `UTMIFY_REPORTAR_WIVEN=1` força o relatório de volta, para o caso de a
+ * integração nativa deles não estar valendo. Duas fontes é ruim; nenhuma
+ * é pior.
+ */
+function gatewayJaReportaSozinho(gateway: string | null | undefined): boolean {
+  if (process.env.UTMIFY_REPORTAR_WIVEN === '1') return false;
+  return gateway === 'wiven';
+}
+
+/**
+ * O nome da plataforma no relatório da Utmify.
+ *
+ * Estava fixo em `'Cakto'` — de quando a Cakto era o plano. Com o Mercado
+ * Pago cobrando, toda venda aparecia no painel dela como se fosse da Cakto,
+ * que nunca cobrou nada. Agora sai do gateway que REALMENTE cobrou aquele
+ * pedido, gravado na tentativa.
+ */
+function plataformaDe(gateway: string | null | undefined): string {
+  if (gateway === 'wiven') return 'Wiven';
+  if (gateway === 'cakto') return 'Cakto';
+  if (gateway === 'mercadopago') return 'MercadoPago';
+  return process.env.UTMIFY_PLATAFORMA ?? 'MercadoPago';
+}
+
 export async function reportarVenda(
   pedido: Pedido,
   status: StatusUtmify,
@@ -30,6 +71,14 @@ export async function reportarVenda(
 ): Promise<void> {
   try {
     if (!pedido.email) return;
+
+    if (gatewayJaReportaSozinho(pedido.gateway)) {
+      console.log(
+        `[utmify] pedido ${pedido.id} não reportado: a Wiven avisa sozinha ` +
+          '(UTMIFY_REPORTAR_WIVEN=1 força o envio)'
+      );
+      return;
+    }
 
     /**
      * `produtoVigente`, não a tabela estática — mesma regra de todo lugar que
@@ -53,6 +102,7 @@ export async function reportarVenda(
     }
 
     await reportarPedido({
+      plataforma: plataformaDe(pedido.gateway),
       orderId: pedido.id,
       status,
       metodo: metodoParaUtmify(extras.metodo ?? pedido.metodo_pagamento),
