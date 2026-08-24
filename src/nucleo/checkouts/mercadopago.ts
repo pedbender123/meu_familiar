@@ -80,8 +80,15 @@ export interface ResultadoPagamento {
   liquidoCentavos: number | null;
   /** `pix`, `master`, `visa`, ... conforme o MP. */
   metodo: string | null;
-  /** Só em Pix: código copia-e-cola e imagem do QR. */
-  pix?: { copiaECola: string; qrBase64: string };
+  /**
+   * Só em Pix: código copia-e-cola e imagem do QR.
+   *
+   * `qrUrl` existe porque a Wiven **deprecou o base64** — o campo dela volta
+   * sempre vazio, e quem desenha o QR é uma URL. Mercado Pago e Cakto seguem
+   * mandando base64, então os dois convivem: quem renderiza usa o base64 se
+   * houver, a URL se não houver, e o copia-e-cola sempre.
+   */
+  pix?: { copiaECola: string; qrBase64: string; qrUrl?: string };
 }
 
 /**

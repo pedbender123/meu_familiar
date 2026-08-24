@@ -246,3 +246,28 @@ body {
   from { opacity: 0; }
   to   { opacity: 1; }
 }
+
+/*
+  A troca de aba do checkout (Pix ↔ cartão).
+
+  Os dois painéis têm alturas bem diferentes — o cartão do Brick são seis
+  campos, o Pix é um QR Code e uma linha de copia-e-cola. Trocar sem transição
+  dá um solavanco na página no clique em que a pessoa está decidindo pagar.
+
+  O `prefers-reduced-motion` global logo acima já zera isto para quem pediu
+  menos movimento; nada a fazer aqui.
+*/
+.painel-do-checkout {
+  animation: painel-do-checkout-entra 220ms ease-out both;
+}
+
+@keyframes painel-do-checkout-entra {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

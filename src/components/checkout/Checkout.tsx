@@ -106,6 +106,17 @@ export function Checkout({
         />
       </div>
 
+      {/*
+        A troca de aba desmonta um formulário e monta outro — o cartão do
+        Mercado Pago tem seis campos, o Pix tem um QR Code. A altura muda de
+        uma vez, e sem isto a página dá um solavanco de uns 300px justamente
+        no clique em que a pessoa está decidindo pagar.
+
+        `key` no wrapper reinicia a animação a cada troca; a opacidade e os
+        8px de deslocamento fazem o bloco novo *chegar* em vez de aparecer.
+        Quem pediu menos movimento no sistema não recebe nenhum.
+      */}
+      <div key={`painel-${meio}`} className="painel-do-checkout">
       {meio === 'pix' && gatewayPix === 'cakto' ? (
         <CheckoutCaktoPix
           key="pix-cakto"
@@ -131,6 +142,7 @@ export function Checkout({
           destino={destino}
         />
       )}
+      </div>
     </div>
   );
 }
