@@ -78,16 +78,36 @@ export function gatewayPadrao(): NomeDoGateway {
  *
  * A primeira chave que casar ganha; a ordem do `.env` é a ordem da decisão.
  */
+/**
+ * Sem acento e sem maiúscula, dos dois lados da comparação.
+ *
+ * A campanha que chega da Meta hoje é o ID numérico (`120248890724340044`),
+ * onde acento não existe. Mas basta alguém trocar a macro do link de
+ * `{{campaign.id}}` para `{{campaign.name}}` para "Começou" começar a chegar —
+ * e aí `começou` digitado no `.env` teria que bater com `Começou`, `COMEÇOU`
+ * ou `Comecou`, dependendo de como foi escrito no gerenciador.
+ *
+ * Nada disso daria erro: daria a venda indo para a conta errada, calada.
+ */
+function achatar(v: string): string {
+  return v
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+}
+
 export function gatewayDaCampanha(
   campanha: string | null | undefined
 ): NomeDoGateway | undefined {
-  const alvo = campanha?.trim().toLowerCase();
+  if (!campanha?.trim()) return undefined;
+  const alvo = achatar(campanha);
   if (!alvo) return undefined;
 
   for (const par of (process.env.GATEWAY_POR_CAMPANHA ?? '').split(',')) {
     const corte = par.lastIndexOf(':');
     if (corte < 1) continue;
-    const chave = par.slice(0, corte).trim().toLowerCase();
+    const chave = achatar(par.slice(0, corte));
     const nome = normalizar(par.slice(corte + 1));
     if (chave && nome && alvo.includes(chave)) return nome;
   }
