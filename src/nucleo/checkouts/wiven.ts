@@ -140,19 +140,39 @@ export function pedidoDoIdentificador(identifier: string | null | undefined): st
 
 /* ── tradução ─────────────────────────────────────────────────────────────*/
 
-export type StatusWiven = 'OK' | 'PENDING' | 'FAILED' | 'REJECTED' | 'CANCELED';
+/** O vocabulário da RESPOSTA DE CRIAÇÃO. */
+export type StatusDeCriacao = 'OK' | 'PENDING' | 'FAILED' | 'REJECTED' | 'CANCELED';
+
+/** O vocabulário do WEBHOOK. Não é o mesmo — ver abaixo. */
+export type StatusDeWebhook = 'COMPLETED' | 'PENDING' | 'FAILED' | 'REFUNDED' | 'CHARGED_BACK';
 
 /**
  * Wiven → nosso vocabulário.
  *
- * O resto do projeto fala `approved`/`pending`/`rejected` desde o Asaas, e
- * `statusLiberaAcesso` continua sendo a única função que decide se alguém
- * recebe o que comprou. `webhook-pagamento.ts` não ganha uma linha sobre
- * Wiven.
+ * ── A Wiven fala DOIS idiomas ─────────────────────────────────────────────
+ *
+ * A resposta de criação devolve `OK · PENDING · FAILED · REJECTED · CANCELED`.
+ * O webhook devolve `COMPLETED · PENDING · FAILED · REFUNDED · CHARGED_BACK`.
+ * Só `PENDING` e `FAILED` são comuns aos dois.
+ *
+ * Isto é uma mina. Uma tradução que só conhecesse o vocabulário da criação
+ * jamais reconheceria `COMPLETED` — e `COMPLETED` é justamente o que chega
+ * quando o dinheiro entra. O sintoma seria o pior possível: todo mundo
+ * pagando e ninguém recebendo, com o log dizendo apenas
+ * `pagamento_COMPLETED` e seguindo em frente.
+ *
+ * Por isso os dois idiomas moram na mesma função, e há teste para cada
+ * palavra dos dois.
+ *
+ * `statusLiberaAcesso` continua sendo a única função do projeto que decide se
+ * alguém recebe o que comprou, e `webhook-pagamento.ts` não ganha uma linha
+ * sobre Wiven.
  */
 export function traduzirStatus(status: string | undefined): string {
   switch (status) {
+    // criação: autorizado. webhook: pago.
     case 'OK':
+    case 'COMPLETED':
       return 'approved';
     case 'PENDING':
       return 'pending';
@@ -161,6 +181,10 @@ export function traduzirStatus(status: string | undefined): string {
       return 'rejected';
     case 'CANCELED':
       return 'cancelled';
+    case 'REFUNDED':
+      return 'refunded';
+    case 'CHARGED_BACK':
+      return 'charged_back';
     default:
       return status ?? 'unknown';
   }
@@ -359,4 +383,87 @@ export class ProvedorWiven implements ProvedorPagamento {
   async listarPagosNoPeriodo(_desde: Date, _ate: Date): Promise<PagamentoResumido[]> {
     throw new Error('[wiven] listagem ainda não implementada — falta a documentação');
   }
+}
+
+/* ── o corpo do webhook ───────────────────────────────────────────────────*/
+
+export type EventoWiven =
+  | 'TRANSACTION_CREATED'
+  | 'TRANSACTION_PAID'
+  | 'TRANSACTION_CANCELED'
+  | 'TRANSACTION_REFUNDED'
+  | 'TRANSACTION_CHARGED_BACK';
+
+export interface CorpoWebhookWiven {
+  event?: string;
+  /** O que prova que a notificação é dela. Viaja no CORPO, não em header. */
+  token?: string;
+  client?: { name?: string; email?: string; cpf?: string };
+  transaction?: {
+    id?: string;
+    /** O nosso `identifier`. **Anulável** — ver `pedidoDoWebhook`. */
+    identifier?: string | null;
+    status?: string;
+    paymentMethod?: string;
+    amount?: number;
+    /** "Valor líquido a ser recebido" — é o LÍQUIDO, não a taxa. */
+    commissionAmount?: number;
+    currency?: string;
+    payedAt?: string | null;
+    pixInformation?: { qrCode?: string; endToEndId?: string | null } | null;
+  };
+  trackProps?: Record<string, string>;
+}
+
+/**
+ * O pedido que a notificação diz respeito.
+ *
+ * **`transaction.identifier` é anulável** — a documentação marca o campo como
+ * `nullable`, e o exemplo de payload dela nem sequer o traz. Confiar só nele
+ * seria apostar a entrega numa string que a própria Wiven avisa que pode
+ * chegar vazia.
+ *
+ * Por isso o webhook tem dois caminhos: este, e o `transaction.id`, que a
+ * gente grava no pedido no instante da criação. Um dos dois acha.
+ */
+export function pedidoDoWebhook(corpo: CorpoWebhookWiven): string | null {
+  return pedidoDoIdentificador(corpo.transaction?.identifier);
+}
+
+/**
+ * O corpo do webhook vira o mesmo `ResultadoPagamento` que todo o resto do
+ * projeto já sabe consumir.
+ *
+ * ── A contabilidade é ao contrário da criação ─────────────────────────────
+ *
+ * Na criação, `fee` é **a taxa**. No webhook, `commissionAmount` é
+ * **o líquido** ("valor líquido a ser recebido"). Mesmo gateway, dois campos
+ * de dinheiro com sentidos opostos.
+ *
+ * Tratar um como o outro inverteria o painel financeiro: numa venda de
+ * R$ 9,80 com R$ 2,58 de taxa, o lucro apareceria como R$ 2,58 em vez de
+ * R$ 7,22 — ou pior, R$ 7,22 viraria taxa e o lucro, R$ 2,58. É a mesma
+ * família do bug de 22/08, e ela já custou uma noite.
+ */
+export function traduzirWebhook(corpo: CorpoWebhookWiven): ResultadoPagamento {
+  const t = corpo.transaction ?? {};
+  const brutoCentavos = emCentavos(t.amount);
+  const liquidoCentavos = emCentavos(t.commissionAmount);
+
+  return {
+    idExterno: t.id ?? '',
+    status: traduzirStatus(t.status),
+    statusDetalhe: corpo.event ?? '',
+    referenciaExterna: pedidoDoWebhook(corpo),
+    brutoCentavos,
+    taxaCentavos:
+      brutoCentavos === null || liquidoCentavos === null ? null : brutoCentavos - liquidoCentavos,
+    liquidoCentavos,
+    metodo: t.paymentMethod === 'PIX' ? 'pix' : (t.paymentMethod?.toLowerCase() ?? null),
+  };
+}
+
+/** O token que prova que a notificação é da Wiven. Cadastrado com o webhook. */
+export function tokenDoWebhook(): string {
+  return process.env.WIVEN_WEBHOOK_TOKEN?.trim() ?? '';
 }

@@ -8,6 +8,8 @@ import {
   pedidoDoIdentificador,
   traduzir,
   traduzirStatus,
+  traduzirWebhook,
+  pedidoDoWebhook,
 } from './wiven';
 
 describe('reais e centavos', () => {
@@ -209,5 +211,119 @@ describe('nasce desligado', () => {
   test('o roteador ainda não conhece o nome wiven', () => {
     const fonte = codigoDe('src/nucleo/checkouts/gateway.ts');
     assert.doesNotMatch(fonte, /wiven/i);
+  });
+});
+
+describe('a Wiven fala dois idiomas', () => {
+  /**
+   * A criação devolve `OK`; o webhook devolve `COMPLETED`. Só `PENDING` e
+   * `FAILED` são comuns aos dois.
+   *
+   * Uma tradução que só conhecesse o vocabulário da criação jamais
+   * reconheceria `COMPLETED` — que é justamente o que chega quando o dinheiro
+   * entra. Todo mundo pagaria, ninguém receberia, e o log diria só
+   * `pagamento_COMPLETED` antes de seguir em frente.
+   */
+  test('COMPLETED, do webhook, é venda', () => {
+    assert.equal(traduzirStatus('COMPLETED'), 'approved');
+  });
+
+  test('o resto do vocabulário do webhook', () => {
+    assert.equal(traduzirStatus('REFUNDED'), 'refunded');
+    assert.equal(traduzirStatus('CHARGED_BACK'), 'charged_back');
+    assert.equal(traduzirStatus('PENDING'), 'pending');
+    assert.equal(traduzirStatus('FAILED'), 'rejected');
+  });
+});
+
+describe('o corpo do webhook', () => {
+  const pago = {
+    event: 'TRANSACTION_PAID',
+    token: 'segredo',
+    transaction: {
+      id: 'tx_9',
+      identifier: 'ped_42--f1e2',
+      status: 'COMPLETED',
+      paymentMethod: 'PIX',
+      amount: 9.8,
+      commissionAmount: 7.22,
+      payedAt: '2026-08-23T14:53:48.894Z',
+    },
+  };
+
+  test('vira o mesmo ResultadoPagamento de sempre', () => {
+    const r = traduzirWebhook(pago);
+    assert.equal(r.idExterno, 'tx_9');
+    assert.equal(r.status, 'approved');
+    assert.equal(r.referenciaExterna, 'ped_42');
+    assert.equal(r.metodo, 'pix');
+  });
+
+  /**
+   * Na criação, `fee` é A TAXA. No webhook, `commissionAmount` é O LÍQUIDO.
+   * Mesmo gateway, dois campos de dinheiro com sentidos opostos — tratar um
+   * como o outro inverteria o painel financeiro.
+   */
+  test('commissionAmount é o líquido, não a taxa', () => {
+    const r = traduzirWebhook(pago);
+    assert.equal(r.brutoCentavos, 980);
+    assert.equal(r.liquidoCentavos, 722);
+    assert.equal(r.taxaCentavos, 258);
+  });
+
+  /**
+   * A documentação marca `identifier` como anulável, e o exemplo de payload
+   * dela nem sequer o traz. Sem o segundo caminho — `transaction.id`, que a
+   * gente grava no pedido na criação — a venda ficaria órfã.
+   */
+  test('identifier nulo não derruba a notificação', () => {
+    const r = traduzirWebhook({ ...pago, transaction: { ...pago.transaction, identifier: null } });
+    assert.equal(r.referenciaExterna, null);
+    assert.equal(r.idExterno, 'tx_9', 'o transaction.id ainda acha o pedido');
+    assert.equal(r.status, 'approved');
+  });
+
+  test('o pedido sai do prefixo do identificador', () => {
+    assert.equal(pedidoDoWebhook(pago), 'ped_42');
+    assert.equal(pedidoDoWebhook({}), null);
+  });
+
+  test('corpo sem dinheiro não inventa lucro', () => {
+    const r = traduzirWebhook({ event: 'TRANSACTION_CREATED', transaction: { id: 'tx_0', status: 'PENDING' } });
+    assert.equal(r.brutoCentavos, null);
+    assert.equal(r.liquidoCentavos, null);
+    assert.equal(r.taxaCentavos, null);
+    assert.equal(r.status, 'pending');
+  });
+});
+
+describe('o webhook tem duas portas', () => {
+  const fonte = codigoDe('src/app/api/webhook/wiven/route.ts');
+
+  /**
+   * O token viaja em texto no corpo a cada notificação. `===` vazaria, pelo
+   * tempo que leva para falhar, quantos caracteres iniciais estavam certos.
+   */
+  test('o token é comparado em tempo constante', () => {
+    assert.match(fonte, /timingSafeEqual/);
+  });
+
+  test('sem token configurado, recusa tudo', () => {
+    assert.match(fonte, /if \(!esperado\)/);
+  });
+
+  /**
+   * Se o token vazar, um POST forjado libera acesso — e reconsultar a API,
+   * que seria a defesa natural, esbarra no "Polling bloqueado" deles. Então
+   * o preço é recalculado do nosso lado.
+   */
+  test('o valor é conferido contra o nosso banco', () => {
+    assert.match(fonte, /precoDoPedido\(pedido\)\.finalCentavos/);
+    assert.match(fonte, /resultado\.brutoCentavos < esperadoCentavos/);
+  });
+
+  /** A entrega não pode segurar a resposta: timeout vira evento reenviado. */
+  test('só a parte síncrona é aguardada', () => {
+    assert.match(fonte, /await processarNotificacaoDePagamento\(resultado\)/);
   });
 });
