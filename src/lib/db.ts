@@ -725,6 +725,15 @@ export function criarPedido(p: {
   atribuicao?: string | null;
   indicado_por?: string | null;
   funil?: string | null;
+  /**
+   * Os UTMs da sessão, gravados no NASCIMENTO do pedido.
+   *
+   * Antes só chegavam na tentativa de pagamento, e só pelos checkouts de
+   * Cakto e Wiven. Com o Brick do Mercado Pago cobrando, nenhum pedido tinha
+   * campanha — e a tela de checkout precisa dela ANTES de qualquer cobrança,
+   * para saber qual gateway mostrar.
+   */
+  utm_json?: string | null;
 }) {
   const agora = new Date().toISOString();
   db.prepare(
@@ -732,11 +741,11 @@ export function criarPedido(p: {
       (id, nome, email, respostas_json, familiar, lua, signo_sol, signo_lua, produto,
        perfil_json, desempatado_pela_pessoa, cupom, desconto_percentual,
        origem, visitante, variante, campanha_id, peca_id, atribuicao,
-       indicado_por, funil, status, criado_em, atualizado_em)
+       indicado_por, funil, utm_json, status, criado_em, atualizado_em)
      VALUES (@id, @nome, @email, @respostas_json, @familiar, @lua, @signo_sol, @signo_lua, @produto,
        @perfil_json, @desempatado_pela_pessoa, @cupom, @desconto_percentual,
        @origem, @visitante, @variante, @campanha_id, @peca_id, @atribuicao,
-       @indicado_por, @funil, 'aguardando_pagamento', @agora, @agora)`
+       @indicado_por, @funil, @utm_json, 'aguardando_pagamento', @agora, @agora)`
   ).run({
     perfil_json: null,
     desempatado_pela_pessoa: 0,
@@ -750,6 +759,7 @@ export function criarPedido(p: {
     atribuicao: null,
     indicado_por: null,
     funil: null,
+    utm_json: null,
     ...p,
     agora,
   });

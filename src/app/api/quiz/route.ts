@@ -60,6 +60,7 @@ export async function POST(req: NextRequest) {
     produto,
     desempate,
     cupom,
+    utm,
   } = corpo ?? {};
 
   if (!respostas || typeof respostas !== 'object') {
@@ -143,6 +144,25 @@ export async function POST(req: NextRequest) {
     empate: resultado.empate,
   });
 
+    /**
+   * A origem, filtrada antes de virar coluna.
+   *
+   * O corpo vem do navegador, e este campo acabou de ganhar poder de decisão:
+   * é dele que sai a campanha que escolhe o gateway. Aceitar qualquer chave
+   * de qualquer tamanho seria deixar o cliente escrever no nosso banco.
+   *
+   * Só as cinco chaves de UTM, só string, 120 caracteres cada.
+   */
+  const utmJson = (() => {
+    if (!utm || typeof utm !== 'object') return null;
+    const limpo: Record<string, string> = {};
+    for (const chave of ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content']) {
+      const valor = (utm as Record<string, unknown>)[chave];
+      if (typeof valor === 'string' && valor.trim()) limpo[chave] = valor.trim().slice(0, 120);
+    }
+    return Object.keys(limpo).length ? JSON.stringify(limpo) : null;
+  })();
+
   const pedidoId = uuidv4();
   criarPedido({
     id: pedidoId,
@@ -185,6 +205,7 @@ export async function POST(req: NextRequest) {
     // rouba crédito, remarketing é a única exceção que sobrescreve.
     ...atribuicaoDoPedido(req.cookies),
     visitante: req.cookies.get('bx_v')?.value ?? null,
+    utm_json: utmJson,
     perfil_json: perfilJson,
     desempatado_pela_pessoa: desempatadoPelaPessoa ? 1 : 0,
   });

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { utmsDaSessao } from '@/components/checkout/utms';
 import { useSearchParams } from 'next/navigation';
 import { marcar } from '@/lib/marcar';
 import { BuscaDeCidade, type CidadeEscolhida } from '@/components/funil/BuscaDeCidade';
@@ -264,6 +265,21 @@ export function RitualCliente({
           estadoNascimento: cidade?.estado,
           email,
           produto: produtoPadrao,
+          /**
+           * A origem, gravada no PEDIDO no momento em que ele nasce.
+           *
+           * Antes ela só era gravada na tentativa de pagamento, e só pelos
+           * checkouts de Cakto e Wiven — o Brick do Mercado Pago nunca mandou
+           * nada. Resultado medido em 24/08: **zero pedidos com campanha no
+           * banco**, com campanha rodando havia dias.
+           *
+           * Isso quebrava duas coisas de uma vez: o relatório da Utmify via
+           * toda venda como direta, e o roteamento por campanha não tinha o
+           * que rotear. E precisa ser aqui, não no pagamento: a tela de
+           * checkout escolhe qual gateway mostrar ANTES de qualquer POST de
+           * cobrança acontecer.
+           */
+          utm: utmsDaSessao(),
           ...(desempate ? { desempate } : {}),
         }),
       });

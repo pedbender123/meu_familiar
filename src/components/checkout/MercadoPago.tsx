@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Flame, Copy, Check } from 'lucide-react';
 import { marcar } from '@/lib/marcar';
+import { utmsDaSessao } from './utms';
 
 /**
  * Payment Brick do Mercado Pago montado dentro da nossa tela.
@@ -212,7 +213,10 @@ export function CheckoutMercadoPago({
               const resposta = await fetch(`/api/${base}/${pedidoId}/${caminho}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ formData }),
+                // A origem vai junto: o pedido já nasce com ela, mas quem
+                // chegou por um link antigo, ou apagou o armazenamento no
+                // meio do caminho, ainda tem esta segunda chance.
+                body: JSON.stringify({ formData, utm: utmsDaSessao() }),
               });
               const dados = await resposta.json();
 
