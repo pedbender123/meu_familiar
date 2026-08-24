@@ -21,9 +21,19 @@ describe('a mesma venda não pode ser contada duas vezes', () => {
    * não existe. O oposto do motivo pelo qual a Utmify entrou: uma segunda via
    * CONFERÍVEL.
    */
-  test('venda da Wiven não é reportada por nós', () => {
-    assert.match(fonte, /gateway === 'wiven'/);
-    assert.match(fonte, /if \(gatewayJaReportaSozinho\(pedido\.gateway\)\)/);
+  test('a venda PAGA da Wiven não é reportada por nós', () => {
+    assert.match(fonte, /gateway === 'wiven' && status === 'paid'/);
+    assert.match(fonte, /if \(gatewayJaReportaSozinho\(pedido\.gateway, status\)\)/);
+  });
+
+  /**
+   * A Wiven não manda o pré-venda, e é ele que dá o denominador: sem
+   * `waiting_payment` o painel mostra as vendas e nada de quem chegou ao
+   * checkout e desistiu. Não existe taxa de conversão com numerador só.
+   */
+  test('o pré-venda vai sempre, inclusive na Wiven', () => {
+    assert.doesNotMatch(fonte, /return gateway === 'wiven';/);
+    assert.match(fonte, /status === 'paid'/);
   });
 
   /** Duas fontes é ruim; nenhuma é pior. A escotilha existe. */

@@ -24,29 +24,36 @@ import {
  * perdida. As duas chamadas acontecem em caminhos que mexem com dinheiro.
  */
 /**
- * Quem já avisa a Utmify sozinho.
+ * Quem já avisa a Utmify sozinho — e sobre O QUÊ.
  *
- * ── O risco de contar a mesma venda duas vezes ────────────────────────────
+ * ── A divisão de trabalho com a Wiven ─────────────────────────────────────
  *
- * A conta da Wiven é ligada à Utmify **por dentro**: venda paga por lá chega
- * no painel sem ninguém do nosso lado fazer nada. Se a gente reportar
- * também, a mesma venda entra por dois caminhos.
+ * A conta da Wiven é ligada à Utmify por dentro, e o que ela manda é a VENDA
+ * PAGA. Se a gente mandasse também, a mesma venda entraria duas vezes: a
+ * Utmify agrupa por `orderId`, e o id da Wiven não é o nosso `pedidoId` —
+ * seriam dois pedidos com o mesmo dinheiro. Receita inflada, ROAS inflado,
+ * campanha escalada por um número que não existe.
  *
- * E ela **não é deduplicada**: a Utmify agrupa por `orderId`, e o id que a
- * Wiven manda é o dela, não o nosso `pedidoId`. Seriam dois pedidos
- * distintos, com o mesmo dinheiro — receita inflada, ROAS inflado, e uma
- * campanha escalada por um número que não existe. É o oposto do motivo pelo
- * qual a Utmify entrou aqui, que era ter uma segunda via CONFERÍVEL.
+ * Mas ela **não manda o pré-venda**. E é o pré-venda que dá o denominador:
+ * sem `waiting_payment`, o painel mostra as vendas e nada de quem chegou ao
+ * checkout e desistiu — não existe taxa de conversão com numerador só.
  *
- * Mercado Pago e Cakto não têm essa ligação: nesses, quem reporta somos nós.
+ * Então a divisão é por ESTÁGIO, não por gateway:
  *
- * `UTMIFY_REPORTAR_WIVEN=1` força o relatório de volta, para o caso de a
- * integração nativa deles não estar valendo. Duas fontes é ruim; nenhuma
- * é pior.
+ *   `waiting_payment` → nós, sempre, em qualquer gateway
+ *   `paid`            → nós, exceto na Wiven, que já manda
+ *
+ * `UTMIFY_REPORTAR_WIVEN=1` devolve os dois para a gente, caso a integração
+ * nativa deles não esteja valendo. Duas fontes é ruim; nenhuma é pior.
  */
-function gatewayJaReportaSozinho(gateway: string | null | undefined): boolean {
+function gatewayJaReportaSozinho(
+  gateway: string | null | undefined,
+  status: StatusUtmify
+): boolean {
   if (process.env.UTMIFY_REPORTAR_WIVEN === '1') return false;
-  return gateway === 'wiven';
+  // Só a venda paga. O pré-venda a Wiven não manda, e é ele que dá o
+  // denominador da conversão.
+  return gateway === 'wiven' && status === 'paid';
 }
 
 /**
@@ -72,10 +79,10 @@ export async function reportarVenda(
   try {
     if (!pedido.email) return;
 
-    if (gatewayJaReportaSozinho(pedido.gateway)) {
+    if (gatewayJaReportaSozinho(pedido.gateway, status)) {
       console.log(
-        `[utmify] pedido ${pedido.id} não reportado: a Wiven avisa sozinha ` +
-          '(UTMIFY_REPORTAR_WIVEN=1 força o envio)'
+        `[utmify] venda paga do pedido ${pedido.id} não reportada: a Wiven ` +
+          'avisa sozinha (UTMIFY_REPORTAR_WIVEN=1 força o envio)'
       );
       return;
     }

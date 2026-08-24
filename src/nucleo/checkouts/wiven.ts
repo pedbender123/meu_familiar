@@ -167,6 +167,53 @@ export function emCentavos(valor: number | string | null | undefined): number | 
   return Math.round(numero * 100);
 }
 
+/* ── split ────────────────────────────────────────────────────────────────*/
+
+/**
+ * A divisão da venda com outra conta Wiven.
+ *
+ * ── O formato, perguntado à própria API ───────────────────────────────────
+ *
+ * A documentação do split não estava em mãos, então a forma veio da
+ * validação deles: mandar `splits: [{}]` devolve
+ *
+ *     path: ["splits", 0, "producerId"]  expected: string
+ *     path: ["splits", 0, "amount"]      expected: number
+ *
+ * E `producerId` inexistente devolve "Produtor X não encontrado" — ou seja,
+ * é validado do lado deles, não é campo livre.
+ *
+ * ── `amount` é VALOR, não percentual ──────────────────────────────────────
+ *
+ * Em reais, como todo dinheiro nesta API. Como os nossos preços variam
+ * (9,80 · 18,90 · 4,90 · 29,90), configurar valor fixo obrigaria uma linha
+ * por produto e um esquecimento a cada preço novo. Então a configuração é em
+ * PORCENTAGEM e a conta é feita aqui, em cima do preço realmente cobrado.
+ *
+ * ── O arredondamento é para BAIXO, de propósito ───────────────────────────
+ *
+ * `Math.floor`. Se a soma dos splits passar do valor da transação, o gateway
+ * recusa a cobrança inteira — e uma venda recusada por um centavo de
+ * arredondamento é muito pior que um centavo a menos repassado.
+ *
+ *     WIVEN_SPLIT_PRODUCER_ID=<id da outra conta>
+ *     WIVEN_SPLIT_PERCENTUAL=30
+ *
+ * Vazio nos dois = sem split, e o corpo nem leva o campo.
+ */
+export function splitsDe(precoCentavos: number): { producerId: string; amount: number }[] {
+  const produtor = process.env.WIVEN_SPLIT_PRODUCER_ID?.trim();
+  const percentual = Number(process.env.WIVEN_SPLIT_PERCENTUAL ?? '');
+
+  if (!produtor) return [];
+  if (!Number.isFinite(percentual) || percentual <= 0 || percentual >= 100) return [];
+
+  const centavos = Math.floor((precoCentavos * percentual) / 100);
+  if (centavos <= 0) return [];
+
+  return [{ producerId: produtor, amount: emReais(centavos) }];
+}
+
 /* ── identificador ────────────────────────────────────────────────────────*/
 
 const SEPARADOR = '--';
@@ -369,6 +416,7 @@ export class ProvedorWiven implements ProvedorPagamento {
      */
     const preco = precoComDesconto(dados.produto, dados.descontoPercentual);
     const identifier = identificadorDe(dados.pedidoId);
+    const splits = splitsDe(preco.finalCentavos);
 
     const corpo = {
       identifier,
@@ -390,6 +438,9 @@ export class ProvedorWiven implements ProvedorPagamento {
        */
       metadata: { provider: 'Bruxario', orderId: dados.pedidoId },
       callbackUrl: urlDeCallback(),
+      // Só entra no corpo quando configurado: campo vazio em gateway de
+      // terceiro é convite para validação recusar a cobrança.
+      ...(splits.length ? { splits } : {}),
       ...(extra.meio === 'cartao'
         ? {
             clientIp: extra.ip,
