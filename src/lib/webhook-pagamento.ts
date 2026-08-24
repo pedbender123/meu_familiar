@@ -17,6 +17,7 @@ import { checarValorCobrado } from '../nucleo/sentinela/invariantes/financeiro';
 import { registrarCompra } from '../nucleo/eventos-meta';
 import { entregarChaveDaPlataforma, nomeDaConta } from './acesso-plataforma';
 import { buscarPedidoPorMelhoria, confirmarMelhoria } from '../nucleo/melhoria';
+import { reportarVenda } from './reportar-venda';
 
 export type DesfechoNotificacao =
   | 'nao_libera_acesso'
@@ -145,10 +146,16 @@ export async function processarNotificacaoDePagamento(
    */
   const daMelhoria = buscarPedidoPorMelhoria(resultado.idExterno);
   if (daMelhoria) {
-    const aplicou = await confirmarMelhoria(daMelhoria.id, {
+    const { aplicou, entrega } = await confirmarMelhoria(daMelhoria.id, {
       brutoCentavos: resultado.brutoCentavos,
     });
-    return { desfecho: aplicou ? 'processado' : 'ja_processado' };
+    /**
+     * `entrega` sai SEM `await`, igual ao caminho da compra normal logo
+     * abaixo. Segurar a resposta pelo tempo da regeneração foi o que deixou
+     * uma cliente presa em `gerando` por dez horas em 21/08 — ver o comentário
+     * em `confirmarMelhoria`.
+     */
+    return { desfecho: aplicou ? 'processado' : 'ja_processado', entrega };
   }
 
   // Casa por `pagamento_id` (gravado na criação) ou pela referência externa,
@@ -209,6 +216,26 @@ export async function processarNotificacaoDePagamento(
     email: pedido.email ?? '',
     valorEmReais: resultado.brutoCentavos !== null ? resultado.brutoCentavos / 100 : undefined,
     quando: pagoEm,
+  });
+
+  /**
+   * **A venda paga, para a Utmify.**
+   *
+   * Aqui, e não na tela de obrigado: quem sabe que o dinheiro entrou é este
+   * ponto, e ele sabe uma vez só — a idempotência acima já garantiu que
+   * qualquer reenvio do gateway parou em `ja_processado`.
+   *
+   * A receita vai **líquida** (`taxa_centavos` desce do bruto dentro de
+   * `reportarVenda`). Mandar o valor cheio infla o resultado de toda campanha
+   * e faz o CPA parecer melhor do que é — com a taxa fixa de R$ 2,49 da
+   * Cakto num ticket de treze reais, a diferença é de quase 20%.
+   *
+   * Sem `await`, como a entrega: este handler tem 8 segundos para responder.
+   */
+  void reportarVenda(buscarPedido(pedido.id)!, 'paid', {
+    metodo: resultado.metodo,
+    taxaCentavos: resultado.taxaCentavos,
+    aprovadoEm: pagoEm,
   });
 
   // Sem `await` de propósito — ver o comentário em `ResultadoNotificacao.entrega`.

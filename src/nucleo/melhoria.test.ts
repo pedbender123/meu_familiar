@@ -81,3 +81,67 @@ describe('o pagamento da melhoria', () => {
     assert.equal(buscarPedidoPorMelhoria('mp-inexistente'), undefined);
   });
 });
+
+/* ────────────────────────────────────────────────────────────────────────
+ * A regeneração não pode ser aguardada dentro do webhook.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+import { readFileSync } from 'node:fs';
+
+/**
+ * O CÓDIGO, sem os comentários.
+ *
+ * A primeira versão deste teste procurava `await processarPedido(...)` no
+ * arquivo inteiro — e falhava, porque o comentário que EXPLICA o bug cita a
+ * linha antiga. Um teste que lê fonte precisa ler só o que executa.
+ */
+function codigoDe(caminho: string): string {
+  return readFileSync(caminho, 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/.*$/gm, '');
+}
+
+describe('o upgrade não segura o webhook', () => {
+  /**
+   * O caso real de 21/08: uma cliente pagou o upgrade às 19:45, o webhook
+   * confirmou às 19:46, a geração começou dentro da requisição e morreu no
+   * meio. O pedido ficou em `gerando` por dez horas.
+   *
+   * E a retentativa do gateway — a rede que existe exatamente para isso — não
+   * salvou: `melhoria_paga_em` já estava gravado, `confirmarMelhoria` devolvia
+   * "já processado", e nada era refeito.
+   */
+  test('confirmarMelhoria devolve a promessa em vez de aguardá-la', () => {
+    const fonte = codigoDe('src/nucleo/melhoria.ts');
+    assert.ok(
+      /entrega: processarPedido\(pedidoId\)/.test(fonte),
+      'a geração precisa sair como promessa para quem chama decidir'
+    );
+    assert.ok(
+      !/await processarPedido\(pedidoId\)/.test(fonte),
+      'aguardar aqui devolve o bug: o webhook segura pelo tempo da geração'
+    );
+  });
+
+  test('o webhook não espera a regeneração', () => {
+    const fonte = codigoDe('src/lib/webhook-pagamento.ts');
+    assert.ok(
+      /const \{ aplicou, entrega \} = await confirmarMelhoria/.test(fonte),
+      'o webhook precisa receber a promessa'
+    );
+    assert.ok(
+      !/await confirmarMelhoria\([^)]*\)[\s\S]{0,80}await entrega/.test(fonte),
+      'o webhook nunca pode aguardar a entrega — tem 8s para responder'
+    );
+  });
+
+  /**
+   * `pedidosTravados()` procura `gerando` com `tentativas < 3`. Se a melhoria
+   * não deixasse o pedido em `gerando`, uma geração morta ficaria invisível
+   * para `npm run reprocessar` — sem rede nenhuma embaixo.
+   */
+  test('o pedido fica em `gerando`, que é o que o reprocessamento enxerga', () => {
+    const fonte = codigoDe('src/nucleo/melhoria.ts');
+    assert.ok(/status: 'gerando'/.test(fonte));
+  });
+});

@@ -336,6 +336,31 @@ db.exec(`
     origem TEXT,
     criado_em TEXT NOT NULL
   );
+
+  /**
+   * Ofertas da Cakto, indexadas pelo preço.
+   *
+   * Existe porque a API da Cakto NAO aceita cobrar um valor: items[0].offerId
+   * é obrigatório e o preço vem da oferta cadastrada na conta deles. Amarrar
+   * preço a cadastro manual devolveria a decisão de quanto custa para uma tela
+   * de painel — exatamente o que produtoVigente existe para impedir.
+   *
+   * Então a oferta vira detalhe interno: dado um preço, o adaptador procura
+   * aqui, e se não achar, cria a oferta na Cakto e grava. O preço continua
+   * sendo nosso, em centavos, e qualquer cupom novo funciona sem ninguém
+   * abrir o painel deles.
+   *
+   * Chaveado por (produto, preço): a mesma Revelação a 16,00 e a 12,80 são
+   * duas ofertas, e dois produtos diferentes no mesmo preço também são.
+   */
+  CREATE TABLE IF NOT EXISTS ofertas_cakto (
+    produto TEXT NOT NULL,
+    preco_centavos INTEGER NOT NULL,
+    offer_id TEXT NOT NULL,
+    nome TEXT,
+    criado_em TEXT NOT NULL,
+    PRIMARY KEY (produto, preco_centavos)
+  );
 `);
 
 /**
@@ -624,6 +649,14 @@ export interface Pedido {
   /** 1 = `narracao.mp3` existe (só produtos com `narracaoAudio`). */
   audio_narracao: number;
   /** Valor cobrado, taxa do MP e o que sobrou — em centavos, como o MP conta. */
+  /** JSON com os UTMs da chegada. Ver a migração 026. */
+  utm_json: string | null;
+  /** Quem cobrou: `cakto`, `mercadopago`, ou NULL nos pedidos antigos (= MP). */
+  gateway: string | null;
+  /** Exigido pela Cakto em qualquer cobrança. Coletado na tela de pagamento. */
+  telefone: string | null;
+  /** IP de quem comprou, capturado na criação do pedido. */
+  ip_comprador: string | null;
   bruto_centavos: number | null;
   taxa_centavos: number | null;
   liquido_centavos: number | null;
@@ -759,23 +792,76 @@ export function pedidosTravados(): Pedido[] {
  * acontecer sozinha. A **máxima** evita ressuscitar carrinho de semanas atrás,
  * que a pessoa já esqueceu e lê como spam.
  */
+/**
+ * ── Por que a espera é de 24 horas ────────────────────────────────────────
+ *
+ * Eram 6. A ideia era pegar a pessoa ainda quente, mas ela atropelava o Pix:
+ * o código gerado vale até o dia seguinte, e mandar "seu familiar ficou
+ * esperando" para quem tem um Pix aberto no celular é apressar quem já
+ * decidiu — e queimar o cupom de resgate com quem ia pagar de qualquer jeito.
+ *
+ * 24h é o ponto em que o Pix venceu de vez e a intenção esfriou: aí o
+ * lembrete vira lembrete, e o desconto vira motivo.
+ */
 export function pedidosAbandonados(
-  horasMinimas = 6,
+  horasMinimas = 24,
   horasMaximas = 72
 ): Pedido[] {
   const agora = Date.now();
-  return db
+  const linhas = db
     .prepare(
       `SELECT * FROM pedidos
        WHERE status = 'aguardando_pagamento'
          AND lembrete_em IS NULL
+         AND email IS NOT NULL AND email != ''
          AND criado_em <= ?
-         AND criado_em >= ?`
+         AND criado_em >= ?
+       ORDER BY criado_em DESC`
     )
     .all(
       new Date(agora - horasMinimas * 3_600_000).toISOString(),
       new Date(agora - horasMaximas * 3_600_000).toISOString()
     ) as Pedido[];
+
+  /**
+   * **Um por pessoa, não um por pedido.**
+   *
+   * A consulta devolvia uma linha por carrinho, e quem refez o ritual três
+   * vezes recebia três e-mails iguais. Uma pessoa fez exatamente isso em
+   * 22/08 — três pedidos em 80 minutos — e outra aparece duas vezes só porque
+   * digitou o e-mail com maiúsculas diferentes nas duas.
+   *
+   * O próprio script já dizia a regra em comentário ("um e-mail por pessoa, e
+   * só... quem não quis vai marcar como spam, e aí o domínio inteiro paga o
+   * preço, inclusive os e-mails de entrega"). O que faltava era o código
+   * cumprir o que o comentário prometia.
+   *
+   * Fica o pedido MAIS RECENTE de cada endereço: é o que a pessoa estava
+   * tentando comprar por último, e o link do lembrete leva para ele.
+   */
+  const porPessoa = new Map<string, Pedido>();
+  for (const p of linhas) {
+    const chave = p.email.trim().toLowerCase();
+    if (!porPessoa.has(chave)) porPessoa.set(chave, p);
+  }
+  return [...porPessoa.values()];
+}
+
+/**
+ * Marca como lembrada TODA a fila daquele endereço, não só o pedido enviado.
+ *
+ * Sem isto, deduplicar não resolve nada: a rodada seguinte encontraria o
+ * segundo carrinho da mesma pessoa, mandaria o segundo e-mail, e o terceiro
+ * na hora seguinte. A dedupe só vale se os irmãos saírem da fila junto.
+ */
+export function marcarLembretePorEmail(email: string): number {
+  return db
+    .prepare(
+      `UPDATE pedidos SET lembrete_em = ?
+       WHERE lower(trim(email)) = ? AND status = 'aguardando_pagamento'
+         AND lembrete_em IS NULL`
+    )
+    .run(new Date().toISOString(), email.trim().toLowerCase()).changes;
 }
 
 export function marcarLembreteEnviado(id: string): void {

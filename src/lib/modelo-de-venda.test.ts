@@ -10,6 +10,8 @@ import {
   precoVigenteCentavos,
   produtoVigente,
   destinoDepoisDaEntrega,
+  ofertaDepoisDaEntrega,
+  CHAVE_OFERTA_FECHADA,
 } from './modelo-de-venda';
 
 /**
@@ -34,13 +36,32 @@ describe('desligado — o modelo de produção', () => {
   });
 
   /** O erro que custaria dinheiro: entregar de graça o que o anúncio cobra. */
-  test('a Revelação custa o preço da campanha, não zero', () => {
-    assert.equal(precoVigenteCentavos('revelacao'), 980);
-    assert.equal(produtoVigente('revelacao').precoCentavos, 980);
+  /**
+   * O número aqui é o CHEIO, antes do cupom de lançamento. O que o cliente
+   * paga (R$ 9,80) é travado em `preco-com-cupom.test.ts` — os dois juntos
+   * são o contrato: cheio 12,25, cobrado 9,80.
+   */
+  test('a Revelação tem preço cheio, não zero', () => {
+    assert.equal(precoVigenteCentavos('revelacao'), 1225);
+    assert.equal(produtoVigente('revelacao').precoCentavos, 1225);
   });
 
-  test('depois da entrega vai para a revelação, como produção faz hoje', () => {
+  /**
+   * Mudou em 22/08/2026, de propósito.
+   *
+   * A tela de oferta estava presa ao interruptor do modelo — e como ele fica
+   * desligado (ligá-lo zera o preço da Revelação), a tela de venda mais
+   * importante do funil nunca apareceu para ninguém. Agora ela tem chave
+   * própria, e o padrão é aparecer.
+   */
+  test('depois da entrega vai para a OFERTA, mesmo com o modelo desligado', () => {
+    assert.equal(destinoDepoisDaEntrega('abc'), '/oferta/abc');
+  });
+
+  test('a trava de emergência devolve todo mundo para a revelação', () => {
+    definirInterruptor({ chave: CHAVE_OFERTA_FECHADA, ligado: true, percentual: 100 });
     assert.equal(destinoDepoisDaEntrega('abc'), '/revelacao/abc');
+    assert.equal(ofertaDepoisDaEntrega(), false);
   });
 
   /**
@@ -57,8 +78,8 @@ describe('desligado — o modelo de produção', () => {
     );
   });
 
-  test('produtos que não mudaram de preço seguem iguais', () => {
-    assert.equal(precoVigenteCentavos('completa'), 1890);
+  test('a Completa também tem cheio, para o cupom caber', () => {
+    assert.equal(precoVigenteCentavos('completa'), 2362);
   });
 });
 
@@ -69,7 +90,7 @@ describe('ligado — o modelo novo', () => {
     assert.equal(precoVigenteCentavos('revelacao'), 0);
   });
 
-  test('depois da entrega vai para a oferta de três degraus', () => {
+  test('com o modelo novo ligado também vai para a oferta', () => {
     assert.equal(destinoDepoisDaEntrega('abc'), '/oferta/abc');
   });
 });
@@ -79,7 +100,7 @@ describe('virar a chave', () => {
     ligar(true);
     assert.equal(precoVigenteCentavos('revelacao'), 0);
     ligar(false);
-    assert.equal(precoVigenteCentavos('revelacao'), 980);
+    assert.equal(precoVigenteCentavos('revelacao'), 1225);
   });
 });
 
@@ -132,7 +153,7 @@ describe('nenhuma rota decide preço pela tabela estática', () => {
     ligar(false);
     const preco = precoVigenteCentavos('revelacao');
     assert.ok(preco > 0, 'preço zero faz o funil entregar sem cobrar');
-    assert.equal(preco, 980);
+    assert.equal(preco, 1225);
   });
 });
 
@@ -173,7 +194,7 @@ describe('nenhum caminho de cobrança escapa do interruptor', () => {
     ligar(false);
     assert.equal(
       precoDoPedido({ produto: 'revelacao', desconto_percentual: null }).finalCentavos,
-      980
+      1225
     );
     ligar(true);
     assert.equal(

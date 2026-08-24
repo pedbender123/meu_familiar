@@ -1,6 +1,5 @@
 import { Suspense } from 'react';
-import { ITENS } from '@/lib/quiz/itens';
-import { ordemEmbaralhada } from '@/lib/quiz/ordem';
+import { ordemEmbaralhada, itensNaOrdemDeExibicao } from '@/lib/quiz/ordem';
 import { PRODUTO_PADRAO } from '@/lib/produtos';
 import { RitualCliente } from './RitualCliente';
 
@@ -28,7 +27,7 @@ export default function Ritual() {
     // useSearchParams — sem a fronteira, o Next recusa o build.
     <Suspense fallback={null}>
       <RitualCliente
-        itens={ITENS}
+        itens={itensNaOrdemDeExibicao()}
         ordemDasOpcoes={ordemEmbaralhada()}
         produtoPadrao={PRODUTO_PADRAO}
       />

@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { Suspense } from 'react';
-import { ITENS } from '@/lib/quiz/itens';
-import { ordemEmbaralhada } from '@/lib/quiz/ordem';
+import { ordemEmbaralhada, itensNaOrdemDeExibicao } from '@/lib/quiz/ordem';
 import { PRODUTO_PADRAO } from '@/lib/produtos';
 import { RitualCliente } from './ritual/RitualCliente';
 
@@ -40,7 +39,7 @@ export function PortaDoRitual() {
   return (
     <Suspense fallback={null}>
       <RitualCliente
-        itens={ITENS}
+        itens={itensNaOrdemDeExibicao()}
         ordemDasOpcoes={ordemEmbaralhada()}
         produtoPadrao={PRODUTO_PADRAO}
         hero={<Hero />}
@@ -58,9 +57,27 @@ export function PortaDoRitual() {
  */
 function Hero() {
   return (
-    <h1 className="font-display italic text-3xl sm:text-5xl leading-[1.12] text-pergaminho text-center text-balance max-w-[16ch] anima-surgir">
-      Toda bruxa tem um familiar. O seu já te escolheu.
-    </h1>
+    <div className="flex flex-col items-center gap-3 anima-surgir">
+      <h1 className="font-display italic text-3xl sm:text-5xl leading-[1.12] text-pergaminho text-center text-balance max-w-[16ch]">
+        Toda bruxa tem um familiar. O seu já te escolheu.
+      </h1>
+      {/*
+        O contrato, numa linha.
+
+        Antes não existia: a pessoa caía numa pergunta abstrata sem saber
+        quantas vinham, quanto tempo levava, nem o que ganhava no fim. A barra
+        de progresso aparece quase vazia e sem número, então ela também não
+        respondia isso. Um ritual de 26 cenas sem contrato é um cheque em
+        branco pedido a alguém que chegou há dois segundos.
+
+        Dizer o tamanho ANTES parece contra-intuitivo — "26 vai assustar" —,
+        mas o que assusta de verdade é não saber onde acaba. O número vem
+        acompanhado do tempo e da entrega, que é o que o torna aceitável.
+      */}
+      <p className="font-corpo text-[0.8rem] leading-relaxed text-pergaminho/55 text-center max-w-[34ch]">
+        26 cenas, uns 3 minutos. No fim, você vê quem é o seu familiar.
+      </p>
+    </div>
   );
 }
 

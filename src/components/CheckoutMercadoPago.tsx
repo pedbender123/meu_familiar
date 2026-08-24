@@ -66,6 +66,8 @@ export function CheckoutMercadoPago({
   nomeProduto,
   cupom,
   modo,
+  /** `false` quando o Pix é cobrado pela Cakto, fora do Brick. */
+  pixNoBrick = true,
   generoDoFamiliar,
   itens,
   /**
@@ -92,6 +94,8 @@ export function CheckoutMercadoPago({
   itens?: string[];
   /** Presente só quando o pedido nasceu com cupom. */
   cupom?: { codigo: string; descontoPercentual: number; cheioEmReais: number };
+  /** `false` quando o Pix é cobrado pela Cakto, fora do Brick. */
+  pixNoBrick?: boolean;
   /** `pedido` = funil do ritual; `cobranca` = assinatura de plano. */
   base?: 'pedido' | 'cobranca';
   /**
@@ -156,7 +160,15 @@ export function CheckoutMercadoPago({
           customization: {
             paymentMethods: {
               creditCard: 'all',
-              bankTransfer: 'all', // Pix
+              /**
+               * Pix sai do Brick quando quem cobra Pix é a Cakto.
+               *
+               * Sem isto, a tela ofereceria Pix duas vezes — uma por gateway —
+               * e a pessoa escolheria por sorte qual dos dois. Pior: o do
+               * Brick continuaria cobrando pelo Mercado Pago, e metade das
+               * vendas "da Cakto" não apareceria lá.
+               */
+              bankTransfer: pixNoBrick ? 'all' : [],
               debitCard: [],
               ticket: [],
               // Parcelar quinze reais faz o produto parecer mais caro do que é.

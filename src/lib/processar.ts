@@ -114,10 +114,57 @@ export async function aposPagamento(pedidoId: string): Promise<void> {
  * existe porque o link da Revelação **expira em 7 dias** — sem o anexo, quem
  * pagou R$ 9,80 ficaria sem cópia nenhuma depois disso.
  */
+/**
+ * Uma geração parada há mais que isto está morta, não em andamento.
+ *
+ * A geração inteira leva de dez a trinta segundos. Dez minutos é folgado o
+ * bastante para nunca competir com uma que ainda está viva, e curto o
+ * bastante para ninguém esperar meio dia por um PDF.
+ */
+export const GERACAO_MORTA_APOS_MS = 10 * 60 * 1000;
+
+/**
+ * Se este pedido pode entrar em geração agora.
+ *
+ * ── O buraco que isto fecha ───────────────────────────────────────────────
+ *
+ * Antes era `status !== 'pago' && status !== 'erro'` e pronto: qualquer
+ * pedido em `gerando` era recusado em silêncio.
+ *
+ * A intenção era boa — não disparar duas gerações sobre o mesmo pedido. O
+ * efeito foi outro: **quando uma geração morre no meio, o pedido fica em
+ * `gerando` para sempre.** E o pior é que `pedidosTravados()` inclui
+ * `gerando` de propósito, porque é exatamente ali que os mortos ficam. Ou
+ * seja, `npm run reprocessar` listava o pedido, chamava esta função, ela
+ * recusava sem dizer nada, e o script imprimia "Concluído".
+ *
+ * A rede de segurança existia, era chamada, e não pegava nada.
+ *
+ * Uma cliente que pagou o upgrade em 21/08 passou catorze horas assim. O
+ * conserto é distinguir "gerando agora" de "morreu gerando", e a diferença é
+ * o relógio: `atualizado_em` para de andar quando o processo cai.
+ */
+export function podeGerar(
+  pedido: { status: string; atualizado_em?: string | null },
+  agora = Date.now()
+): boolean {
+  if (pedido.status === 'pago' || pedido.status === 'erro') return true;
+
+  if (pedido.status === 'gerando') {
+    const carimbo = pedido.atualizado_em ? Date.parse(pedido.atualizado_em) : NaN;
+    // Sem carimbo legível, assume morta: um pedido preso em `gerando` sem
+    // saber desde quando é justamente o que precisa ser resgatado.
+    if (!Number.isFinite(carimbo)) return true;
+    return agora - carimbo > GERACAO_MORTA_APOS_MS;
+  }
+
+  return false;
+}
+
 export async function processarPedido(pedidoId: string): Promise<void> {
   const pedido = buscarPedido(pedidoId);
   if (!pedido) return;
-  if (pedido.status !== 'pago' && pedido.status !== 'erro') return;
+  if (!podeGerar(pedido)) return;
 
   try {
     atualizarPedido(pedidoId, { status: 'gerando', tentativas: pedido.tentativas + 1 });
@@ -161,16 +208,37 @@ export async function processarPedido(pedidoId: string): Promise<void> {
     // existia, e o texto do e-mail depende disso.
     const contaJaExistia = !!buscarConta(pedido.email);
 
-    const leitura = await gerarLeitura({
-      nome: pedido.nome,
-      familiar,
-      signoSol,
-      signoLua,
-      lua: pedido.lua as LuaId,
-      resumoRespostas,
-      longa: produto.relatorioCompleto,
-      perfil: descreverPerfil(pedido.perfil_json),
-    });
+    /**
+     * **A leitura já escrita é reaproveitada.**
+     *
+     * Antes esta chamada era incondicional, e isso quebrava duas coisas de
+     * uma vez no upgrade de R$ 4,90:
+     *
+     * 1. **O texto mudava.** A pessoa já tinha lido a revelação dela. Pagar
+     *    para desbloquear gráficos e narração e receber de volta um texto
+     *    DIFERENTE não é um upgrade — é outro produto, e ela vai reparar.
+     * 2. **Custava uma geração de IA inteira** para entregar arquivos que
+     *    saem do texto que já existia. O upgrade é barato de propósito
+     *    justamente porque não deveria ter custo marginal nenhum.
+     *
+     * O mesmo vale para o reprocessamento de um pedido que morreu no meio:
+     * se a leitura sobreviveu, refazê-la é pagar duas vezes pela mesma coisa
+     * e devolver um texto diferente a quem já tinha visto o primeiro.
+     *
+     * Só gera quando não existe nada — que é o caso de toda primeira entrega.
+     */
+    const leitura = pedido.leitura_json
+      ? (JSON.parse(pedido.leitura_json) as Awaited<ReturnType<typeof gerarLeitura>>)
+      : await gerarLeitura({
+          nome: pedido.nome,
+          familiar,
+          signoSol,
+          signoLua,
+          lua: pedido.lua as LuaId,
+          resumoRespostas,
+          longa: produto.relatorioCompleto,
+          perfil: descreverPerfil(pedido.perfil_json),
+        });
 
     await gerarArtes(pedidoId, {
       nome: pedido.nome,

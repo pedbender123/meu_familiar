@@ -57,25 +57,57 @@ export function anotarPagamentoDaMelhoria(pedidoId: string, pagamentoId: string)
  * PDF é o que a pessoa guarda. Refazer parcial deixaria um artefato costurado
  * de duas gerações diferentes.
  */
+export interface ResultadoDaMelhoria {
+  aplicou: boolean;
+  /**
+   * A regeneração, **não aguardada aqui**.
+   *
+   * Quem chama decide se espera. O webhook NÃO deve: ver o comentário abaixo.
+   */
+  entrega?: Promise<void>;
+}
+
+/**
+ * ── Por que isto não espera mais a geração ────────────────────────────────
+ *
+ * Antes era `await processarPedido(pedidoId)` aqui dentro, e o webhook
+ * chamava com `await`. Ou seja: a geração inteira — IA, artes, PDF, e-mail —
+ * rodava DENTRO da requisição do webhook do gateway.
+ *
+ * O caminho da compra normal nunca fez isso. `webhook-pagamento.ts` dispara
+ * `aposPagamento()` sem `await`, de propósito, e diz isso em comentário. A
+ * melhoria era a exceção, e a exceção quebrou.
+ *
+ * **O que aconteceu em 21/08:** uma cliente pagou o upgrade às 19:45, o
+ * webhook confirmou às 19:46, a geração começou e foi interrompida no meio.
+ * O pedido ficou em `gerando` para sempre. E o pior: quando o gateway
+ * reenviou a notificação — que é exatamente a rede que existe para salvar
+ * esse caso — `melhoria_paga_em` já estava gravado, esta função devolvia
+ * `false`, e a retentativa não fazia nada.
+ *
+ * Devolver a promessa em vez de aguardá-la deixa a escolha com quem chama: o
+ * webhook responde rápido e some, o modo fake espera para a tela seguinte já
+ * encontrar tudo pronto.
+ */
 export async function confirmarMelhoria(
   pedidoId: string,
   dados: { brutoCentavos?: number | null } = {}
-): Promise<boolean> {
+): Promise<ResultadoDaMelhoria> {
   const pedido = buscarPedido(pedidoId);
-  if (!pedido) return false;
+  if (!pedido) return { aplicou: false };
 
-  if (pedido.melhoria_paga_em) return false;
+  if (pedido.melhoria_paga_em) return { aplicou: false };
 
   atualizarPedido(pedidoId, {
     produto: 'completa',
     melhoria_paga_em: new Date().toISOString(),
     melhoria_bruto_centavos: dados.brutoCentavos ?? PRECO_DA_MELHORIA_CENTAVOS,
     // Volta a `gerando` para a tela de espera saber que há algo acontecendo —
-    // `processarPedido` a devolve para `entregue` no fim.
+    // `processarPedido` a devolve para `entregue` no fim. E é este `gerando`
+    // que faz `pedidosTravados()` encontrar o pedido se a geração morrer.
     status: 'gerando',
   });
   registrarEvento('melhoria_confirmada', pedidoId);
 
-  await processarPedido(pedidoId);
-  return true;
+  return { aplicou: true, entrega: processarPedido(pedidoId) };
 }

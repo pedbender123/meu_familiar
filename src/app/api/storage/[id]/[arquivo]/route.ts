@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import { buscarPedido } from '@/lib/db';
-import { pastaDoPedido } from '@/lib/caminhos';
+import { pastaDoPedido, familiarFundidaPng } from '@/lib/caminhos';
 
 const ARQUIVOS_PERMITIDOS: Record<string, string> = {
   'story.png': 'image/png',
@@ -14,6 +14,18 @@ const ARQUIVOS_PERMITIDOS: Record<string, string> = {
   'revelacao.pdf': 'application/pdf',
   'narracao.mp3': 'audio/mpeg',
   'veu.webp': 'image/webp',
+  /**
+   * A aparência do familiar, sem a leitura.
+   *
+   * Não é um arquivo do pedido: resolve para uma das 48 artes prontas
+   * (familiar × lua) em `conteudo/fundidas`. Existe para quem fez o ritual e
+   * não comprou poder ver A CARA do familiar dela — que é o que o anúncio
+   * prometeu — sem receber o que a Revelação vende, que é o texto.
+   *
+   * Mostrar isto não custa nada: a arte já existe em disco desde antes de a
+   * pessoa chegar. O que custa (a leitura por IA) nem chegou a ser gerado.
+   */
+  'familiar.png': 'image/png',
 };
 
 export async function GET(
@@ -44,12 +56,19 @@ export async function GET(
    * existem depois de `entregue`, então esta linha é defensiva, não uma porta
    * aberta de verdade.
    */
-  const LIBERADOS_ANTES = new Set(['carta.webp', 'og.png', 'veu.webp']);
+  const LIBERADOS_ANTES = new Set(['carta.webp', 'og.png', 'veu.webp', 'familiar.png']);
   if (pedido.status !== 'entregue' && !LIBERADOS_ANTES.has(arquivo)) {
     return NextResponse.json({ erro: 'não encontrado' }, { status: 404 });
   }
 
-  const caminho = path.join(pastaDoPedido(id), arquivo);
+  /**
+   * `familiar.png` mora fora da pasta do pedido: é arte compartilhada, a
+   * mesma para todo mundo que tirou aquele familiar naquela lua.
+   */
+  const caminho =
+    arquivo === 'familiar.png'
+      ? familiarFundidaPng(pedido.familiar, pedido.lua)
+      : path.join(pastaDoPedido(id), arquivo);
 
   /**
    * `email.jpg` nasceu depois dos pedidos que já existem.

@@ -3,6 +3,7 @@ import path from 'path';
 import { Resend } from 'resend';
 import { pastaDoPedido } from './caminhos';
 import { diasRestantes, produtoDe, precoFormatado, PRODUTOS } from './produtos';
+import { PRECO_DA_MELHORIA_CENTAVOS } from '../nucleo/melhoria';
 
 /**
  * E-mail transacional via Resend.
@@ -184,6 +185,35 @@ export async function enviarRevelacao(params: {
            dá para fazer isso por R$ ${precoFormatado(PRODUTOS.link_permanente)}.
          </p>`;
 
+  /**
+   * O upgrade para a Completa, por R$ 4,90.
+   *
+   * ── Por que aqui, e por que só na Revelação ───────────────────────────
+   *
+   * A melhoria existia em código (`/melhorar/[id]`, `PRECO_DA_MELHORIA_CENTAVOS`)
+   * e não era oferecida em lugar nenhum: nem no e-mail, nem na revelação. Uma
+   * página de compra sem nenhum link para ela é receita que nunca acontece.
+   *
+   * Este é o melhor momento do funil para oferecer: a pessoa acabou de
+   * receber o que comprou e está satisfeita — não é interrupção, é o passo
+   * seguinte natural.
+   *
+   * Só aparece para quem tem a Revelação simples. Quem já comprou a Completa
+   * receberia uma oferta do que já tem, que é o tipo de erro que faz perder a
+   * confiança do comprador inteiro.
+   */
+  const ofereceUpgrade = produtoId === 'revelacao';
+  const urlUpgrade = comMarca(`${base()}/melhorar/${pedidoId}`, 'up');
+  const blocoUpgrade = ofereceUpgrade
+    ? `<p style="margin:22px 0 0;font-family:Arial,sans-serif;font-size:13px;line-height:1.6;color:#6B4E1E;background:rgba(217,164,65,0.16);border-radius:6px;padding:14px;">
+         <strong>Quer a leitura completa?</strong> Por mais
+         R$ ${(PRECO_DA_MELHORIA_CENTAVOS / 100).toFixed(2).replace('.', ',')} você
+         abre o relatório inteiro do seu perfil, com os gráficos e as leituras
+         que ficaram de fora.
+         <br><a href="${urlUpgrade}" style="color:#8A6A2F;font-weight:bold;">Ver o que vem na Completa</a>
+       </p>`
+    : '';
+
   const anexos: Anexo[] = [];
   const caminhoPdf = path.join(pastaDoPedido(pedidoId), 'revelacao.pdf');
   if (fs.existsSync(caminhoPdf)) {
@@ -209,6 +239,7 @@ export async function enviarRevelacao(params: {
       invocação${produto.graficos ? ' e os gráficos do seu perfil' : ''}.
       Guarde ou imprima.
     </p>
+    ${blocoUpgrade}
   `);
 
   const texto = [
@@ -218,6 +249,9 @@ export async function enviarRevelacao(params: {
       : `Seu link fica no ar até ${new Date(expiraEm!).toLocaleDateString('pt-BR')}. O PDF em anexo é seu para sempre.`,
     `Em anexo vai a revelação inteira em PDF: a carta, a leitura, a sua invocação${produto.graficos ? ' e os gráficos do seu perfil' : ''}.`,
     `Ver a revelação: ${url}`,
+    ofereceUpgrade
+      ? `Quer a leitura completa? Por mais R$ ${(PRECO_DA_MELHORIA_CENTAVOS / 100).toFixed(2).replace('.', ',')}: ${urlUpgrade}`
+      : '',
   ]
     .filter(Boolean)
     .join('\n\n');
@@ -325,9 +359,40 @@ export async function enviarLembreteDeCarrinho(params: {
   email: string;
   pedidoId: string;
   nomeFamiliar: string;
+  /**
+   * A condição de resgate: código e percentual. Opcional — sem ela o e-mail
+   * volta a ser só um lembrete, que é como ele nasceu.
+   */
+  oferta?: { codigo: string; percentual: number; precoCentavos: number } | null;
 }): Promise<void> {
-  const { nome, email, pedidoId } = params;
-  const url = comMarca(`${base()}/pagamento/${pedidoId}`, 'ca');
+  const { nome, email, pedidoId, oferta } = params;
+  // O cupom viaja na URL para a tela já abrir com o desconto aplicado. Quem
+  // valida é o servidor, sempre: o código no link é conveniência, não permissão.
+  const url = comMarca(
+    `${base()}/pagamento/${pedidoId}${oferta ? `?cupom=${encodeURIComponent(oferta.codigo)}` : ''}`,
+    'ca'
+  );
+
+  /**
+   * A oferta de resgate.
+   *
+   * Quem parou na tela de pagamento já respondeu 26 cenas e já entregou o
+   * e-mail — falta lembrança e um motivo para ser agora. O desconto é esse
+   * motivo, e ele é grande de propósito: esta pessoa já custou o clique do
+   * anúncio, então cada resgate é margem que não existiria de outro jeito.
+   *
+   * O código é de USO LIMITADO e vence junto com a janela do lembrete. Um
+   * cupom permanente de 45% que vaza vira desconto eterno para todo mundo.
+   */
+  const blocoOferta = oferta
+    ? `<p style="margin:22px 0 0;font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#6B4E1E;background:rgba(217,164,65,0.16);border-radius:6px;padding:14px;">
+         <strong>Se for agora, a Revelação Completa sai por
+         R$ ${(oferta.precoCentavos / 100).toFixed(2).replace('.', ',')}</strong>
+         — ${oferta.percentual}% off, com a leitura funda, a narração em áudio e
+         os gráficos do seu perfil.
+         <br><span style="color:#6B5F72;">O código <strong>${oferta.codigo}</strong> já vai aplicado no link. Vale por poucos dias.</span>
+       </p>`
+    : '';
 
   const html = moldura(`
     <p style="margin:0 0 6px;font-family:Arial,sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#6B5F72;">O ritual ficou aberto</p>
@@ -340,6 +405,7 @@ export async function enviarLembreteDeCarrinho(params: {
       parou.
     </p>
     <p style="margin:0 0 8px;">${botao(url, 'Ver quem me encontrou')}</p>
+    ${blocoOferta}
   `);
 
   await enviar({
@@ -348,6 +414,11 @@ export async function enviarLembreteDeCarrinho(params: {
     html,
     texto: [
       `${nome}, você respondeu às 26 cenas e o seu familiar foi encontrado.`,
+      oferta
+        ? `Se for agora, a Completa sai por R$ ${(oferta.precoCentavos / 100)
+            .toFixed(2)
+            .replace('.', ',')} (${oferta.percentual}% off) com o código ${oferta.codigo}.`
+        : '',
       `Está tudo guardado. Continue de onde parou: ${url}`,
     ].join('\n\n'),
   });

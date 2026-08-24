@@ -89,6 +89,13 @@ const GANHOS: Record<PlanoDaOfertaId, string[]> = {
  * vez de derrubar a página — esta tela está no caminho do dinheiro, e ela
  * ficar de pé com duas opções é infinitamente melhor do que dar 500.
  */
+/**
+ * A escada é sempre a mesma: os três degraus, para todo mundo.
+ *
+ * Houve uma versão que escondia a avulsa que a pessoa já possuía. Saiu por
+ * decisão do dono: a tela é a vitrine da plataforma, não um cálculo de
+ * inventário, e esconder degrau quebra a escada que faz a decisão ficar fácil.
+ */
 export function escadaDaOferta(opcoes: { avulsas?: boolean } = {}): ItemDaOferta[] {
   const comAvulsas = opcoes.avulsas ?? true;
   const itens: ItemDaOferta[] = [];

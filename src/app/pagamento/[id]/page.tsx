@@ -4,6 +4,8 @@ import { chavePublica, modoAtual, pagamentoEhFake } from '@/nucleo/checkouts/mer
 import { produtoDe } from '@/lib/produtos';
 import { precoDoPedido } from '@/lib/cupons';
 import { CheckoutMercadoPago } from '@/components/CheckoutMercadoPago';
+import { CheckoutCaktoPix } from '@/components/CheckoutCaktoPix';
+import { gatewayDe } from '@/nucleo/checkouts/gateway';
 import { PagamentoFake } from '@/components/PagamentoFake';
 import { MarcoDoCheckout } from '@/components/MarcoDoCheckout';
 import { FAMILIARES, type FamiliarId } from '@/lib/familiares';
@@ -34,12 +36,33 @@ export default async function Pagamento({
   const preco = precoDoPedido(pedido);
   const chave = chavePublica();
 
+  /**
+   * Quem cobra cada meio, decidido no servidor a cada visita.
+   *
+   * Durante a virada os dois convivem: o Pix pode estar na Cakto e o cartão no
+   * Mercado Pago. Quando o Pix não é do Brick, ele sai do Brick — deixar os
+   * dois oferecendo Pix mostraria duas formas de fazer a mesma coisa, com
+   * gateways diferentes, na mesma tela.
+   */
+  const pixNaCakto = gatewayDe('pix') === 'cakto';
+
   return (
     <main className="flex-1 flex flex-col items-center justify-center px-6 py-16">
       <MarcoDoCheckout pedidoId={id} valorEmReais={preco.finalCentavos / 100} />
       {pagamentoEhFake() || !chave ? (
         <PagamentoFake pedidoId={id} />
       ) : (
+        <>
+        {pixNaCakto ? (
+          <div className="w-full max-w-md mb-10">
+            <CheckoutCaktoPix
+              pedidoId={id}
+              valorEmReais={preco.finalCentavos / 100}
+              nome={pedido.nome}
+              cpf={pedido.cpf}
+            />
+          </div>
+        ) : null}
         <CheckoutMercadoPago
           pedidoId={id}
           chavePublica={chave}
@@ -53,7 +76,9 @@ export default async function Pagamento({
               : undefined
           }
           modo={modoAtual()}
+          pixNoBrick={!pixNaCakto}
         />
+        </>
       )}
     </main>
   );

@@ -10,6 +10,8 @@ import { TextoEscrito, BlocoRevelado } from '@/components/TextoEscrito';
 import { PoeiraNaLuz } from '@/components/PoeiraNaLuz';
 import { Constelacao } from '@/components/Constelacao';
 import { BotaoCompartilhar } from '@/components/BotaoCompartilhar';
+import { OfertaDaCompleta } from '@/components/OfertaDaCompleta';
+import { podeMelhorar } from '@/nucleo/melhoria';
 import { MarcarNoStory } from '@/components/MarcarNoStory';
 import { marcacaoDoPedido } from '@/lib/marcacoes';
 import { RodapeLegal } from '@/components/RodapeLegal';
@@ -249,6 +251,20 @@ export default async function Revelacao({
             textoCompartilhar={`Descobri meu familiar de bruxa: ${familiar.nome} · ${leitura.nome_secreto}.`}
           />
         </BlocoRevelado>
+
+        {/*
+          O upgrade para a Completa, por R$ 4,90.
+
+          Só para a DONA: a página tem link público, e oferecer um upgrade a
+          quem recebeu o link de outra pessoa venderia a melhoria de um pedido
+          que não é dela. `podeMelhorar` cuida do resto — quem já tem a
+          Completa, quem já pagou, e os exemplos do mural ficam de fora.
+        */}
+        {ehADona && podeMelhorar(pedido) && (
+          <BlocoRevelado className="flex justify-center">
+            <OfertaDaCompleta pedidoId={id} />
+          </BlocoRevelado>
+        )}
 
         {/*
           A troca por compartilhamento fica logo abaixo dos botões de

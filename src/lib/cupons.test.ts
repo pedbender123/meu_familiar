@@ -2,6 +2,7 @@ import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { PISO_COBRAVEL_CENTAVOS, normalizarCodigo, precoComDesconto, receitaDoPedido } from './cupons';
 import { PRODUTOS, type Produto } from './produtos';
+import { precoVigenteCentavos } from './modelo-de-venda';
 
 /**
  * Um produto de preço FIXO só para estes testes.
@@ -139,8 +140,16 @@ describe('receita de verdade', () => {
     );
   });
 
-  /** Pedidos antigos, de antes de `bruto_centavos` existir. */
-  test('com pagamento mas sem valor, cai no preço de tabela', () => {
+  /**
+   * Pedidos antigos, de antes de `bruto_centavos` existir.
+   *
+   * Compara com `precoVigenteCentavos` e não com um número escrito à mão: o
+   * que este teste garante é que a receita CAI NO PREÇO VIGENTE quando o valor
+   * cobrado não foi gravado — e não qual é esse preço. Fixar 980 aqui fez o
+   * teste quebrar no dia em que a Revelação passou para R$ 12,90, escondendo
+   * uma mudança de preço legítima atrás de uma falha que parecia bug.
+   */
+  test('com pagamento mas sem valor, cai no preço vigente', () => {
     assert.equal(
       receitaDoPedido({
         produto: 'revelacao',
@@ -148,7 +157,7 @@ describe('receita de verdade', () => {
         bruto_centavos: null,
         pagamento_id: 'mp-antigo',
       }),
-      980
+      precoVigenteCentavos('revelacao')
     );
   });
 

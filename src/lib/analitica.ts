@@ -513,6 +513,8 @@ export const MARCOS = [
    */
   'plano_revelacao',
   'plano_completa',
+  /** O terceiro degrau da oferta: o plano de 30 dias. */
+  'plano_assinatura',
   /**
    * Os três botões da tela de oferta de 19/08.
    *

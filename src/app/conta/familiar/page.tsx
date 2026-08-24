@@ -15,6 +15,7 @@ const LEGENDA_LUA: Record<LuaId, string> = {
 interface Linha {
   id: string;
   familiar: string;
+  status: string;
   lua: string | null;
   leitura_json: string | null;
   criado_em: string;
@@ -44,11 +45,26 @@ export default async function FamiliarDaConta() {
    */
   if (!sessao) return null;
 
+  /**
+   * Entregues **e** os que ficaram no meio do caminho.
+   *
+   * A consulta só trazia `entregue`, e quem fez o ritual sem comprar via a
+   * plataforma vazia — nada do que ela acabou de responder. É justamente essa
+   * pessoa que o e-mail de acesso traz até aqui.
+   *
+   * Ela vê a APARÊNCIA do familiar e o nome; a leitura continua trancada. A
+   * arte é uma das 48 prontas em disco, então mostrar não custa nada — e o
+   * texto, que custaria uma chamada de IA, nunca chegou a ser gerado.
+   *
+   * `ritual_completo = 1` porque quem parou na terceira cena não tem familiar
+   * nenhum para ver: o resultado só existe depois das 26.
+   */
   const revelacoes = db
     .prepare(
-      `SELECT id, familiar, lua, leitura_json, criado_em FROM pedidos
-       WHERE lower(email) = ? AND status = 'entregue'
-       ORDER BY criado_em DESC`
+      `SELECT id, familiar, lua, leitura_json, status, criado_em FROM pedidos
+       WHERE lower(email) = ?
+         AND (status = 'entregue' OR (status = 'aguardando_pagamento' AND ritual_completo = 1))
+       ORDER BY (status = 'entregue') DESC, criado_em DESC`
     )
     .all(sessao.email) as Linha[];
 
@@ -105,30 +121,58 @@ export default async function FamiliarDaConta() {
             )}
 
             <div className="flex flex-wrap items-center justify-center gap-2.5">
-              <Link
-                href={`/revelacao/${linha.id}`}
-                className="font-corpo text-sm px-6 py-2.5 rounded-full border border-vela/45 text-vela hover:bg-vela/10 transition-colors"
-              >
-                Abrir a revelação
-              </Link>
+              {linha.status === 'entregue' ? (
+                <>
+                  <Link
+                    href={`/revelacao/${linha.id}`}
+                    className="font-corpo text-sm px-6 py-2.5 rounded-full border border-vela/45 text-vela hover:bg-vela/10 transition-colors"
+                  >
+                    Abrir a revelação
+                  </Link>
 
-              {/*
-                O PDF baixa AQUI, não pelo e-mail. É a troca que a mudança de
-                agosto/2026 fez: o e-mail virou a chave, e o artefato mora
-                dentro — do lado do Oráculo e do calendário, que é o que a
-                pessoa precisa ver para querer o resto.
+                  {/*
+                    O PDF baixa AQUI, não pelo e-mail. É a troca que a mudança de
+                    agosto/2026 fez: o e-mail virou a chave, e o artefato mora
+                    dentro — do lado do Oráculo e do calendário, que é o que a
+                    pessoa precisa ver para querer o resto.
 
-                `download` no anchor, e não `target=_blank`: o PDF é dela, e
-                abrir num visualizador de aba nova esconde justamente o gesto
-                de guardar.
-              */}
-              <a
-                href={`/api/storage/${linha.id}/revelacao.pdf`}
-                download={`bruxario-${familiar.nome.toLowerCase().replace(/\s+/g, '-')}.pdf`}
-                className="font-corpo text-sm px-6 py-2.5 rounded-full border border-pergaminho/20 text-pergaminho/65 hover:border-pergaminho/45 hover:text-pergaminho transition-colors"
-              >
-                Baixar o PDF
-              </a>
+                    `download` no anchor, e não `target=_blank`: o PDF é dela, e
+                    abrir num visualizador de aba nova esconde justamente o gesto
+                    de guardar.
+                  */}
+                  <a
+                    href={`/api/storage/${linha.id}/revelacao.pdf`}
+                    download={`bruxario-${familiar.nome.toLowerCase().replace(/\s+/g, '-')}.pdf`}
+                    className="font-corpo text-sm px-6 py-2.5 rounded-full border border-pergaminho/20 text-pergaminho/65 hover:border-pergaminho/45 hover:text-pergaminho transition-colors"
+                  >
+                    Baixar o PDF
+                  </a>
+                </>
+              ) : (
+                <>
+                  {/*
+                    Quem não comprou.
+                    O lugar é o mesmo, e os dois botões trocam de função: abrir
+                    vira comprar, e baixar entrega só a imagem. A leitura — por
+                    que ele te escolheu, o Sol e a Lua — é o que continua do
+                    outro lado, e é o que a Revelação vende.
+                  */}
+                  <Link
+                    href={`/pagamento/${linha.id}`}
+                    className="font-corpo text-sm px-6 py-2.5 rounded-full bg-vela text-tinta hover:brightness-110 transition"
+                  >
+                    Comprar a revelação
+                  </Link>
+
+                  <a
+                    href={`/api/storage/${linha.id}/familiar.png`}
+                    download={`bruxario-${familiar.nome.toLowerCase().replace(/\s+/g, '-')}.png`}
+                    className="font-corpo text-sm px-6 py-2.5 rounded-full border border-pergaminho/20 text-pergaminho/65 hover:border-pergaminho/45 hover:text-pergaminho transition-colors"
+                  >
+                    Baixar a imagem
+                  </a>
+                </>
+              )}
             </div>
           </article>
         );

@@ -4,7 +4,7 @@ import { buscarPlano, type Plano } from './planos';
 import { criarAssinatura, type Assinatura } from './assinaturas';
 import { ehPlanoDaOferta } from './oferta';
 import { registrarInicioDeCheckout } from './eventos-meta';
-import { modeloNovoLigado } from '../lib/modelo-de-venda';
+import { planosVendaveis } from '../lib/modelo-de-venda';
 
 export interface Cobranca {
   id: string;
@@ -50,14 +50,22 @@ export function abrirCobranca(dados: {
   origem?: 'vitrine' | 'oferta';
 }): { cobranca: Cobranca; plano: Plano } | null {
   /**
-   * Assinatura só existe no modelo novo.
+   * A trava de emergência, e só ela.
    *
-   * Enquanto o interruptor estiver desligado, produção vende a Revelação
-   * avulsa como sempre vendeu e nenhum plano é cobrável — nem por link
-   * direto. Sem isto, alguém que achasse `/planos` compraria um plano num
-   * site cujo funil inteiro ainda é o antigo.
+   * Antes aqui estava `if (!modeloNovoLigado()) return null` — a venda de
+   * plano dependia do interruptor do modelo de venda. Com ele desligado,
+   * `/planos` anunciava três planos com preço e clicar em qualquer um dava
+   * "plano indisponível". A vitrine ficou aberta e a porta trancada por
+   * semanas, sem uma única cobrança de plano no banco.
+   *
+   * Amarrar as duas coisas na mesma chave significava que vender plano custava
+   * zerar o preço da Revelação, que é o que a campanha vende. Agora são
+   * chaves separadas: `planos_fechados` tranca só isto.
+   *
+   * Os filtros que importam vêm logo abaixo e sempre estiveram certos: só
+   * plano `publico` (ou liberado pela oferta), `ativo`, e com preço.
    */
-  if (!modeloNovoLigado()) return null;
+  if (!planosVendaveis()) return null;
 
   const plano = buscarPlano(dados.planoId);
   if (!plano || !plano.ativo) return null;

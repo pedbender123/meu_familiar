@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { buscarPedido, atualizarPedido, registrarEvento } from '@/lib/db';
 import {
-  pagamento,
   pagamentoEhFake,
   statusLiberaAcesso,
   type FormDataBrick,
 } from '@/nucleo/checkouts/mercadopago';
+import { provedorPara, gatewayDe, meioDe } from '@/nucleo/checkouts/gateway';
+import type { DadosCaktoDoFront } from '@/nucleo/checkouts/cakto';
+import { reportarVenda } from '@/lib/reportar-venda';
 import { calcularExpiracao, produtoDe } from '@/lib/produtos';
+import { produtoVigenteDe } from '@/lib/modelo-de-venda';
 import { aposPagamento } from '@/lib/processar';
 import { excedeuLimite, LIMITES } from '@/lib/rate-limit';
 
@@ -66,9 +69,19 @@ export async function POST(
   }
 
   let form: FormDataBrick;
+  let cakto: DadosCaktoDoFront | undefined;
   try {
     const corpo = await req.json();
-    form = corpo?.formData ?? corpo;
+    /**
+     * Dois fronts, um endpoint.
+     *
+     * O Payment Brick manda `{ formData }`; a nossa tela de Pix da Cakto manda
+     * `{ cakto }`. Quem decidir o gateway a partir daqui precisa saber qual
+     * dos dois chegou — e não dá para adivinhar pelo `payment_method_id`,
+     * porque a Cakto não manda esse campo.
+     */
+    cakto = corpo?.cakto;
+    form = corpo?.formData ?? (cakto ? { payment_method_id: cakto.metodo } : corpo);
     if (!form?.payment_method_id) throw new Error('payment_method_id ausente');
   } catch {
     return NextResponse.json(
@@ -77,10 +90,70 @@ export async function POST(
     );
   }
 
+  /**
+   * Quem cobra este meio, agora.
+   *
+   * Lido a cada requisição, e não fixado na importação: trocar `GATEWAY` no
+   * `.env` e reiniciar passa a valer sem rebuild — que é o que torna o
+   * rollback uma variável de ambiente em vez de um deploy.
+   */
+  const meio = meioDe(cakto?.metodo ?? form.payment_method_id);
+  const nomeDoGateway = gatewayDe(meio);
+  const provedor = provedorPara(meio);
+
+  /**
+   * **A tentativa é gravada ANTES de a cobrança sair.**
+   *
+   * Antes, tudo era gravado depois da resposta do gateway. Isso deixa uma
+   * janela em que o dinheiro já saiu e o nosso banco não sabe de nada: a
+   * chamada estoura o timeout, o processo cai, a notificação chega antes da
+   * resposta — e sobra um pagamento sem pedido para casar com ele.
+   *
+   * Gravar antes inverte o risco. No pior caso fica um pedido marcado como
+   * "tentou pagar e não sabemos o desfecho", que a reconciliação resolve
+   * consultando o gateway. Um pedido com tentativa a mais é ruído; uma venda
+   * paga sem entrega é prejuízo e é reclamação.
+   */
+  atualizarPedido(id, {
+    tentativas_pagamento: (pedido.tentativas_pagamento ?? 0) + 1,
+    metodo_tentado: form.payment_method_id ?? null,
+    // Quem cobrou fica gravado NA TENTATIVA: é o que o painel usa depois para
+    // saber a quem pedir estorno, e o que a reconciliação usa para saber
+    // contra qual extrato comparar.
+    gateway: nomeDoGateway,
+    ...(cakto?.telefone ? { telefone: cakto.telefone } : {}),
+    /**
+     * UTMs e IP, gravados no pedido.
+     *
+     * Quem reporta a venda para a Utmify é o webhook, horas depois, sem
+     * navegador por perto — então a origem precisa estar guardada antes. Este
+     * é o último ponto do funil em que ainda existe uma aba aberta.
+     *
+     * `ip_comprador` sai do cabeçalho e não do corpo: IP mandado pelo cliente
+     * é IP escolhido pelo cliente.
+     */
+    ...(cakto?.utm && Object.keys(cakto.utm).length
+      ? { utm_json: JSON.stringify(cakto.utm) }
+      : {}),
+    ip_comprador: ip === 'local' ? null : ip.split(',')[0].trim(),
+  });
+  registrarEvento('pagamento_tentado', id);
+
   try {
-    const resultado = await pagamento.criarPagamento({
+    const resultado = await provedor.criarPagamento({
       form,
-      produto: produtoDe(pedido.produto),
+      // Ignorado pelo Mercado Pago; é o que a Cakto precisa para cobrar.
+      ...(cakto ? { cakto: { ...cakto, cupomCodigo: pedido.cupom ?? undefined } } : {}),
+      /**
+       * `produtoVigente`, nunca `produtoDe`.
+       *
+       * A tabela estática tem a Revelação com `precoCentavos: 0` — ela virou
+       * a porta de entrada do modelo novo. Lida daqui, com o interruptor
+       * DESLIGADO, esta rota mandava o gateway cobrar R$ 0,00 de uma venda
+       * que a campanha anuncia a R$ 9,80. É o mesmo furo de 21/08, um degrau
+       * adiante: lá a entrega saía de graça, aqui a cobrança sairia zerada.
+       */
+      produto: produtoVigenteDe(pedido.produto),
       pedidoId: id,
       emailDoPedido: pedido.email,
       // Lido do PEDIDO, nunca do corpo da requisição: é o cupom que já foi
@@ -96,16 +169,34 @@ export async function POST(
      * `pagamento_criado_rejected` sem dizer se era cartão, Pix ou boleto, nem
      * por quê. É justamente a tentativa que falha que precisa ser analisada.
      */
+    // `tentativas_pagamento` NÃO entra aqui: já foi contada antes da chamada.
+    // Somar de novo faria cada cobrança contar duas tentativas, e é justamente
+    // esse número que diz se alguém está apanhando para conseguir pagar.
     atualizarPedido(id, {
       pagamento_id: resultado.idExterno,
       metodo_tentado: resultado.metodo ?? form.payment_method_id ?? null,
       motivo_recusa: statusLiberaAcesso(resultado.status)
         ? null
         : resultado.statusDetalhe || null,
-      tentativas_pagamento: (pedido.tentativas_pagamento ?? 0) + 1,
       ...(resultado.pix ? { pix_copia_e_cola: resultado.pix.copiaECola } : {}),
     });
     registrarEvento(`pagamento_criado_${resultado.status}`, id);
+
+    /**
+     * **A Utmify soube que a cobrança abriu.**
+     *
+     * `waiting_payment`, não `paid` — a venda ainda não aconteceu. Reportar só
+     * a venda paga esconderia quem chegou ao checkout e desistiu, que é
+     * metade do que faz o painel dela valer alguma coisa: sem o denominador
+     * não existe taxa de conversão por campanha.
+     *
+     * Sem `await`: relatório é rastreio, e rastreio lento não pode segurar a
+     * resposta de uma tela de pagamento com a pessoa esperando o QR.
+     */
+    void reportarVenda(buscarPedido(id)!, 'waiting_payment', {
+      metodo: resultado.metodo ?? form.payment_method_id,
+      taxaCentavos: resultado.taxaCentavos,
+    });
 
     // Cartão aprovado: quem confirma de verdade é o webhook, mas mandar a
     // pessoa pra tela de espera já é correto — /obrigado faz poll até

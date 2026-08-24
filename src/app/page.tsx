@@ -47,12 +47,12 @@ export const dynamic = 'force-dynamic';
 export default async function Raiz({
   searchParams,
 }: {
-  searchParams: Promise<{ c?: string; de?: string; s?: string }>;
+  searchParams: Promise<{ c?: string; de?: string; s?: string; utm_source?: string }>;
 }) {
-  const { c, de, s } = await searchParams;
+  const { c, de, s, utm_source } = await searchParams;
   const biscoitos = await cookies();
 
-  const { funil, viaMarcador } = await decidir({ c, de, s, biscoitos });
+  const { funil, viaMarcador } = await decidir({ c, de, s, utm_source, biscoitos });
 
   /**
    * O funil escolhido viaja para o cliente, que o grava no cookie pela
@@ -133,15 +133,37 @@ async function decidir({
   c,
   de,
   s,
+  utm_source,
   biscoitos,
 }: {
   c?: string;
   de?: string;
   s?: string;
+  utm_source?: string;
   biscoitos: Awaited<ReturnType<typeof cookies>>;
 }): Promise<{ funil: FunilId; campanha: string | null; viaMarcador: boolean }> {
   const { campanha: codigo } = lerCodigoDeCampanha(c);
-  const marcadoPorRede = !!normalizarOrigem(de) || !!s;
+
+  /**
+   * **`utm_source` também é marcador.**
+   *
+   * O link do anúncio na Meta carrega os parâmetros da própria plataforma —
+   * `utm_source=FB&utm_campaign={{campaign.name}}|{{campaign.id}}&...` — e
+   * nenhum deles é `?c=`, `?de=` ou `?s=`. Sem esta linha, quem clica no
+   * anúncio chega SEM marcador e vê a landing: exatamente a página que foi
+   * tirada do caminho em 19/08 porque deixava o cérebro calcular o que vem no
+   * fim antes de chegar lá.
+   *
+   * Estava assim em produção com campanha rodando. O sintoma é silencioso —
+   * o site funciona, converte menos, e nada em log diz que a porta errada
+   * abriu.
+   *
+   * Continua valendo pôr `?c=` no anúncio: é ele que liga a chegada a uma
+   * campanha e permite o teste A/B entre funis. `utm_source` sozinho é a rede
+   * de segurança para quando alguém esquecer — e alguém sempre esquece.
+   */
+  const marcadoPorAnuncio = !!utm_source?.trim();
+  const marcadoPorRede = !!normalizarOrigem(de) || !!s || marcadoPorAnuncio;
   const temMarcador = !!codigo || marcadoPorRede;
 
   if (!temMarcador) {

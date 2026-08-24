@@ -39,6 +39,18 @@ export function pastaDoPedido(pedidoId: string) {
   return path.join(PEDIDOS, pedidoId);
 }
 
+/**
+ * A arte do familiar já fundida com a fase da lua da pessoa.
+ *
+ * São 48 arquivos prontos (12 familiares × 4 luas), gerados uma vez por
+ * `npm run gerar-fusoes`. **Custo zero por pessoa** — é o que torna possível
+ * mostrar a aparência do familiar a quem ainda não comprou: a leitura, que
+ * custa uma chamada de IA, continua trancada.
+ */
+export function familiarFundidaPng(familiarId: string, lua: string) {
+  return path.join(RAIZ, 'conteudo', 'fundidas', lua, `${familiarId}.png`);
+}
+
 export function familiarPng(familiarId: string) {
   return path.join(FAMILIARES_PNG, `${familiarId}.png`);
 }

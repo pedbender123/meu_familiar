@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { PRODUTOS } from '@/lib/produtos';
 import type { PrecoComDesconto } from '@/lib/cupons';
 import { marcar } from '@/lib/marcar';
+import type { Marco } from '@/lib/analitica';
 
 /**
  * As duas opções, depois da revelação parcial.
@@ -34,6 +35,31 @@ import { marcar } from '@/lib/marcar';
  * das duas fica visível o tempo todo. Padrão que esconde a opção barata é
  * outra coisa, e não é isso.
  */
+type EscolhaId = 'revelacao' | 'completa' | 'revelacao_mensal';
+
+interface Cartao {
+  id: EscolhaId;
+  selo: string | null;
+  preco: PrecoComDesconto;
+  itens: string[];
+  destaque: boolean;
+}
+
+/** O plano da oferta, em centavos. Espelha `planos.revelacao_mensal`. */
+const PRECO_DO_PLANO_CENTAVOS = 2990;
+
+const NOME_DA_ESCOLHA: Record<EscolhaId, string> = {
+  revelacao: 'Revelação',
+  completa: 'Completa',
+  revelacao_mensal: 'assinatura',
+};
+
+const MARCO_DA_ESCOLHA: Record<EscolhaId, Marco> = {
+  revelacao: 'plano_revelacao',
+  completa: 'plano_completa',
+  revelacao_mensal: 'plano_assinatura',
+};
+
 export function Oferta({
   pedidoId,
   descontoPercentual,
@@ -49,7 +75,23 @@ export function Oferta({
   const ele = generoDoFamiliar === 'f' ? 'ela' : 'ele';
   const Ele = generoDoFamiliar === 'f' ? 'Ela' : 'Ele';
   const [indo, setIndo] = useState<string | null>(null);
-  const [escolhido, setEscolhido] = useState<'revelacao' | 'completa'>('completa');
+  /**
+   * **A Revelação vem marcada, não a Completa.**
+   *
+   * O padrão era `completa`, e o botão principal — o único CTA da tela, depois
+   * de 26 cenas — dizia "Continuar com a Completa — R$ 18,90". O anúncio
+   * promete R$ 9,80. A pessoa atravessava o ritual inteiro e batia num preço
+   * que era quase o dobro do que a trouxe até aqui.
+   *
+   * Os números de 21–23/08 mostraram o tamanho disso: **21 pessoas chegaram
+   * nesta tela e 2 clicaram** — e os dois cliques foram no padrão, nenhum na
+   * Revelação. O funil não estava quebrado; a promessa é que quebrava no
+   * momento da decisão.
+   *
+   * A Completa continua ao lado, em destaque, para quem quiser subir. O que
+   * muda é qual preço o botão anuncia sozinho: o mesmo do anúncio.
+   */
+  const [escolhido, setEscolhido] = useState<EscolhaId>('revelacao');
   const [precosAtuais, setPrecosAtuais] = useState(precos);
   const [cupom, setCupom] = useState<{ codigo: string; gratis: boolean } | null>(
     null
@@ -57,20 +99,43 @@ export function Oferta({
 
   const brl = (c: number) => `R$ ${(c / 100).toFixed(2).replace('.', ',')}`;
 
-  async function escolher(produto: 'revelacao' | 'completa') {
+  async function escolher(escolha: EscolhaId) {
     if (indo) return;
-    setIndo(produto);
+    setIndo(escolha);
     // Dois marcos: o genérico (compatível com o histórico) e o do plano
-    // escolhido — sem o segundo, não dá para saber qual dos dois puxa gente.
+    // escolhido — sem o segundo, não dá para saber qual dos três puxa gente.
     marcar('pagamento_aberto');
-    marcar(produto === 'completa' ? 'plano_completa' : 'plano_revelacao');
+    marcar(MARCO_DA_ESCOLHA[escolha]);
     try {
-      const r = await fetch(`/api/pedido/${pedidoId}/escolher`, {
+      /**
+       * O plano não passa por `escolher`, e não é detalhe de rota.
+       *
+       * `/api/pedido/[id]/escolher` grava PRODUTO no pedido — é a compra
+       * única do ritual. O plano é outra coisa: vive na tabela `planos`, abre
+       * uma `cobranca`, cria a conta e nasce uma `assinatura` com 30 dias de
+       * validade. Quem sabe fazer isso a partir de um pedido é
+       * `/api/oferta/[id]/comprar`, que já existia para a tela pós-entrega.
+       */
+      const rota =
+        escolha === 'revelacao_mensal'
+          ? `/api/oferta/${pedidoId}/comprar`
+          : `/api/pedido/${pedidoId}/escolher`;
+
+      const corpo =
+        escolha === 'revelacao_mensal'
+          ? { plano: escolha }
+          : { produto: escolha, cupom: cupom?.codigo };
+
+      const r = await fetch(rota, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ produto, cupom: cupom?.codigo }),
+        body: JSON.stringify(corpo),
       });
       const d = await r.json();
+      if (!r.ok) {
+        setIndo(null);
+        return;
+      }
       window.location.assign(d.redirect ?? `/pagamento/${pedidoId}`);
     } catch {
       setIndo(null);
@@ -127,31 +192,67 @@ export function Oferta({
    * que existia desde ontem e não estava escrita em lugar nenhum: quem comprava
    * a Completa descobria o áudio depois de pagar.
    */
-  const cartoes = [
+  /**
+   * O que cada degrau entrega — em uma linha por item.
+   *
+   * A versão anterior tinha itens de duas e três linhas ("a tensão que te
+   * puxa para dois lados, onde ela te custa caro, e o que você faz bem sem se
+   * dar crédito"). Bonito de ler com calma, e ninguém lê com calma no fim de
+   * um ritual de treze minutos com o preço na tela. Três blocos daquele
+   * tamanho empurravam o botão para baixo da dobra no celular — e o botão é
+   * a única coisa que precisa ser vista.
+   */
+  const cartoes: Cartao[] = [
     {
-      id: 'revelacao' as const,
+      id: 'revelacao',
+      selo: null,
       preco: precosAtuais.revelacao,
       itens: [
-        `Quem é o seu familiar — o nome, o retrato e o nome secreto que só ${ele} te dá`,
-        `A leitura escrita a partir das suas respostas: por que ${ele} te escolheu e o que veio te lembrar`,
-        `O que o seu Sol e a sua Lua revelam através d${generoDoFamiliar === 'f' ? 'ela' : 'ele'}`,
-        'PDF e as artes para compartilhar, no seu e-mail na hora',
+        `Seu familiar: nome, retrato e o nome secreto`,
+        `A leitura de por que ${ele} te escolheu`,
+        'PDF e artes no seu e-mail, na hora',
       ],
       destaque: false,
     },
     {
-      id: 'completa' as const,
+      id: 'completa',
+      selo: 'mais escolhida',
       preco: precosAtuais.completa,
       itens: [
-        'Tudo da Revelação, e a leitura vai mais fundo: a tensão que te puxa para dois lados, onde ela te custa caro, e o que você faz bem sem se dar crédito',
-        'A leitura narrada em áudio, na voz do seu familiar',
-        'Os gráficos do que o teste mediu: os quatro eixos e a sua posição entre os doze',
-        'Seu perfil com link permanente — o da Revelação sai do ar em uma semana',
-        `${PRODUTOS.completa.perguntasOraculo} perguntas ao Oráculo do seu familiar`,
+        'Tudo da Revelação, com a leitura mais funda',
+        `A leitura narrada na voz d${ele === 'ela' ? 'ela' : 'ele'}`,
+        'Gráficos do seu perfil e link que não expira',
+        `${PRODUTOS.completa.perguntasOraculo} perguntas ao Oráculo`,
       ],
       destaque: true,
     },
+    {
+      /**
+       * O terceiro degrau.
+       *
+       * Cobrança única de 30 dias, não débito automático: a `assinatura`
+       * nasce com `inicio` e `fim`, e `scripts/assinaturas.ts` manda o aviso
+       * de renovação quando o prazo fecha. É o modelo que já roda — o que
+       * faltava era a porta.
+       */
+      id: 'revelacao_mensal',
+      selo: '30 dias',
+      preco: {
+        cheioCentavos: PRECO_DO_PLANO_CENTAVOS,
+        finalCentavos: PRECO_DO_PLANO_CENTAVOS,
+        descontoPercentual: 0,
+        gratis: false,
+      },
+      itens: [
+        'Tudo da Completa, e o mês inteiro aberto',
+        'O Oráculo respondendo todo dia',
+        'Calendário e leituras novas por 30 dias',
+      ],
+      destaque: false,
+    },
   ];
+
+  const cartaoEscolhido = cartoes.find((c) => c.id === escolhido) ?? cartoes[0];
 
   return (
     <section className="w-full max-w-lg flex flex-col items-center gap-5">
@@ -171,7 +272,6 @@ export function Oferta({
         className="w-full flex flex-col gap-3"
       >
         {cartoes.map((c) => {
-          const produto = PRODUTOS[c.id];
           const marcado = escolhido === c.id;
           return (
             <div
@@ -207,10 +307,10 @@ export function Oferta({
                         : 'border-pergaminho/35',
                     ].join(' ')}
                   />
-                  {produto.nome}
-                  {c.destaque && (
+                  {NOME_DA_ESCOLHA[c.id]}
+                  {c.selo && (
                     <span className="font-corpo text-[0.6rem] tracking-[0.18em] uppercase text-vela border border-vela/40 rounded-full px-2 py-0.5 self-center">
-                      recomendada
+                      {c.selo}
                     </span>
                   )}
                 </span>
@@ -249,10 +349,10 @@ export function Oferta({
       >
         {indo
           ? 'Abrindo...'
-          : `Continuar com a ${PRODUTOS[escolhido].nome} — ${
-              precosAtuais[escolhido].gratis
+          : `Continuar com a ${NOME_DA_ESCOLHA[escolhido]} — ${
+              cartaoEscolhido.preco.gratis
                 ? 'grátis'
-                : brl(precosAtuais[escolhido].finalCentavos)
+                : brl(cartaoEscolhido.preco.finalCentavos)
             }`}
       </button>
 

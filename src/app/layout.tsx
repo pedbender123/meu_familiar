@@ -5,6 +5,7 @@ import "./globals.css";
 import { Farejador } from "@/components/Farejador";
 import { AudioAmbiente } from "@/components/AudioAmbiente";
 import { MetaPixel } from "@/components/MetaPixel";
+import { ScriptUtmify } from "@/components/ScriptUtmify";
 
 const cormorant = localFont({
   src: "../assets/fonts/CormorantGaramond.woff2",
@@ -75,6 +76,14 @@ export default function RootLayout({
         <Suspense fallback={null}>
           <Farejador />
           <MetaPixel />
+          {/*
+            O captador de UTM da Utmify. Não substitui o pixel da Meta acima:
+            ele guarda de onde a pessoa veio entre as páginas, e quem conta a
+            venda continua sendo o `MetaPixel` no navegador — a Utmify só
+            manda evento para a Meta quando houver token da API de Conversões
+            configurado no painel dela, e hoje não há.
+          */}
+          <ScriptUtmify />
         </Suspense>
         <AudioAmbiente />
         {children}

@@ -45,7 +45,10 @@ export async function POST(
   }
 
   if (pagamentoEhFake()) {
-    await confirmarMelhoria(id);
+    // No modo fake, ESPERAR é o certo: a resposta manda direto para
+    // `/revelacao`, e a tela precisa encontrar a Completa já pronta.
+    const { entrega } = await confirmarMelhoria(id);
+    await entrega;
     registrarEvento('melhoria_confirmada_fake', id);
     return NextResponse.json({ status: 'approved', redirect: `/revelacao/${id}` });
   }
