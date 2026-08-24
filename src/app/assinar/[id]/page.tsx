@@ -2,7 +2,7 @@ import { notFound, redirect } from 'next/navigation';
 import { chavePublica, modoAtual, pagamentoEhFake } from '@/nucleo/checkouts/mercadopago';
 import { buscarCobranca } from '@/nucleo/cobrancas';
 import { buscarPlano, direitosDoPlano } from '@/nucleo/planos';
-import { CheckoutMercadoPago } from '@/components/CheckoutMercadoPago';
+import { CheckoutMercadoPago } from '@/components/checkout/MercadoPago';
 import { PagamentoFake } from '@/components/PagamentoFake';
 import { PoeiraNaLuz } from '@/components/PoeiraNaLuz';
 import { MarcoDoCheckout } from '@/components/MarcoDoCheckout';

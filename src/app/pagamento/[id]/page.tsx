@@ -3,8 +3,7 @@ import { buscarPedido } from '@/lib/db';
 import { chavePublica, modoAtual, pagamentoEhFake } from '@/nucleo/checkouts/mercadopago';
 import { produtoDe } from '@/lib/produtos';
 import { precoDoPedido } from '@/lib/cupons';
-import { CheckoutMercadoPago } from '@/components/CheckoutMercadoPago';
-import { CheckoutCaktoPix } from '@/components/CheckoutCaktoPix';
+import { Checkout } from '@/components/checkout/Checkout';
 import { gatewayDe } from '@/nucleo/checkouts/gateway';
 import { PagamentoFake } from '@/components/PagamentoFake';
 import { MarcoDoCheckout } from '@/components/MarcoDoCheckout';
@@ -39,12 +38,11 @@ export default async function Pagamento({
   /**
    * Quem cobra cada meio, decidido no servidor a cada visita.
    *
-   * Durante a virada os dois convivem: o Pix pode estar na Cakto e o cartão no
-   * Mercado Pago. Quando o Pix não é do Brick, ele sai do Brick — deixar os
-   * dois oferecendo Pix mostraria duas formas de fazer a mesma coisa, com
-   * gateways diferentes, na mesma tela.
+   * Durante uma virada os dois convivem: o Pix pode estar num gateway e o
+   * cartão em outro. Quem despacha é o `Checkout`; aqui só se resolve.
    */
-  const pixNaCakto = gatewayDe('pix') === 'cakto';
+  const gatewayPix = gatewayDe('pix');
+  const gatewayCartao = gatewayDe('cartao');
 
   return (
     <main className="flex-1 flex flex-col items-center justify-center px-6 py-16">
@@ -52,18 +50,7 @@ export default async function Pagamento({
       {pagamentoEhFake() || !chave ? (
         <PagamentoFake pedidoId={id} />
       ) : (
-        <>
-        {pixNaCakto ? (
-          <div className="w-full max-w-md mb-10">
-            <CheckoutCaktoPix
-              pedidoId={id}
-              valorEmReais={preco.finalCentavos / 100}
-              nome={pedido.nome}
-              cpf={pedido.cpf}
-            />
-          </div>
-        ) : null}
-        <CheckoutMercadoPago
+        <Checkout
           pedidoId={id}
           chavePublica={chave}
           valorEmReais={preco.finalCentavos / 100}
@@ -76,9 +63,11 @@ export default async function Pagamento({
               : undefined
           }
           modo={modoAtual()}
-          pixNoBrick={!pixNaCakto}
+          nome={pedido.nome}
+          cpf={pedido.cpf}
+          gatewayPix={gatewayPix}
+          gatewayCartao={gatewayCartao}
         />
-        </>
       )}
     </main>
   );

@@ -528,6 +528,19 @@ export const MARCOS = [
   'oferta_completa',
   'oferta_mensal',
   'checkout_aberto',
+  /**
+   * Qual meio a pessoa escolheu no checkout.
+   *
+   * Só disparam na TROCA de aba: o Pix já vem selecionado, então
+   * `checkout_cartao` conta quem ativamente recusou o Pix, e `checkout_pix`
+   * conta quem foi ao cartão e voltou. Contar a seleção inicial faria
+   * `checkout_pix` empatar com `checkout_aberto` e não diria nada.
+   *
+   * A leitura que interessa: cartão muito clicado e pouco pago é formulário
+   * caro demais, não preço alto demais.
+   */
+  'checkout_pix',
+  'checkout_cartao',
   'pagamento_tentado',
   /**
    * Os passos do funil longo (`/familiar`), um por tela.

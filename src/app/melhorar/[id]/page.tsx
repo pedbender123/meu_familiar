@@ -1,7 +1,8 @@
 import { notFound, redirect } from 'next/navigation';
 import { buscarPedido } from '@/lib/db';
 import { chavePublica, modoAtual, pagamentoEhFake } from '@/nucleo/checkouts/mercadopago';
-import { CheckoutMercadoPago } from '@/components/CheckoutMercadoPago';
+import { Checkout } from '@/components/checkout/Checkout';
+import { gatewayDe } from '@/nucleo/checkouts/gateway';
 import { PagamentoFake } from '@/components/PagamentoFake';
 import { PoeiraNaLuz } from '@/components/PoeiraNaLuz';
 import { SigiloFamiliar } from '@/components/SigiloFamiliar';
@@ -88,7 +89,7 @@ export default async function Melhorar({
         {pagamentoEhFake() || !chave ? (
           <PagamentoFake pedidoId={id} base="pedido" />
         ) : (
-          <CheckoutMercadoPago
+          <Checkout
             base="pedido"
             caminho="melhorar"
             destino={`/revelacao/${id}`}
@@ -102,6 +103,10 @@ export default async function Melhorar({
               'Narração em áudio',
             ]}
             modo={modoAtual()}
+            nome={pedido.nome}
+            cpf={pedido.cpf}
+            gatewayPix={gatewayDe('pix')}
+            gatewayCartao={gatewayDe('cartao')}
           />
         )}
       </main>

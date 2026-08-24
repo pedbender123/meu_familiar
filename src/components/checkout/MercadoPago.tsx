@@ -54,6 +54,8 @@ function carregarSdk(): Promise<void> {
   });
 }
 
+export type MeioDoBrick = 'pix' | 'cartao';
+
 interface Pix {
   copiaECola: string;
   qrBase64: string;
@@ -66,8 +68,15 @@ export function CheckoutMercadoPago({
   nomeProduto,
   cupom,
   modo,
-  /** `false` quando o Pix é cobrado pela Cakto, fora do Brick. */
-  pixNoBrick = true,
+  /**
+   * Quais meios o Brick mostra.
+   *
+   * Era um booleano (`pixNoBrick`) quando a única pergunta era "o Pix é da
+   * Cakto?". Virou lista porque agora quem escolhe o meio é a tela, antes do
+   * Brick existir: o seletor monta um Brick de Pix ou um Brick de cartão, um
+   * de cada vez. Booleano não expressa "só cartão".
+   */
+  meios = ['pix', 'cartao'],
   generoDoFamiliar,
   itens,
   /**
@@ -94,8 +103,8 @@ export function CheckoutMercadoPago({
   itens?: string[];
   /** Presente só quando o pedido nasceu com cupom. */
   cupom?: { codigo: string; descontoPercentual: number; cheioEmReais: number };
-  /** `false` quando o Pix é cobrado pela Cakto, fora do Brick. */
-  pixNoBrick?: boolean;
+  /** Quais meios o Brick mostra. Padrão: os dois. */
+  meios?: MeioDoBrick[];
   /** `pedido` = funil do ritual; `cobranca` = assinatura de plano. */
   base?: 'pedido' | 'cobranca';
   /**
@@ -159,16 +168,16 @@ export function CheckoutMercadoPago({
            */
           customization: {
             paymentMethods: {
-              creditCard: 'all',
+              creditCard: meios.includes('cartao') ? 'all' : [],
               /**
-               * Pix sai do Brick quando quem cobra Pix é a Cakto.
+               * Um meio de fora da lista some do Brick.
                *
-               * Sem isto, a tela ofereceria Pix duas vezes — uma por gateway —
+               * Sem isto a tela ofereceria Pix duas vezes — uma por gateway —
                * e a pessoa escolheria por sorte qual dos dois. Pior: o do
                * Brick continuaria cobrando pelo Mercado Pago, e metade das
-               * vendas "da Cakto" não apareceria lá.
+               * vendas "do outro gateway" não apareceria lá.
                */
-              bankTransfer: pixNoBrick ? 'all' : [],
+              bankTransfer: meios.includes('pix') ? 'all' : [],
               debitCard: [],
               ticket: [],
               // Parcelar quinze reais faz o produto parecer mais caro do que é.
