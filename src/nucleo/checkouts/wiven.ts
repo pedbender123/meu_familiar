@@ -170,7 +170,7 @@ export function emCentavos(valor: number | string | null | undefined): number | 
 /* ── split ────────────────────────────────────────────────────────────────*/
 
 /**
- * A divisão da venda com outra conta Wiven.
+ * A divisão da venda entre contas Wiven.
  *
  * ── O formato, perguntado à própria API ───────────────────────────────────
  *
@@ -180,38 +180,81 @@ export function emCentavos(valor: number | string | null | undefined): number | 
  *     path: ["splits", 0, "producerId"]  expected: string
  *     path: ["splits", 0, "amount"]      expected: number
  *
- * E `producerId` inexistente devolve "Produtor X não encontrado" — ou seja,
- * é validado do lado deles, não é campo livre.
+ * E `producerId` inexistente devolve "Produtor X não encontrado" — é
+ * validado do lado deles, não é campo livre.
+ *
+ * ── Quem fica com o resto ─────────────────────────────────────────────────
+ *
+ * O split TIRA da transação e manda para outra conta. O que sobra fica com a
+ * conta que cobrou. Então, num acordo de 40/40/20 onde quem cobra é uma das
+ * partes, só DUAS entradas são configuradas — a terceira é o resto.
+ *
+ * Configurar as três faria a soma bater 100% e não sobrar nada para quem
+ * recebeu, o que o gateway ou recusa ou executa, e as duas são ruins.
+ *
+ *     WIVEN_SPLITS=prod_abc:40,prod_xyz:20
  *
  * ── `amount` é VALOR, não percentual ──────────────────────────────────────
  *
- * Em reais, como todo dinheiro nesta API. Como os nossos preços variam
- * (9,80 · 18,90 · 4,90 · 29,90), configurar valor fixo obrigaria uma linha
- * por produto e um esquecimento a cada preço novo. Então a configuração é em
- * PORCENTAGEM e a conta é feita aqui, em cima do preço realmente cobrado.
+ * Em reais, como todo dinheiro nesta API. Nossos preços variam (9,80 · 18,90
+ * · 4,90 · 29,90), e valor fixo obrigaria uma linha por produto e um
+ * esquecimento a cada preço novo. A porcentagem é convertida aqui.
  *
- * ── O arredondamento é para BAIXO, de propósito ───────────────────────────
+ * ── Arredondamento para BAIXO, e um teto ──────────────────────────────────
  *
- * `Math.floor`. Se a soma dos splits passar do valor da transação, o gateway
- * recusa a cobrança inteira — e uma venda recusada por um centavo de
- * arredondamento é muito pior que um centavo a menos repassado.
- *
- *     WIVEN_SPLIT_PRODUCER_ID=<id da outra conta>
- *     WIVEN_SPLIT_PERCENTUAL=30
- *
- * Vazio nos dois = sem split, e o corpo nem leva o campo.
+ * `Math.floor`, e a soma nunca passa de 99% do valor. Se os splits somarem
+ * mais que a transação, o gateway recusa a COBRANÇA INTEIRA — uma venda
+ * perdida por centavo de arredondamento é muito pior que um centavo a menos
+ * repassado.
  */
-export function splitsDe(precoCentavos: number): { producerId: string; amount: number }[] {
-  const produtor = process.env.WIVEN_SPLIT_PRODUCER_ID?.trim();
-  const percentual = Number(process.env.WIVEN_SPLIT_PERCENTUAL ?? '');
+export interface SplitWiven {
+  producerId: string;
+  amount: number;
+}
 
-  if (!produtor) return [];
-  if (!Number.isFinite(percentual) || percentual <= 0 || percentual >= 100) return [];
+/** O teto: sempre sobra algo para a conta que cobrou. */
+const MAXIMO_REPASSADO = 0.99;
 
-  const centavos = Math.floor((precoCentavos * percentual) / 100);
-  if (centavos <= 0) return [];
+export function splitsDe(precoCentavos: number): SplitWiven[] {
+  const bruto = (process.env.WIVEN_SPLITS ?? '').trim();
+  if (!bruto || precoCentavos <= 0) return [];
 
-  return [{ producerId: produtor, amount: emReais(centavos) }];
+  const partes: SplitWiven[] = [];
+  let repassadoCentavos = 0;
+  const teto = Math.floor(precoCentavos * MAXIMO_REPASSADO);
+
+  for (const par of bruto.split(',')) {
+    const corte = par.lastIndexOf(':');
+    if (corte < 1) continue;
+
+    const produtor = par.slice(0, corte).trim();
+    const percentual = Number(par.slice(corte + 1));
+    if (!produtor) continue;
+    if (!Number.isFinite(percentual) || percentual <= 0 || percentual >= 100) continue;
+
+    const centavos = Math.floor((precoCentavos * percentual) / 100);
+    if (centavos <= 0) continue;
+
+    /**
+     * O teto é conferido acumulando, não por entrada.
+     *
+     * Duas linhas de 60% cada passam do total sem que nenhuma delas, sozinha,
+     * pareça errada. É o tipo de erro de configuração que só aparece quando a
+     * primeira venda de verdade é recusada.
+     */
+    if (repassadoCentavos + centavos > teto) {
+      console.error(
+        `[wiven] split de ${produtor} (${percentual}%) ignorado: a soma passaria ` +
+          `de ${MAXIMO_REPASSADO * 100}% da transação. Confira WIVEN_SPLITS.`
+      );
+      continue;
+    }
+
+    repassadoCentavos += centavos;
+    partes.push({ producerId: produtor, amount: emReais(centavos) });
+  }
+
+  return partes;
 }
 
 /* ── identificador ────────────────────────────────────────────────────────*/

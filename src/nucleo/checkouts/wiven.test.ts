@@ -529,57 +529,74 @@ describe('a Wiven entrega o mesmo evento duas vezes', () => {
 });
 
 describe('o split da venda', () => {
-  const g = { ...process.env };
+  const g = process.env.WIVEN_SPLITS;
   const restaurar = () => {
-    process.env.WIVEN_SPLIT_PRODUCER_ID = g.WIVEN_SPLIT_PRODUCER_ID;
-    process.env.WIVEN_SPLIT_PERCENTUAL = g.WIVEN_SPLIT_PERCENTUAL;
-  };
-  const configurar = (id: string | undefined, pct: string | undefined) => {
-    if (id === undefined) delete process.env.WIVEN_SPLIT_PRODUCER_ID;
-    else process.env.WIVEN_SPLIT_PRODUCER_ID = id;
-    if (pct === undefined) delete process.env.WIVEN_SPLIT_PERCENTUAL;
-    else process.env.WIVEN_SPLIT_PERCENTUAL = pct;
+    if (g === undefined) delete process.env.WIVEN_SPLITS;
+    else process.env.WIVEN_SPLITS = g;
   };
 
   /**
-   * O formato veio da validação da própria API: `splits: [{}]` devolve que
-   * `producerId` é string obrigatória e `amount` é number obrigatório.
-   * `amount` é VALOR em reais, não percentual — por isso a conta é feita
-   * aqui, sobre o preço realmente cobrado.
+   * O formato veio da validação da própria API: `producerId` string
+   * obrigatória, `amount` number obrigatório. `amount` é VALOR em reais, não
+   * percentual — por isso a conta é feita aqui, sobre o preço cobrado.
    */
-  test('a porcentagem vira valor em reais', () => {
-    configurar('prod_x', '30');
-    assert.deepEqual(splitsDe(980), [{ producerId: 'prod_x', amount: 2.94 }]);
-    assert.deepEqual(splitsDe(1890), [{ producerId: 'prod_x', amount: 5.67 }]);
+  test('cada porcentagem vira valor em reais', () => {
+    process.env.WIVEN_SPLITS = 'prod_a:40,prod_b:20';
+    assert.deepEqual(splitsDe(980), [
+      { producerId: 'prod_a', amount: 3.92 },
+      { producerId: 'prod_b', amount: 1.96 },
+    ]);
     restaurar();
   });
 
   /**
-   * `Math.floor`, não `round`. Se a soma dos splits passar do valor da
-   * transação o gateway recusa a cobrança INTEIRA — e uma venda perdida por
-   * um centavo de arredondamento é muito pior que um centavo a menos
-   * repassado.
+   * O split TIRA da transação; o resto fica com quem cobrou. Num acordo
+   * 40/40/20 em que quem cobra é uma das partes, só DUAS entradas são
+   * configuradas — a terceira é o resto.
+   */
+  test('o resto sobra para a conta que cobrou', () => {
+    process.env.WIVEN_SPLITS = 'prod_a:40,prod_b:20';
+    const total = splitsDe(1890).reduce((s, p) => s + p.amount, 0);
+    assert.equal(Number(total.toFixed(2)), 11.34);
+    assert.equal(Number((18.9 - total).toFixed(2)), 7.56, 'sobram 40% para quem cobrou');
+    restaurar();
+  });
+
+  /**
+   * `Math.floor`, não `round`. Soma de splits maior que a transação faz o
+   * gateway recusar a COBRANÇA INTEIRA — venda perdida por centavo de
+   * arredondamento é muito pior que centavo a menos repassado.
    */
   test('arredonda para baixo, nunca para cima', () => {
-    configurar('prod_x', '33');
+    process.env.WIVEN_SPLITS = 'prod_a:33';
     // 490 * 33 / 100 = 161,7 → 161, nunca 162
     assert.equal(splitsDe(490)[0].amount, 1.61);
     restaurar();
   });
 
-  /** Sem configuração, o corpo nem leva o campo. */
-  test('sem produtor, sem split', () => {
-    configurar(undefined, '30');
+  /**
+   * Duas linhas de 60% não passam do total isoladamente — só somadas. É o
+   * erro de configuração que só apareceria na primeira venda recusada.
+   */
+  test('a soma tem teto, e o excesso é descartado com aviso', () => {
+    process.env.WIVEN_SPLITS = 'prod_a:60,prod_b:60';
+    const r = splitsDe(1000);
+    assert.equal(r.length, 1, 'a segunda entrada não cabe');
+    assert.equal(r[0].producerId, 'prod_a');
+    restaurar();
+  });
+
+  test('sem configuração, sem split', () => {
+    delete process.env.WIVEN_SPLITS;
+    assert.deepEqual(splitsDe(980), []);
+    process.env.WIVEN_SPLITS = '   ';
     assert.deepEqual(splitsDe(980), []);
     restaurar();
   });
 
-  /** Percentual inválido não pode virar split de zero nem de tudo. */
-  test('percentual fora da faixa é ignorado', () => {
-    for (const pct of ['0', '100', '150', '-10', 'trinta', '']) {
-      configurar('prod_x', pct);
-      assert.deepEqual(splitsDe(980), [], `percentual ${pct}`);
-    }
+  test('entrada malformada é ignorada, não derruba as outras', () => {
+    process.env.WIVEN_SPLITS = 'lixo,prod_a:40,:30,prod_c:abc,prod_d:0';
+    assert.deepEqual(splitsDe(980), [{ producerId: 'prod_a', amount: 3.92 }]);
     restaurar();
   });
 
