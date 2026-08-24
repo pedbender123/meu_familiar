@@ -12,6 +12,7 @@ import {
   pedidoDoWebhook,
   urlDeCallback,
   CAMINHO_DO_WEBHOOK,
+  tokensDoWebhook,
 } from './wiven';
 
 describe('reais e centavos', () => {
@@ -362,7 +363,7 @@ describe('o webhook tem duas portas', () => {
   });
 
   test('sem token configurado, recusa tudo', () => {
-    assert.match(fonte, /if \(!esperado\)/);
+    assert.match(fonte, /if \(esperados\.length === 0\)/);
   });
 
   /**
@@ -477,5 +478,51 @@ describe('o cache de borda da Wiven', () => {
   /** URL que já tem query não pode ganhar um segundo `?`. */
   test('o separador respeita a query que já existe', () => {
     assert.match(fonte, /caminho\.includes\('\?'\) \? '&' : '\?'/);
+  });
+});
+
+describe('a Wiven entrega o mesmo evento duas vezes', () => {
+  const guardado = process.env.WIVEN_WEBHOOK_TOKEN;
+  const restaurar = () => {
+    process.env.WIVEN_WEBHOOK_TOKEN = guardado;
+  };
+
+  /**
+   * Medido em 24/08. Ela entrega por dois caminhos com credenciais
+   * diferentes: o webhook que a conta já tinha, e um que **ela cria sozinha**
+   * a partir do `callbackUrl` que mandamos no corpo de cada cobrança — esse
+   * nasce com token próprio, e aparece no painel como "API CallbackURL".
+   *
+   * Apareceu como oito `token não confere` no log. Nada se perdia, mas log
+   * cheio de recusa de autenticação é alarme que se aprende a ignorar.
+   */
+  test('dois tokens, separados por vírgula', () => {
+    process.env.WIVEN_WEBHOOK_TOKEN = 'py4abcdnr,o1p6sn84';
+    assert.deepEqual(tokensDoWebhook(), ['py4abcdnr', 'o1p6sn84']);
+    restaurar();
+  });
+
+  /** Token colado de painel vem com espaço mais vezes do que se imagina. */
+  test('espaço em volta não invalida token', () => {
+    process.env.WIVEN_WEBHOOK_TOKEN = ' py4abcdnr , o1p6sn84 ';
+    assert.deepEqual(tokensDoWebhook(), ['py4abcdnr', 'o1p6sn84']);
+    restaurar();
+  });
+
+  /** Vírgula sobrando não pode virar um token vazio que aceita tudo. */
+  test('token vazio nunca entra na lista', () => {
+    process.env.WIVEN_WEBHOOK_TOKEN = 'py4abcdnr,,';
+    assert.deepEqual(tokensDoWebhook(), ['py4abcdnr']);
+    process.env.WIVEN_WEBHOOK_TOKEN = '';
+    assert.deepEqual(tokensDoWebhook(), []);
+    process.env.WIVEN_WEBHOOK_TOKEN = ' , ';
+    assert.deepEqual(tokensDoWebhook(), []);
+    restaurar();
+  });
+
+  test('a rota aceita qualquer um dos cadastrados', () => {
+    const fonte = codigoDe('src/app/api/webhook/wiven/route.ts');
+    assert.match(fonte, /esperados\.some\(\(e\) => tokenConfere\(corpo\?\.token, e\)\)/);
+    assert.match(fonte, /esperados\.length === 0/);
   });
 });

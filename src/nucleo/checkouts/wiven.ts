@@ -638,7 +638,39 @@ export function traduzirWebhook(corpo: CorpoWebhookWiven): ResultadoPagamento {
   };
 }
 
-/** O token que prova que a notificação é da Wiven. Cadastrado com o webhook. */
+/**
+ * Os tokens que provam que a notificação é da Wiven. **Plural.**
+ *
+ * ── Por que mais de um (medido em 24/08) ──────────────────────────────────
+ *
+ * A Wiven entrega o mesmo evento por DOIS caminhos, com credenciais
+ * diferentes:
+ *
+ *   1. o webhook que a conta já tinha, com o token que está no `.env`
+ *   2. um webhook que **ela cria sozinha** a partir do `callbackUrl` que
+ *      mandamos no corpo de cada cobrança — e esse nasce com token próprio,
+ *      visível no painel como "API CallbackURL"
+ *
+ * Na primeira noite isso apareceu como oito `token não confere` no log: a
+ * entrega 1 passava e a 2 era recusada. Nada se perdia, mas um log cheio de
+ * recusa de autenticação é um alarme que a gente aprende a ignorar — e o dia
+ * em que ele for de verdade, ninguém vai olhar.
+ *
+ * Aceitar os dois é seguro porque o processamento já tolera repetição: todo
+ * gateway reenvia notificação, e `processarNotificacaoDePagamento` é
+ * idempotente desde o Mercado Pago.
+ *
+ * Separados por vírgula. Espaço em volta é tolerado — token colado de painel
+ * vem com espaço mais vezes do que se imagina.
+ */
+export function tokensDoWebhook(): string[] {
+  return (process.env.WIVEN_WEBHOOK_TOKEN ?? '')
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean);
+}
+
+/** Compatibilidade: o primeiro token, para quem só precisa saber se há algum. */
 export function tokenDoWebhook(): string {
-  return process.env.WIVEN_WEBHOOK_TOKEN?.trim() ?? '';
+  return tokensDoWebhook()[0] ?? '';
 }

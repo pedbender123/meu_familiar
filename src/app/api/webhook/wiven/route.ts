@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { timingSafeEqual } from 'crypto';
+import { appendFileSync, statSync } from 'node:fs';
 import {
-  tokenDoWebhook,
+  tokensDoWebhook,
   traduzirWebhook,
   type CorpoWebhookWiven,
 } from '@/nucleo/checkouts/wiven';
@@ -49,25 +50,110 @@ function tokenConfere(recebido: unknown, esperado: string): boolean {
   return timingSafeEqual(a, b);
 }
 
-export async function POST(req: NextRequest) {
-  const esperado = tokenDoWebhook();
+/**
+ * Captação temporária, para diagnosticar o que a Wiven manda de verdade.
+ *
+ * ── Por que existe ────────────────────────────────────────────────────────
+ *
+ * Oito notificações foram recusadas por token na primeira noite, e uma
+ * passou. "Token não confere" não distingue as causas: a Wiven pode estar
+ * entregando o mesmo evento em dois lugares — o webhook do painel e o
+ * `callbackUrl` da transação — com credenciais diferentes.
+ *
+ * ── Por que ela se apaga sozinha ──────────────────────────────────────────
+ *
+ * Diagnóstico ligado por variável de ambiente vira diagnóstico esquecido
+ * ligado. Aqui a chave é um ARQUIVO, e ele vale por 15 minutos a partir da
+ * própria data de modificação. Ligar é `touch`; desligar é não fazer nada.
+ * Sem restart nas duas pontas.
+ *
+ * ── O que ela NÃO grava ───────────────────────────────────────────────────
+ *
+ * O token inteiro. Arquivo vira backup, backup sai da máquina. Vai o
+ * suficiente para comparar duas origens — tamanho e as pontas — e nada que
+ * sirva para forjar uma notificação.
+ */
+const ARQUIVO_LIGA = 'var/captura-wiven.ligada';
+const ARQUIVO_CAPTURA = 'var/captura-wiven.jsonl';
+const JANELA_MS = 15 * 60 * 1000;
 
-  if (!esperado) {
+function captacaoLigada(): boolean {
+  try {
+    return Date.now() - statSync(ARQUIVO_LIGA).mtimeMs < JANELA_MS;
+  } catch {
+    return false;
+  }
+}
+
+/** As pontas de um segredo, para comparar origens sem poder reusá-lo. */
+function pontasDe(v: unknown): string {
+  if (typeof v !== 'string') return `(${typeof v})`;
+  if (v.length <= 6) return `${v.length} chars, curto demais para mostrar`;
+  return `${v.length} chars: ${v.slice(0, 3)}…${v.slice(-3)}`;
+}
+
+function captar(req: NextRequest, cru: string) {
+  if (!captacaoLigada()) return;
+  try {
+    let corpo: Record<string, unknown> = {};
+    try {
+      corpo = JSON.parse(cru);
+    } catch {
+      corpo = { '(corpo não é JSON)': cru.slice(0, 2000) };
+    }
+    const { token, ...resto } = corpo as { token?: unknown };
+
+    appendFileSync(
+      ARQUIVO_CAPTURA,
+      JSON.stringify({
+        em: new Date().toISOString(),
+        ip: req.headers.get('x-forwarded-for'),
+        agente: req.headers.get('user-agent'),
+        // Cabeçalhos que a Wiven possa usar para assinar, se um dia usar.
+        cabecalhos: Object.fromEntries(
+          [...req.headers.entries()].filter(([k]) => /signature|token|hmac|wiven/i.test(k))
+        ),
+        token: pontasDe(token),
+        corpo: resto,
+      }) + '\n',
+      'utf8'
+    );
+  } catch (erro) {
+    console.error('[webhook/wiven] captação falhou:', erro);
+  }
+}
+
+export async function POST(req: NextRequest) {
+  const esperados = tokensDoWebhook();
+
+  if (esperados.length === 0) {
     // Sem token não há como distinguir a Wiven de qualquer um na internet. O
     // corpo é a única credencial que existe — isto não é "aceitável em dev".
+    // A captação ainda roda: é justamente quando não se sabe o token que se
+    // precisa ver o que está chegando.
+    captar(req, await req.text());
     console.error('[webhook/wiven] WIVEN_WEBHOOK_TOKEN ausente — recusando tudo');
     return NextResponse.json({ erro: 'não configurado' }, { status: 401 });
   }
 
+  /**
+   * O corpo é lido como TEXTO primeiro.
+   *
+   * `req.json()` direto descarta o corpo quando ele não é JSON válido — e
+   * corpo que não é JSON é exatamente o que a captação precisa ver.
+   */
+  const cru = await req.text();
+  captar(req, cru);
+
   let corpo: CorpoWebhookWiven;
   try {
-    corpo = (await req.json()) as CorpoWebhookWiven;
+    corpo = JSON.parse(cru) as CorpoWebhookWiven;
   } catch {
     return NextResponse.json({ erro: 'corpo inválido' }, { status: 400 });
   }
 
-  /* Porta 1: o token. */
-  if (!tokenConfere(corpo?.token, esperado)) {
+  /* Porta 1: o token — qualquer um dos cadastrados. */
+  if (!esperados.some((e) => tokenConfere(corpo?.token, e))) {
     /**
      * O diagnóstico que faltava na primeira noite.
      *
@@ -85,7 +171,7 @@ export async function POST(req: NextRequest) {
     console.warn(
       `[webhook/wiven] token não confere — evento=${corpo?.event ?? '?'} ` +
         `recebido=${typeof recebido === 'string' ? `${recebido.length} chars` : typeof recebido} ` +
-        `esperado=${esperado.length} chars ` +
+        `esperados=[${esperados.map((e) => `${e.length} chars`).join(', ')}] ` +
         `transacao=${corpo?.transaction?.id ?? '?'}`
     );
     return NextResponse.json({ erro: 'não autorizado' }, { status: 401 });
