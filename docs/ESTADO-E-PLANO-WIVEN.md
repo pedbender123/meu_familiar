@@ -131,147 +131,122 @@ Ver `docs/PLANO-CAKTO.md` para o detalhe da API.
 
 ---
 
-## 4. Wiven — o plano
+## 4. Wiven — INTEGRADA, dormente
 
-`https://app.wiven.com.br/docs` (o `curl` toma **403 do CloudFront** sem
-User-Agent de navegador — não é falta de documentação, é WAF).
-
-### O que já se sabe
+`https://app.wiven.com.br/docs`. **A documentação é SPA**: `curl` e WebFetch
+pegam a casca vazia, `sitemap.xml` e `robots.txt` também. O jeito é salvar a
+página no navegador — o schema inteiro vem embutido no HTML.
 
 - Base: `https://app.wiven.com.br/api/v1`
-- Auth: headers **`x-public-key`** e **`x-secret-key`**, geradas no painel
-- Webhook: configurável no painel (Configurações > Webhooks) **ou por API**,
-  com `callbackUrl`, por produto e por eventos
-- Rate limit: depende do plano contratado
-- **Taxa: 5,99% + R$ 1,99** (faixa R$ 0–10k/mês); 4,99% + R$ 1,49 até 100k
+- Auth: headers `x-public-key` e `x-secret-key`
+- **Taxa: 5,99% + R$ 1,99** (faixa 0–10k/mês); 4,99% + R$ 1,49 até 100k
 
-### ⚠️ O número que precisa ser encarado antes de escrever código
+### O código
+
+| Arquivo | O quê |
+| --- | --- |
+| `src/nucleo/checkouts/wiven.ts` | O provedor inteiro |
+| `src/app/api/webhook/wiven/route.ts` | O webhook, com duas portas |
+| `src/components/checkout/Wiven.tsx` | Pix e cartão, cartão em etapas |
+| `scripts/wiven-fumaca.ts` | `npm run wiven-fumaca` — Pix real de R$ 5 |
+
+Rotas usadas: `POST /gateway/pix/receive`, `POST /gateway/card/receive`,
+`GET /gateway/transactions?id=|clientIdentifier=`,
+`POST /gateway/producer/refunds`, `GET /gateway/producer/credentials`.
+
+### Para ligar
+
+```
+WIVEN_PUBLIC_KEY=...
+WIVEN_SECRET_KEY=...
+WIVEN_WEBHOOK_TOKEN=...      # cadastrado junto do webhook, no painel
+GATEWAY_PIX=wiven            # ou GATEWAY=wiven para os dois meios
+```
+
+Webhook do painel apontando para `https://bruxario.com.br/api/webhook/wiven`.
+`GATEWAY=mercadopago` volta tudo com um restart, sem deploy.
+
+**A meia-configuração falha na entrada.** As chaves da API bastam para cobrar,
+mas quem libera acesso é o webhook — e a rota recusa tudo sem o token. Então
+`gatewayDe()` recusa a Wiven sem `WIVEN_WEBHOOK_TOKEN` e cai no Mercado Pago.
+Sem isso, ela cobraria e nunca entregaria.
+
+### As quatro armadilhas (todas com teste)
+
+**1. Ela fala TRÊS vocabulários de dinheiro.**
+
+| Onde | Campo | Significa |
+| --- | --- | --- |
+| criação | `fee` | a TAXA |
+| webhook | `commissionAmount` | o LÍQUIDO |
+| consulta | `chargeAmount` / `amount` | pago pelo cliente / recebido pelo produtor |
+
+A consulta **não tem campo de taxa**. Fica `null` — a diferença entre os dois
+é juro de parcelamento, não taxa nossa. Quem alimenta o painel é o webhook.
+
+**2. E dois vocabulários de status.** Criação: `OK · PENDING · FAILED ·
+REJECTED · CANCELED`. Webhook: `COMPLETED · PENDING · FAILED · REFUNDED ·
+CHARGED_BACK`. Só dois são comuns. Uma tradução que só conhecesse a criação
+nunca reconheceria `COMPLETED` — todo mundo pagando, ninguém recebendo.
+
+**3. `OK` na criação do Pix não é venda.** O QR acabou de nascer. Traduzido
+como `pending`, sempre.
+
+**4. `transaction.identifier` é anulável** — e o exemplo de payload deles nem
+o traz. Por isso a busca tem dois caminhos: o prefixo de `pedidoId--uuid` e o
+`transaction.id`, gravado como `pagamento_id` na criação.
+
+E `amount` é **reais decimais**: `emReais` passa por `toFixed(2)`, com teste
+varrendo 1 a 5000 centavos.
+
+### O webhook tem duas portas
+
+O `token` viaja no corpo, em texto — não é HMAC. Comparado em tempo constante.
+A defesa natural contra token vazado seria reconsultar a API, mas isso esbarra
+no item **"Polling bloqueado"** deles. Então a segunda porta é o preço,
+recalculado do nosso lado: notificação dizendo ter pago menos é recusada. A
+mais passa — `precoComDesconto` arredonda para cima.
+
+### Reconciliação: indisponível, e barulhenta
+
+`listarPagosNoPeriodo` **lança**. `GET /gateway/transactions` não filtra por
+data, e varrer uma a uma é o polling que eles desencorajam. `[]` faria a
+reconciliação concluir em silêncio que a Wiven não tem venda nenhuma e marcar
+como suspeita toda venda que o webhook gravou certo.
+
+### O custo, para ser escolha e não surpresa
 
 | | MP (hoje) | Cakto | **Wiven** |
 | --- | --- | --- | --- |
 | Revelação R$ 9,80 | ~R$ 0,10 · **1%** | R$ 2,49 · 25% | **R$ 2,58 · 26%** |
 | Completa R$ 18,90 | ~R$ 0,19 · **1%** | R$ 2,49 · 13% | **R$ 3,12 · 17%** |
 
-Nas duas vendas reais de R$ 15,12 de 20 e 21/08, o Mercado Pago cobrou
-**R$ 0,15** cada (líquido R$ 14,97 — conferido no extrato). Pela Wiven seriam
-**R$ 12,22**: **R$ 2,75 a menos por venda**.
+Nas duas vendas reais de R$ 15,12 (20 e 21/08) o MP cobrou **R$ 0,15** cada.
+Pela Wiven seriam R$ 12,22 — **R$ 2,75 a menos por venda**. Decisão do dono:
+conectar mesmo assim.
 
-É a mesma armadilha da Cakto, um pouco pior: a parte fixa destrói ticket
-baixo. O dono já viveu isso — foi por causa dos R$ 2,49 que o preço subiu
-para 12,90 em 22/08, e as vendas pararam (voltou para 9,80 no mesmo dia).
+### PCI — o que foi feito e o que não dá para fazer
 
-**Decisão do dono: conectar mesmo assim.** Este documento registra o custo
-para que ele seja escolha, não surpresa no extrato.
+O cartão da Wiven **não tem tokenização**: PAN e CVV chegam em texto no corpo.
+Hoje, com o Brick do MP, o número nunca toca a máquina.
 
-### Como conectar — o caminho já está pavimentado
+Feito: passagem direta. Estado de React que morre com a aba, nada em
+`localStorage`, nada em log — o erro ecoa o texto do gateway, nunca o corpo
+enviado. **Isso reduz o risco real e não tira o escopo PCI-DSS**, porque a
+régua é transmitir ou processar, não armazenar.
 
-A troca de gateway **já foi feita uma vez** (Cakto) e a arquitetura aguenta:
+**Se aparecer SDK de tokenização no navegador, é a primeira coisa a trocar.**
+Enquanto não, `GATEWAY_PIX=wiven` sozinho entrega a plaquinha sem o PAN: o Pix
+pede só nome, e-mail, telefone e CPF.
 
-1. **`src/nucleo/checkouts/wiven.ts`** implementando `ProvedorPagamento`:
-   `criarPagamento`, `consultarPagamento`, `estornar`,
-   `listarPagosNoPeriodo`. Copiar a forma de `cakto.ts`.
-2. **Traduzir o status para o vocabulário do sistema.** O resto do projeto
-   fala `approved`/`pending`/`rejected` desde o Asaas. `webhook-pagamento.ts`
-   não pode ganhar uma linha sobre Wiven.
-3. **Achar o `external_reference`.** É o ponto que mais dói: sem um campo
-   livre que volte na consulta, o webhook não reencontra o pedido. Na Cakto
-   foi o `sck`. **Descobrir isso ANTES de escrever o resto.**
-4. **`/api/webhook/wiven`** — rota nova, separada. O webhook do MP continua
-   de pé durante a virada.
-5. **Registrar no roteador** (`src/nucleo/checkouts/gateway.ts`): basta
-   acrescentar `'wiven'` a `NomeDoGateway` e ao `provedorDe`. O roteamento
-   por meio (`GATEWAY_PIX` / `GATEWAY_CARTAO`) já existe e vale de graça.
-6. **Nasce desligado.** `GATEWAY=mercadopago` até uma compra real de valor
-   baixo passar ponta a ponta.
+### O que ainda não foi lido da documentação
 
-### O que conferir na documentação assim que ela estiver em mãos
-
-- [ ] Existe **sandbox**? (a Cakto não tinha, e isso mudou todo o plano)
-- [ ] O corpo aceita **valor livre** ou exige produto/oferta cadastrada?
-      (a Cakto exigia oferta — foi o que obrigou `cakto-ofertas.ts`)
-- [ ] Qual campo carrega a **nossa referência** e ele volta na consulta?
-- [ ] O webhook é **assinado** (HMAC) ou tem segredo no corpo?
-- [ ] Prazo de resposta do webhook e política de retentativa
-- [ ] **Checkout embutido ou hospedado?** O SPEC 10.3 proíbe redirecionar
-      para tela de terceiro — foi o que tirou o Asaas
-- [ ] A resposta traz **taxa** por transação? (o painel financeiro depende)
-- [ ] `GET` de pedidos aceita **filtro por data**? (a Cakto não aceitava, e a
-      reconciliação virou paginação)
-
----
-
-### O que a documentação do cartão já respondeu (23/08)
-
-Endpoint: `POST https://app.wiven.com.br/api/v1/gateway/card/receive`.
-
-**Resolvido — e melhor do que na Cakto:**
-
-- **`identifier` é o nosso `external_reference`.** String única criada por
-  *nós*, obrigatória. Some o problema que na Cakto obrigou a gambiarra do
-  `sck`. Vai ser o `pedidoId`. Ainda falta confirmar que ele **volta no
-  webhook** — se não voltar, o `transactionId` da resposta tem que ser gravado
-  no pedido na hora, antes de qualquer coisa.
-- **`callbackUrl` por transação**, no corpo. Não depende de cadastro no painel.
-- **`fee` vem na resposta.** O painel financeiro continua de pé.
-- **Status:** `OK` · `PENDING` · `FAILED` · `REJECTED` · `CANCELED` → tradução
-  direta para `approved`/`pending`/`rejected`. `webhook-pagamento.ts` não muda.
-- **Valor livre.** Nada de produto/oferta cadastrada — `products` é opcional.
-  `cakto-ofertas.ts` não tem equivalente aqui.
-- **Antifraude devolve `PENDING`** (`ACQUIRER_ANTIFRAUD_REPROVED`). Confirma a
-  regra: **cartão não libera na resposta, só no webhook.**
-
-**⚠️ `amount` é em REAIS, número decimal** (`100.5`). O sistema inteiro fala
-centavos inteiros. A conversão é ponto único de erro: `centavos / 100` com
-arredondamento explícito, nunca aritmética de float sobre o resultado.
-
-### ⚠️ Bloqueio 1 — o cartão passa a bater no nosso servidor
-
-Hoje o número do cartão **nunca toca a nossa máquina**: o Brick do Mercado
-Pago coleta no navegador e devolve um `token` (`mercadopago.ts:34`). O corpo
-da Wiven pede `card.number`, `card.cvv` e `card.expiresAt` **em texto puro**.
-
-Receber PAN e CVV joga o servidor dentro do escopo do PCI-DSS — o formulário,
-o log, o proxy, o backup do banco. É uma mudança de responsabilidade legal,
-não uma refatoração.
-
-A resposta traz `order.url` ("checkout interno"), o que sugere existir
-checkout hospedado. Mas o SPEC 10.3 proíbe mandar a pessoa para tela de
-terceiro — foi o que tirou o Asaas. **Precisa existir uma terceira via:
-tokenização no navegador (JS/SDK da Wiven).** Se não existir, o cartão fica no
-Mercado Pago e a Wiven leva só o Pix — que o roteador já sabe fazer,
-`GATEWAY_PIX=wiven`.
-
-### ⚠️ Bloqueio 2 — o formulário triplica de tamanho
-
-Obrigatórios no cartão que **hoje não são pedidos**: `document` (CPF),
-`phone`, `clientIp` e o endereço **inteiro** — país, CEP, estado, cidade,
-bairro, rua, número.
-
-O funil tem hoje nome e e-mail. Medido em 21–23/08: **13 viram a oferta, 2
-clicaram**. Pedir CPF e endereço completo numa compra por impulso de R$ 9,80,
-de um produto que não tem entrega física, ataca exatamente o degrau que já é o
-mais fino do funil.
-
-Já temos `telefone` e `ip_comprador` gravados (migração 027). Faltam CPF e
-endereço. **Confirmar na documentação do Pix se ele exige o mesmo** — se o Pix
-pedir só CPF, ele vira o caminho e o cartão fica com o MP.
-
-### O que ainda falta da documentação
-
-Nesta ordem, que é a ordem em que trava:
-
-1. **Receber Pix** — corpo, campos obrigatórios (exige endereço?) e o que
-   volta: QR code, copia-e-cola, vencimento
-2. **Consultar transação** — busca por `identifier` ou só por `transactionId`?
-   Devolve `identifier` e `metadata`?
-3. **Webhook / callback** — o corpo que chega, e se é **assinado** (HMAC) ou
-   traz segredo. Sem isso qualquer um libera pedido com um POST
-4. **Estorno**
-5. **Sandbox ou chaves de teste** (a Cakto não tinha — mudou o plano inteiro)
-6. **Tokenização de cartão no navegador**, se existir — decide o Bloqueio 1
-7. **Listar transações por período** — a reconciliação depende
-
----
+- `Polling bloqueado` — quero o texto antes de mexer na reconciliação
+- `Bucket de vendas pendentes`, `Limite de webhooks via API`
+- `Cálculo do valor da transação` (os campos `shippingFee`/`extraFee`/`discount`)
+- Assinaturas (`pix/subscription`, `card/subscription`) — o plano de 29,90
+- `trackProps` do webhook traz UTMs, `fbc`, `fbp`, IP e user-agent: matéria
+  pronta para Meta CAPI e Utmify
 
 ## 5. Regras que não se discutem
 
