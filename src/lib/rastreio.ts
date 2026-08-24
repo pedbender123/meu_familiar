@@ -370,7 +370,15 @@ export function lerAtribuicao(bruto: string | null | undefined): Atribuicao | nu
  */
 export function deveSubstituir(
   atual: Atribuicao | null,
-  novo: Toque
+  novo: Toque,
+  /**
+   * A campanha do toque novo, já resolvida contra o banco.
+   *
+   * Vem de fora porque `Toque` guarda só o código da URL (`?c=ig01`), e
+   * comparar códigos não serve: peças diferentes da mesma campanha têm
+   * códigos diferentes, e trocar de peça não é trocar de campanha.
+   */
+  campanhaIdNova?: string | null
 ): boolean {
   if (!novo.contaAquisicao) return false;
   if (!atual) return true;
@@ -382,6 +390,30 @@ export function deveSubstituir(
    * endereço no dia seguinte — é justamente o vazamento que virava `outro`.
    */
   if (atual.tipo === 'direto' && novo.tipo !== 'direto') return true;
+
+  /**
+   * ── Clique em OUTRA campanha re-atribui ─────────────────────────────────
+   *
+   * O primeiro toque valia para sempre, e o cookie dura um ano. Com duas
+   * campanhas rodando ao mesmo tempo para públicos que se sobrepõem, quem
+   * clicou na primeira ficava creditado a ela mesmo comprando dias depois
+   * pelo anúncio da segunda. Era o vazamento visível no painel: tráfego de
+   * uma campanha aparecendo na outra.
+   *
+   * E deixou de ser só relatório errado. **A campanha escolhe o gateway** —
+   * ou seja, escolhe em QUAL CONTA o dinheiro cai. Com campanhas de donos
+   * diferentes, o primeiro toque grudado mandava a venda de uma para a conta
+   * da outra. Erro de atribuição virou erro de repasse.
+   *
+   * Clique em link de campanha é toque pago, explícito e recente — o sinal
+   * mais forte que existe sobre quem trouxe a pessoa AGORA. Ele vence o
+   * primeiro toque quando aponta para uma campanha diferente.
+   *
+   * Mesma campanha não substitui: trocar de peça dentro dela não é aquisição
+   * nova, e reescrever manteria a última peça em vez da que trouxe.
+   */
+  if (campanhaIdNova && campanhaIdNova !== atual.campanhaId) return true;
+
   return false;
 }
 

@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   deveSubstituir,
@@ -8,6 +8,7 @@ import {
   origemDoReferer,
   serializarAtribuicao,
   type Atribuicao,
+  type Toque,
 } from './rastreio';
 
 /**
@@ -178,4 +179,66 @@ test('separador injetado no valor não quebra a leitura', () => {
   assert.equal(lido?.origem, 'instagram');
   assert.equal(lido?.campanhaId, 'ab');
   assert.equal(lido?.pecaId, null);
+});
+
+describe('clique em outra campanha re-atribui a pessoa', () => {
+  const campanhaToque = (): Toque => ({
+    tipo: 'campanha',
+    origem: 'instagram',
+    codigoCampanha: 'ig',
+    codigoPeca: '01',
+    codigoIndicacao: null,
+    contaAquisicao: true,
+  });
+  const atribuidoA = (campanhaId: string): Atribuicao => ({
+    tipo: 'campanha',
+    origem: 'instagram',
+    campanhaId,
+    pecaId: 'peca-1',
+    indicadoPor: null,
+  });
+
+  /**
+   * O vazamento visível no painel: o primeiro toque valia para sempre e o
+   * cookie dura um ano. Com duas campanhas rodando para públicos que se
+   * sobrepõem, quem clicou na primeira ficava creditado a ela mesmo comprando
+   * dias depois pelo anúncio da segunda.
+   *
+   * E deixou de ser só relatório errado quando a campanha passou a escolher o
+   * gateway: com campanhas de donos diferentes, o primeiro toque grudado
+   * mandava a venda de uma para a CONTA da outra.
+   */
+  test('campanha diferente substitui a anterior', () => {
+    assert.equal(deveSubstituir(atribuidoA('camp-a'), campanhaToque(), 'camp-b'), true);
+  });
+
+  /**
+   * Trocar de peça dentro da mesma campanha não é aquisição nova — e
+   * reescrever manteria a última peça em vez da que trouxe a pessoa.
+   */
+  test('a mesma campanha não substitui', () => {
+    assert.equal(deveSubstituir(atribuidoA('camp-a'), campanhaToque(), 'camp-a'), false);
+  });
+
+  /** Sem campanha resolvida, a regra antiga vale: primeiro toque vence. */
+  test('toque sem campanha não rouba o crédito', () => {
+    assert.equal(deveSubstituir(atribuidoA('camp-a'), campanhaToque(), null), false);
+    assert.equal(deveSubstituir(atribuidoA('camp-a'), campanhaToque()), false);
+  });
+
+  /**
+   * A proteção que já existia continua: perder a campanha porque a pessoa
+   * digitou o endereço no dia seguinte era o vazamento que virava `outro`.
+   */
+  test('tráfego direto nunca rouba a campanha', () => {
+    const direto: Toque = {
+      tipo: 'direto',
+      origem: 'direto',
+      codigoCampanha: null,
+      codigoPeca: null,
+      codigoIndicacao: null,
+      contaAquisicao: true,
+    };
+    assert.equal(deveSubstituir(atribuidoA('camp-a'), direto, null), false);
+  });
 });

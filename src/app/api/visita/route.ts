@@ -224,11 +224,12 @@ export async function POST(req: NextRequest) {
   }
 
   /**
-   * A atribuição só muda quando `deveSubstituir` deixa: primeiro toque vence,
-   * e remarketing é a única exceção nomeada. Ver `lib/rastreio.ts`.
+   * A atribuição só muda quando `deveSubstituir` deixa: o primeiro toque
+   * vence, com duas exceções nomeadas — remarketing, e clique numa campanha
+   * DIFERENTE da que estava creditada. Ver `lib/rastreio.ts`.
    */
   const atual = lerAtribuicao(req.cookies.get(COOKIE_ATRIBUICAO)?.value);
-  if (deveSubstituir(atual, toque)) {
+  if (deveSubstituir(atual, toque, campanha?.id ?? null)) {
     resposta.cookies.set(
       COOKIE_ATRIBUICAO,
       serializarAtribuicao({

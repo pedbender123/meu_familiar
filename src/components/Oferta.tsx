@@ -91,7 +91,7 @@ export function Oferta({
    * A Completa continua ao lado, em destaque, para quem quiser subir. O que
    * muda é qual preço o botão anuncia sozinho: o mesmo do anúncio.
    */
-  const [escolhido, setEscolhido] = useState<EscolhaId>('revelacao');
+  const [escolhido, setEscolhido] = useState<EscolhaId>('completa');
   const [precosAtuais, setPrecosAtuais] = useState(precos);
   const [cupom, setCupom] = useState<{ codigo: string; gratis: boolean } | null>(
     null

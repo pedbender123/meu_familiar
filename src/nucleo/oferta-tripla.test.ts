@@ -77,21 +77,27 @@ describe('o CTA depois do ritual', () => {
   });
 
   /**
-   * O padrão era `completa`, e o botão dizia "Continuar com a Completa —
-   * R$ 18,90" para quem tinha clicado num anúncio de R$ 9,80.
+   * ── Este padrão já foi trocado duas vezes, e as duas por um motivo ──────
    *
-   * Entre 21 e 23/08: 21 pessoas chegaram nesta tela, **2 clicaram**, e os
-   * dois cliques foram no padrão — `plano_revelacao` ficou em zero. Não havia
-   * defeito de código; o que quebrava era a promessa, no momento da decisão.
+   * Era `completa`, e o botão dizia "Continuar com a Completa — R$ 18,90"
+   * para quem tinha clicado num anúncio de R$ 9,80. Entre 21 e 23/08: 21
+   * pessoas chegaram nesta tela, **2 clicaram**, e os dois cliques foram no
+   * padrão. Foi trocado para `revelacao` em 23/08 — casar o botão com o
+   * preço anunciado.
+   *
+   * Em 24/08 o dono trocou de volta para `completa`, decisão de ticket. Fica
+   * registrado o que a medição anterior mostrou, para que a próxima leitura
+   * do funil saiba o que comparar: se o clique na oferta cair de novo, o
+   * suspeito número um é esta linha, não a tela.
    */
-  test('a Revelação é o plano pré-selecionado', () => {
+  test('a Completa é o plano pré-selecionado', () => {
     const fonte = readFileSync('src/components/Oferta.tsx', 'utf8').replace(
       /\/\*[\s\S]*?\*\//g,
       ''
     );
     assert.ok(
-      /useState<EscolhaId>\('revelacao'\)/.test(fonte),
-      'o botão precisa anunciar o mesmo preço que trouxe a pessoa até aqui'
+      /useState<EscolhaId>\('completa'\)/.test(fonte),
+      'o padrão da oferta é uma decisão de preço — trocar sem querer muda o ticket'
     );
   });
 });
