@@ -61,10 +61,42 @@ function chaves(): { publica: string; secreta: string } {
   return { publica, secreta };
 }
 
-/** Para onde a Wiven avisa que o status mudou. Vai por transação, no corpo. */
+/** O caminho da nossa rota de webhook. Um lugar só define isto. */
+export const CAMINHO_DO_WEBHOOK = '/api/webhook/wiven';
+
+/**
+ * Para onde a Wiven avisa que o status mudou. Vai por transação, no corpo.
+ *
+ * ── Por que não é só `BASE_URL` ───────────────────────────────────────────
+ *
+ * Em desenvolvimento `BASE_URL` é `http://localhost:3000`, e um `callbackUrl`
+ * apontando para localhost é uma cobrança que **nunca vai ser confirmada**: a
+ * Wiven bate num endereço que só existe dentro desta máquina, desiste, e o
+ * pedido fica em `aguardando_pagamento` para sempre com o dinheiro já pago.
+ *
+ * Já aconteceu neste projeto — a Cakto ficou com `salesPage` em
+ * `http://localhost:3000` porque ninguém checou. Aqui a checagem é do código.
+ *
+ * `WIVEN_CALLBACK_URL` existe para o caso do túnel (ngrok e afins), quando se
+ * quer mesmo receber a notificação na máquina local. Sem ele, endereço local
+ * cai no domínio de produção — que é o único alcançável — com aviso no log.
+ */
 export function urlDeCallback(): string {
-  const base = process.env.BASE_URL || 'https://bruxario.com.br';
-  return `${base.replace(/\/$/, '')}/api/webhook/wiven`;
+  const explicito = process.env.WIVEN_CALLBACK_URL?.trim();
+  if (explicito) return `${explicito.replace(/\/$/, '')}${CAMINHO_DO_WEBHOOK}`;
+
+  const base = (process.env.BASE_URL || 'https://bruxario.com.br').replace(/\/$/, '');
+
+  if (/^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(:\d+)?$/i.test(base)) {
+    console.warn(
+      `[wiven] BASE_URL é ${base} — a Wiven não alcança isso. Usando ` +
+        'https://bruxario.com.br. Para receber aqui, exponha a máquina e ' +
+        'defina WIVEN_CALLBACK_URL.'
+    );
+    return `https://bruxario.com.br${CAMINHO_DO_WEBHOOK}`;
+  }
+
+  return `${base}${CAMINHO_DO_WEBHOOK}`;
 }
 
 async function chamar(caminho: string, init: RequestInit = {}): Promise<Response> {

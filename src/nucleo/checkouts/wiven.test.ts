@@ -10,6 +10,8 @@ import {
   traduzirStatus,
   traduzirWebhook,
   pedidoDoWebhook,
+  urlDeCallback,
+  CAMINHO_DO_WEBHOOK,
 } from './wiven';
 
 describe('reais e centavos', () => {
@@ -376,5 +378,62 @@ describe('o webhook tem duas portas', () => {
   /** A entrega não pode segurar a resposta: timeout vira evento reenviado. */
   test('só a parte síncrona é aguardada', () => {
     assert.match(fonte, /await processarNotificacaoDePagamento\(resultado\)/);
+  });
+});
+
+describe('para onde a Wiven avisa', () => {
+  const guardado = { ...process.env };
+  const restaurar = () => {
+    process.env.BASE_URL = guardado.BASE_URL;
+    process.env.WIVEN_CALLBACK_URL = guardado.WIVEN_CALLBACK_URL;
+  };
+
+  test('o caminho é o da rota que existe no disco', () => {
+    assert.equal(CAMINHO_DO_WEBHOOK, '/api/webhook/wiven');
+  });
+
+  /**
+   * O erro que já aconteceu neste projeto: a Cakto ficou com `salesPage` em
+   * `http://localhost:3000` porque ninguém checou.
+   *
+   * Aqui seria pior que uma vitrine feia — um `callbackUrl` de localhost é
+   * uma cobrança que NUNCA confirma: a Wiven bate num endereço que só existe
+   * nesta máquina, desiste, e o pedido fica em `aguardando_pagamento` para
+   * sempre com o dinheiro já pago.
+   */
+  test('localhost nunca vira callback', () => {
+    for (const local of [
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'http://0.0.0.0:8080',
+      'http://localhost',
+    ]) {
+      delete process.env.WIVEN_CALLBACK_URL;
+      process.env.BASE_URL = local;
+      assert.equal(urlDeCallback(), 'https://bruxario.com.br/api/webhook/wiven', local);
+    }
+    restaurar();
+  });
+
+  test('um túnel explícito ganha de tudo', () => {
+    process.env.BASE_URL = 'http://localhost:3000';
+    process.env.WIVEN_CALLBACK_URL = 'https://algo.ngrok.app';
+    assert.equal(urlDeCallback(), 'https://algo.ngrok.app/api/webhook/wiven');
+    restaurar();
+  });
+
+  test('em produção, sai o domínio de produção', () => {
+    delete process.env.WIVEN_CALLBACK_URL;
+    process.env.BASE_URL = 'https://bruxario.com.br';
+    assert.equal(urlDeCallback(), 'https://bruxario.com.br/api/webhook/wiven');
+    restaurar();
+  });
+
+  /** Barra sobrando no fim não pode virar `//api/webhook/wiven`. */
+  test('a barra do fim não duplica', () => {
+    delete process.env.WIVEN_CALLBACK_URL;
+    process.env.BASE_URL = 'https://bruxario.com.br/';
+    assert.equal(urlDeCallback(), 'https://bruxario.com.br/api/webhook/wiven');
+    restaurar();
   });
 });
