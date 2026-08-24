@@ -200,6 +200,79 @@ A troca de gateway **já foi feita uma vez** (Cakto) e a arquitetura aguenta:
 
 ---
 
+### O que a documentação do cartão já respondeu (23/08)
+
+Endpoint: `POST https://app.wiven.com.br/api/v1/gateway/card/receive`.
+
+**Resolvido — e melhor do que na Cakto:**
+
+- **`identifier` é o nosso `external_reference`.** String única criada por
+  *nós*, obrigatória. Some o problema que na Cakto obrigou a gambiarra do
+  `sck`. Vai ser o `pedidoId`. Ainda falta confirmar que ele **volta no
+  webhook** — se não voltar, o `transactionId` da resposta tem que ser gravado
+  no pedido na hora, antes de qualquer coisa.
+- **`callbackUrl` por transação**, no corpo. Não depende de cadastro no painel.
+- **`fee` vem na resposta.** O painel financeiro continua de pé.
+- **Status:** `OK` · `PENDING` · `FAILED` · `REJECTED` · `CANCELED` → tradução
+  direta para `approved`/`pending`/`rejected`. `webhook-pagamento.ts` não muda.
+- **Valor livre.** Nada de produto/oferta cadastrada — `products` é opcional.
+  `cakto-ofertas.ts` não tem equivalente aqui.
+- **Antifraude devolve `PENDING`** (`ACQUIRER_ANTIFRAUD_REPROVED`). Confirma a
+  regra: **cartão não libera na resposta, só no webhook.**
+
+**⚠️ `amount` é em REAIS, número decimal** (`100.5`). O sistema inteiro fala
+centavos inteiros. A conversão é ponto único de erro: `centavos / 100` com
+arredondamento explícito, nunca aritmética de float sobre o resultado.
+
+### ⚠️ Bloqueio 1 — o cartão passa a bater no nosso servidor
+
+Hoje o número do cartão **nunca toca a nossa máquina**: o Brick do Mercado
+Pago coleta no navegador e devolve um `token` (`mercadopago.ts:34`). O corpo
+da Wiven pede `card.number`, `card.cvv` e `card.expiresAt` **em texto puro**.
+
+Receber PAN e CVV joga o servidor dentro do escopo do PCI-DSS — o formulário,
+o log, o proxy, o backup do banco. É uma mudança de responsabilidade legal,
+não uma refatoração.
+
+A resposta traz `order.url` ("checkout interno"), o que sugere existir
+checkout hospedado. Mas o SPEC 10.3 proíbe mandar a pessoa para tela de
+terceiro — foi o que tirou o Asaas. **Precisa existir uma terceira via:
+tokenização no navegador (JS/SDK da Wiven).** Se não existir, o cartão fica no
+Mercado Pago e a Wiven leva só o Pix — que o roteador já sabe fazer,
+`GATEWAY_PIX=wiven`.
+
+### ⚠️ Bloqueio 2 — o formulário triplica de tamanho
+
+Obrigatórios no cartão que **hoje não são pedidos**: `document` (CPF),
+`phone`, `clientIp` e o endereço **inteiro** — país, CEP, estado, cidade,
+bairro, rua, número.
+
+O funil tem hoje nome e e-mail. Medido em 21–23/08: **13 viram a oferta, 2
+clicaram**. Pedir CPF e endereço completo numa compra por impulso de R$ 9,80,
+de um produto que não tem entrega física, ataca exatamente o degrau que já é o
+mais fino do funil.
+
+Já temos `telefone` e `ip_comprador` gravados (migração 027). Faltam CPF e
+endereço. **Confirmar na documentação do Pix se ele exige o mesmo** — se o Pix
+pedir só CPF, ele vira o caminho e o cartão fica com o MP.
+
+### O que ainda falta da documentação
+
+Nesta ordem, que é a ordem em que trava:
+
+1. **Receber Pix** — corpo, campos obrigatórios (exige endereço?) e o que
+   volta: QR code, copia-e-cola, vencimento
+2. **Consultar transação** — busca por `identifier` ou só por `transactionId`?
+   Devolve `identifier` e `metadata`?
+3. **Webhook / callback** — o corpo que chega, e se é **assinado** (HMAC) ou
+   traz segredo. Sem isso qualquer um libera pedido com um POST
+4. **Estorno**
+5. **Sandbox ou chaves de teste** (a Cakto não tinha — mudou o plano inteiro)
+6. **Tokenização de cartão no navegador**, se existir — decide o Bloqueio 1
+7. **Listar transações por período** — a reconciliação depende
+
+---
+
 ## 5. Regras que não se discutem
 
 - **Só o webhook libera acesso.** Cartão volta `paid` na hora e Pix volta
