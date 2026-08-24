@@ -2,7 +2,7 @@ import { notFound, redirect } from 'next/navigation';
 import { buscarPedido } from '@/lib/db';
 import { chavePublica, modoAtual, pagamentoEhFake } from '@/nucleo/checkouts/mercadopago';
 import { Checkout } from '@/components/checkout/Checkout';
-import { gatewayDe, campanhaDoPedido } from '@/nucleo/checkouts/gateway';
+import { gatewayDe } from '@/nucleo/checkouts/gateway';
 import { PagamentoFake } from '@/components/PagamentoFake';
 import { PoeiraNaLuz } from '@/components/PoeiraNaLuz';
 import { SigiloFamiliar } from '@/components/SigiloFamiliar';
@@ -105,8 +105,8 @@ export default async function Melhorar({
             modo={modoAtual()}
             nome={pedido.nome}
             cpf={pedido.cpf}
-            gatewayPix={gatewayDe('pix', campanhaDoPedido(pedido))}
-            gatewayCartao={gatewayDe('cartao', campanhaDoPedido(pedido))}
+            gatewayPix={gatewayDe('pix', pedido.campanha_id)}
+            gatewayCartao={gatewayDe('cartao', pedido.campanha_id)}
           />
         )}
       </main>

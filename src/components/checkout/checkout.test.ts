@@ -83,6 +83,6 @@ describe('a tela não decide quem cobra', () => {
     assert.match(fonte, /gatewayDe\('cartao', campanha\)/);
     // A campanha sai do PEDIDO, nunca da URL da requisição: origem mandada
     // pelo cliente seria o cliente escolhendo em que conta o dinheiro cai.
-    assert.match(fonte, /campanhaDoPedido\(pedido\)/);
+    assert.match(fonte, /const campanha = pedido\.campanha_id/);
   });
 });

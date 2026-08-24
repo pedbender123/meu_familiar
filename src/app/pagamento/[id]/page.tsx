@@ -4,7 +4,7 @@ import { chavePublica, modoAtual, pagamentoEhFake } from '@/nucleo/checkouts/mer
 import { produtoDe } from '@/lib/produtos';
 import { precoDoPedido } from '@/lib/cupons';
 import { Checkout } from '@/components/checkout/Checkout';
-import { gatewayDe, campanhaDoPedido } from '@/nucleo/checkouts/gateway';
+import { gatewayDe } from '@/nucleo/checkouts/gateway';
 import { PagamentoFake } from '@/components/PagamentoFake';
 import { MarcoDoCheckout } from '@/components/MarcoDoCheckout';
 import { FAMILIARES, type FamiliarId } from '@/lib/familiares';
@@ -41,7 +41,7 @@ export default async function Pagamento({
    * Durante uma virada os dois convivem: o Pix pode estar num gateway e o
    * cartão em outro. Quem despacha é o `Checkout`; aqui só se resolve.
    */
-  const campanha = campanhaDoPedido(pedido);
+  const campanha = pedido.campanha_id;
   const gatewayPix = gatewayDe('pix', campanha);
   const gatewayCartao = gatewayDe('cartao', campanha);
 

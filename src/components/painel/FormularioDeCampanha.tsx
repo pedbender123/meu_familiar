@@ -3,7 +3,9 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { EscolhaDeFunis } from './EscolhaDeFunis';
+import { EscolhaDeCheckout } from './EscolhaDeCheckout';
 import type { FunilId } from '@/lib/funis';
+import type { NomeDoGateway } from '@/nucleo/checkouts/nomes';
 import { agoraEmBrasilia } from '@/lib/periodo';
 
 /**
@@ -38,6 +40,8 @@ export function FormularioDeCampanha() {
    * pelo talvez sem ninguém ter decidido isso.
    */
   const [funis, setFunis] = useState<FunilId[]>(['padrao']);
+  /** `null` = segue o padrão do servidor, como toda campanha antiga. */
+  const [gateway, setGateway] = useState<NomeDoGateway | null>(null);
 
   const set = (k: keyof typeof form) => (v: string) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -49,7 +53,7 @@ export function FormularioDeCampanha() {
       const r = await fetch('/api/painel/campanha', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, funis }),
+        body: JSON.stringify({ ...form, funis, gateway }),
       });
       const d = await r.json();
       if (!r.ok) {
@@ -92,6 +96,8 @@ export function FormularioDeCampanha() {
           placeholder="Story 07/08 — teste do bilhete" />
         <div className="sm:col-span-2">
           <EscolhaDeFunis valor={funis} onChange={setFunis} />
+
+          <EscolhaDeCheckout valor={gateway} onChange={setGateway} />
         </div>
 
         <Seletor rotulo="Plataforma" valor={form.plataforma} onChange={set('plataforma')}

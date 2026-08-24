@@ -17,6 +17,18 @@ export interface Campanha {
    */
   codigo: string | null;
   /**
+   * Quem cobra as vendas desta campanha.
+   *
+   * `mercadopago` · `cakto` · `wiven`. Nulo = o padrão do `.env`, que é como
+   * toda campanha funcionava antes disto existir.
+   *
+   * Existe pelo mesmo motivo de `funis`: a campanha é a unidade de decisão do
+   * negócio, e escolher em qual conta o dinheiro cai é uma decisão do mesmo
+   * tipo que escolher a página de vendas. Nenhuma das duas devia exigir
+   * deploy.
+   */
+  gateway: string | null;
+  /**
    * As páginas de venda desta campanha, em JSON.
    *
    * Uma só: todo mundo que chegar por ela vê aquela. Mais de uma: teste A/B
@@ -52,6 +64,8 @@ export function criarCampanha(c: {
   plataforma?: string | null;
   codigo?: string | null;
   funis?: string | null;
+  /** Quem cobra as vendas desta campanha. `null` = o padrão do `.env`. */
+  gateway?: string | null;
   inicio: string;
   fim?: string | null;
   investido_centavos?: number;
@@ -81,12 +95,13 @@ export function criarCampanha(c: {
   }
   db.prepare(
     `INSERT INTO campanhas
-      (id, nome, plataforma, codigo, funis, inicio, fim, investido_centavos,
+      (id, nome, plataforma, codigo, funis, gateway, inicio, fim, investido_centavos,
        alcance_estimado, nota, criado_em, atualizado_em)
-     VALUES (@id, @nome, @plataforma, @codigo, @funis, @inicio, @fim,
+     VALUES (@id, @nome, @plataforma, @codigo, @funis, @gateway, @inicio, @fim,
        @investido_centavos, @alcance_estimado, @nota, @agora, @agora)`
   ).run({
     id,
+    gateway: null,
     plataforma: null,
     funis: null,
     fim: null,

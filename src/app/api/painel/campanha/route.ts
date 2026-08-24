@@ -7,6 +7,7 @@ import {
 } from '@/lib/campanhas';
 import { deLocalParaUtc } from '@/lib/periodo';
 import { ehFunil } from '@/lib/funis';
+import { ehGateway } from '@/nucleo/checkouts/nomes';
 
 /**
  * CRUD das campanhas. **Só admin, sempre.**
@@ -59,9 +60,21 @@ export async function POST(req: NextRequest) {
    */
   const funis = Array.isArray(c.funis) ? c.funis.filter(ehFunil) : [];
 
+  /**
+   * Quem cobra esta campanha.
+   *
+   * Validado contra a lista de gateways, como os funis: um nome inventado
+   * aqui viraria uma campanha que não consegue cobrar — e o sintoma
+   * apareceria só na primeira pessoa que tentasse pagar.
+   *
+   * Vazio vira `null`, que significa "o padrão do `.env`".
+   */
+  const gateway = ehGateway(c.gateway) ? c.gateway : null;
+
   const alcance = Number(c.alcance_estimado);
   const id = criarCampanha({
     nome,
+    gateway,
     funis: funis.length > 0 ? JSON.stringify(funis) : null,
     plataforma: String(c.plataforma ?? '').trim().slice(0, 40) || null,
     inicio,
@@ -83,6 +96,11 @@ export async function PATCH(req: NextRequest) {
   if (!id) return NextResponse.json({ erro: 'id ausente' }, { status: 400 });
 
   const campos: Record<string, unknown> = {};
+  /**
+   * `null` explícito limpa o campo e devolve a campanha ao padrão; ausente
+   * não mexe. Sem essa distinção, não haveria como desfazer a escolha.
+   */
+  if ('gateway' in c) campos.gateway = ehGateway(c.gateway) ? c.gateway : null;
   if (Array.isArray(c.funis)) {
     const validos = c.funis.filter(ehFunil);
     campos.funis = validos.length > 0 ? JSON.stringify(validos) : null;

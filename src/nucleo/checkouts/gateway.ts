@@ -1,6 +1,11 @@
 import { pagamento as mercadopago, type ProvedorPagamento } from './mercadopago';
 import { ProvedorCakto, caktoConfigurada } from './cakto';
 import { ProvedorWiven, wivenConfigurada, tokenDoWebhook } from './wiven';
+import { buscarCampanha } from '../../lib/campanhas';
+import { NOMES_DE_GATEWAY, type NomeDoGateway } from './nomes';
+
+export { NOMES_DE_GATEWAY, ROTULO_DO_GATEWAY, ehGateway } from './nomes';
+export type { NomeDoGateway } from './nomes';
 
 /**
  * Quem cobra.
@@ -26,7 +31,7 @@ import { ProvedorWiven, wivenConfigurada, tokenDoWebhook } from './wiven';
  * volta ao Mercado Pago sem desistir do resto.
  */
 
-export type NomeDoGateway = 'mercadopago' | 'cakto' | 'wiven';
+
 
 /** Como o front nomeia o meio, já normalizado. */
 export type MeioDePagamento = 'pix' | 'cartao' | 'boleto';
@@ -34,7 +39,7 @@ export type MeioDePagamento = 'pix' | 'cartao' | 'boleto';
 const caktoInstancia = new ProvedorCakto();
 const wivenInstancia = new ProvedorWiven();
 
-const NOMES: readonly NomeDoGateway[] = ['mercadopago', 'cakto', 'wiven'];
+const NOMES = NOMES_DE_GATEWAY;
 
 function normalizar(valor: string | undefined): NomeDoGateway | undefined {
   const limpo = valor?.trim().toLowerCase() as NomeDoGateway | undefined;
@@ -50,85 +55,39 @@ export function gatewayPadrao(): NomeDoGateway {
 }
 
 /**
- * Quem cobra ESTA campanha.
+ * Quem cobra as vendas de uma campanha do painel.
  *
  * ── Por que a campanha decide ─────────────────────────────────────────────
  *
  * Duas campanhas rodando ao mesmo tempo podem precisar cair em contas
- * diferentes — a do dono numa, a da agência noutra. Sem isto, a única forma
- * de separar seria dois sites.
+ * diferentes — a do dono numa, a da agência noutra. A campanha é a unidade
+ * de decisão do negócio, e escolher em qual conta o dinheiro cai é do mesmo
+ * tipo que escolher a página de vendas: um campo no formulário, sem deploy.
  *
- * O link do anúncio já carrega a origem (`utm_campaign`), ela já é gravada no
- * pedido (`utm_json`) no momento da tentativa de pagamento, e o pedido é lido
- * tanto pela tela de checkout quanto pela rota que cobra. Então a informação
- * já estava toda lá; só faltava alguém perguntar.
+ * ── Por que não pelo `utm_campaign` ───────────────────────────────────────
  *
- * ── O formato ─────────────────────────────────────────────────────────────
+ * Foi a primeira tentativa, e era frágil de dois jeitos. Dependia de o link
+ * carregar `utm_campaign` — e o da Meta carrega o ID numérico
+ * (`120248890724340044`), não o nome, então uma regra escrita pelo nome
+ * falharia calada, mandando a venda para a conta errada. E mudar a regra
+ * exigia entrar na VPS.
  *
- *     GATEWAY_POR_CAMPANHA=agencia:wiven,black:mercadopago
+ * A campanha do painel já tem código próprio na URL (`?c=`) e já é gravada
+ * no pedido como `campanha_id` desde que ele nasce. A informação já estava
+ * toda aqui.
  *
- * A comparação é por **trecho contido, sem acento de maiúscula**: a chave
- * `agencia` pega `agencia-familiar-agosto` e `AGENCIA_frio`. O nome que a
- * Meta devolve raramente é o que se digitou no gerenciador — exigir igualdade
- * exata faria a regra falhar em silêncio, e falhar em silêncio aqui significa
- * dinheiro caindo na conta errada.
- *
- * Em compensação, chave curta demais pega o que não devia. `ag` casaria com
- * `viagem`. **Use o nome inteiro da campanha, ou um pedaço que só ela tenha.**
- *
- * A primeira chave que casar ganha; a ordem do `.env` é a ordem da decisão.
+ * Campanha sem escolha, ou pedido sem campanha, cai no padrão.
  */
-/**
- * Sem acento e sem maiúscula, dos dois lados da comparação.
- *
- * A campanha que chega da Meta hoje é o ID numérico (`120248890724340044`),
- * onde acento não existe. Mas basta alguém trocar a macro do link de
- * `{{campaign.id}}` para `{{campaign.name}}` para "Começou" começar a chegar —
- * e aí `começou` digitado no `.env` teria que bater com `Começou`, `COMEÇOU`
- * ou `Comecou`, dependendo de como foi escrito no gerenciador.
- *
- * Nada disso daria erro: daria a venda indo para a conta errada, calada.
- */
-function achatar(v: string): string {
-  return v
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .trim()
-    .toLowerCase();
-}
-
 export function gatewayDaCampanha(
-  campanha: string | null | undefined
+  campanhaId: string | null | undefined
 ): NomeDoGateway | undefined {
-  if (!campanha?.trim()) return undefined;
-  const alvo = achatar(campanha);
-  if (!alvo) return undefined;
-
-  for (const par of (process.env.GATEWAY_POR_CAMPANHA ?? '').split(',')) {
-    const corte = par.lastIndexOf(':');
-    if (corte < 1) continue;
-    const chave = achatar(par.slice(0, corte));
-    const nome = normalizar(par.slice(corte + 1));
-    if (chave && nome && alvo.includes(chave)) return nome;
-  }
-  return undefined;
-}
-
-/**
- * A campanha de um pedido, como ela ficou gravada.
- *
- * `utm_campaign` primeiro, `utm_source` depois. O segundo cobre o caso do
- * anúncio que só marca a rede — vale menos, mas separar "veio de algum
- * anúncio" de "não veio de anúncio nenhum" já é o bastante para rotear.
- */
-export function campanhaDoPedido(pedido: { utm_json?: string | null }): string | null {
-  if (!pedido.utm_json) return null;
+  if (!campanhaId) return undefined;
   try {
-    const utm = JSON.parse(pedido.utm_json) as Record<string, string>;
-    return utm.utm_campaign?.trim() || utm.utm_source?.trim() || null;
+    const campanha = buscarCampanha(campanhaId);
+    return normalizar(campanha?.gateway ?? undefined);
   } catch {
-    // UTM malformado não pode impedir a cobrança — cai no gateway padrão.
-    return null;
+    // Campanha some do banco, a venda continua: cai no padrão.
+    return undefined;
   }
 }
 
@@ -153,9 +112,9 @@ export function campanhaDoPedido(pedido: { utm_json?: string | null }): string |
  */
 export function gatewayDe(
   meio: MeioDePagamento,
-  campanha?: string | null
+  campanhaId?: string | null
 ): NomeDoGateway {
-  const daCampanha = gatewayDaCampanha(campanha);
+  const daCampanha = gatewayDaCampanha(campanhaId);
 
   const especifico =
     meio === 'pix'
@@ -213,9 +172,9 @@ export function provedorDe(nome: NomeDoGateway): ProvedorPagamento {
 /** O provedor que deve cobrar um meio, já resolvido. */
 export function provedorPara(
   meio: MeioDePagamento,
-  campanha?: string | null
+  campanhaId?: string | null
 ): ProvedorPagamento {
-  return provedorDe(gatewayDe(meio, campanha));
+  return provedorDe(gatewayDe(meio, campanhaId));
 }
 
 /**

@@ -1,73 +1,96 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { gatewayDaCampanha, campanhaDoPedido } from './gateway';
+import { readFileSync } from 'node:fs';
+import { ehGateway, NOMES_DE_GATEWAY, ROTULO_DO_GATEWAY } from './nomes';
 
-const g = process.env.GATEWAY_POR_CAMPANHA;
-const usar = (v: string) => {
-  process.env.GATEWAY_POR_CAMPANHA = v;
-};
-const restaurar = () => {
-  if (g === undefined) delete process.env.GATEWAY_POR_CAMPANHA;
-  else process.env.GATEWAY_POR_CAMPANHA = g;
-};
+function codigoDe(caminho: string): string {
+  return readFileSync(caminho, 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/.*$/gm, '');
+}
 
-describe('a campanha escolhe quem cobra', () => {
+describe('a campanha do painel escolhe o checkout', () => {
   /**
-   * O que a Meta manda hoje, medido em produção: o ID NUMÉRICO da campanha,
-   * não o nome. `utm_campaign: "120248890724340044"`.
+   * A primeira tentativa casava o `utm_campaign` por texto, e era frágil de
+   * dois jeitos: o link da Meta carrega o ID NUMÉRICO da campanha
+   * (`120248890724340044`), não o nome — então uma regra escrita pelo nome
+   * falharia calada, mandando a venda para a conta errada — e mudar a regra
+   * exigia entrar na VPS.
    *
-   * Configurar `começou:mercadopago` não pegaria nada — e não daria erro
-   * nenhum, daria a venda caindo na conta errada, calada.
+   * A campanha do painel já é gravada no pedido como `campanha_id` desde que
+   * ele nasce. Escolher o checkout virou igual a escolher a página de vendas.
    */
-  test('casa pelo id numérico que a Meta manda', () => {
-    usar('120248890724340044:mercadopago');
-    assert.equal(gatewayDaCampanha('120248890724340044'), 'mercadopago');
-    restaurar();
+  test('a decisão sai do campanha_id, não do utm', () => {
+    const fonte = codigoDe('src/nucleo/checkouts/gateway.ts');
+    assert.match(fonte, /export function gatewayDaCampanha\(\s*campanhaId/);
+    assert.match(fonte, /buscarCampanha\(campanhaId\)/);
+    assert.doesNotMatch(fonte, /GATEWAY_POR_CAMPANHA/);
   });
 
-  test('campanha que não casa devolve indefinido, e o padrão decide', () => {
-    usar('120248890724340044:mercadopago');
-    assert.equal(gatewayDaCampanha('120299999999999999'), undefined);
-    assert.equal(gatewayDaCampanha(null), undefined);
-    assert.equal(gatewayDaCampanha(''), undefined);
-    restaurar();
+  /**
+   * O corpo da requisição de pagamento vem do navegador. Deixar o cliente
+   * dizer de qual campanha ele veio é deixar o cliente escolher em qual conta
+   * o dinheiro cai.
+   */
+  test('a cobrança lê a campanha do pedido, nunca do corpo', () => {
+    const fonte = codigoDe('src/app/api/pedido/[id]/pagamento/route.ts');
+    assert.match(fonte, /gatewayDe\(meio, pedido\.campanha_id\)/);
+    assert.match(fonte, /provedorPara\(meio, pedido\.campanha_id\)/);
   });
 
-  /** Para o dia em que o link mandar `{{campaign.name}}` em vez do id. */
-  test('acento e maiúscula não separam a mesma campanha', () => {
-    usar('comecou:mercadopago');
-    for (const v of ['Começou', 'COMEÇOU', 'comecou', ' Começou ', 'campanha-Começou-agosto']) {
-      assert.equal(gatewayDaCampanha(v), 'mercadopago', v);
+  /** A tela e a cobrança precisam concordar, senão cobra por outro gateway. */
+  test('a tela de checkout resolve pelo mesmo campo', () => {
+    const fonte = codigoDe('src/app/pagamento/[id]/page.tsx');
+    assert.match(fonte, /pedido\.campanha_id/);
+  });
+
+  /**
+   * Nome inventado no formulário viraria campanha que não consegue cobrar, e
+   * o sintoma apareceria só na primeira pessoa que tentasse pagar.
+   */
+  test('só gateway conhecido é aceito no formulário', () => {
+    assert.equal(ehGateway('wiven'), true);
+    assert.equal(ehGateway('mercadopago'), true);
+    assert.equal(ehGateway('cakto'), true);
+    assert.equal(ehGateway('pagseguro'), false);
+    assert.equal(ehGateway(''), false);
+    assert.equal(ehGateway(null), false);
+    assert.equal(ehGateway(undefined), false);
+  });
+
+  /** `null` explícito devolve a campanha ao padrão; ausente não mexe. */
+  test('dá para desfazer a escolha', () => {
+    const fonte = codigoDe('src/app/api/painel/campanha/route.ts');
+    assert.match(fonte, /'gateway' in c/);
+    assert.match(fonte, /ehGateway\(c\.gateway\) \? c\.gateway : null/);
+  });
+
+  test('todo gateway tem rótulo para o painel', () => {
+    for (const n of NOMES_DE_GATEWAY) {
+      assert.equal(typeof ROTULO_DO_GATEWAY[n], 'string');
+      assert.ok(ROTULO_DO_GATEWAY[n].length > 0, n);
     }
-    restaurar();
-  });
-
-  test('a primeira chave que casa ganha', () => {
-    usar('120248890724340044:mercadopago,1202:wiven');
-    assert.equal(gatewayDaCampanha('120248890724340044'), 'mercadopago');
-    restaurar();
-  });
-
-  test('gateway desconhecido na configuração é ignorado', () => {
-    usar('120248890724340044:pagseguro');
-    assert.equal(gatewayDaCampanha('120248890724340044'), undefined);
-    restaurar();
   });
 });
 
-describe('de onde sai a campanha do pedido', () => {
-  test('utm_campaign primeiro, utm_source como reserva', () => {
-    assert.equal(
-      campanhaDoPedido({ utm_json: '{"utm_source":"fb","utm_campaign":"120248890724340044"}' }),
-      '120248890724340044'
-    );
-    assert.equal(campanhaDoPedido({ utm_json: '{"utm_source":"fb"}' }), 'fb');
+describe('o painel não arrasta o banco para o navegador', () => {
+  /**
+   * O seletor é componente de cliente e precisa só da LISTA de nomes.
+   * `gateway.ts` lê a campanha no banco para decidir quem cobra, e importar
+   * de lá levava `better-sqlite3` para dentro do bundle — o build quebrava em
+   * `Can't resolve 'fs'`.
+   *
+   * Separar o vocabulário da decisão é a divisão certa de qualquer forma: a
+   * lista de gateways é um fato do domínio, não uma regra de negócio.
+   */
+  test('o módulo de nomes não importa nada', () => {
+    const fonte = codigoDe('src/nucleo/checkouts/nomes.ts');
+    assert.doesNotMatch(fonte, /^import /m);
   });
 
-  /** UTM malformado não pode impedir a cobrança — cai no gateway padrão. */
-  test('json quebrado ou ausente não derruba a venda', () => {
-    assert.equal(campanhaDoPedido({ utm_json: '{quebrado' }), null);
-    assert.equal(campanhaDoPedido({ utm_json: null }), null);
-    assert.equal(campanhaDoPedido({}), null);
+  test('o seletor do painel importa dos nomes, não do gateway', () => {
+    const fonte = codigoDe('src/components/painel/EscolhaDeCheckout.tsx');
+    assert.match(fonte, /from '@\/nucleo\/checkouts\/nomes'/);
+    assert.doesNotMatch(fonte, /from '@\/nucleo\/checkouts\/gateway'/);
   });
 });
