@@ -3,6 +3,7 @@ import { ProvedorCakto, caktoConfigurada } from './cakto';
 import { ProvedorWiven, wivenConfigurada, tokenDoWebhook } from './wiven';
 import { buscarCampanha } from '../../lib/campanhas';
 import { NOMES_DE_GATEWAY, type NomeDoGateway } from './nomes';
+import { estaDisponivel } from './saude';
 
 export { NOMES_DE_GATEWAY, ROTULO_DO_GATEWAY, ehGateway } from './nomes';
 export type { NomeDoGateway } from './nomes';
@@ -152,6 +153,21 @@ export function gatewayDe(
    * Configuração pela metade tem que falhar na porta de entrada, não na porta
    * de saída.
    */
+  /**
+   * Gateway em quarentena não é oferecido.
+   *
+   * É o que faz a tela SEGUINTE já nascer no Mercado Pago depois da primeira
+   * falha, em vez de cada pessoa descobrir sozinha que não dá para pagar. E
+   * resolve o cartão junto: um formulário que já nasce no gateway certo não
+   * precisa de queda no meio da cobrança — que, no cartão, seria impossível
+   * de fazer com segurança, porque o Brick tokeniza no navegador e o token
+   * de um gateway não vale no outro.
+   */
+  if (escolhido !== 'mercadopago' && !estaDisponivel(escolhido)) {
+    console.warn(`[gateway] ${escolhido} em quarentena — ${meio} vai para o Mercado Pago.`);
+    return 'mercadopago';
+  }
+
   if (escolhido === 'wiven' && !tokenDoWebhook()) {
     console.warn(
       `[gateway] ${meio} pedia Wiven, mas falta WIVEN_WEBHOOK_TOKEN — ` +

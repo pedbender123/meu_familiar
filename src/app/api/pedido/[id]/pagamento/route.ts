@@ -5,7 +5,8 @@ import {
   statusLiberaAcesso,
   type FormDataBrick,
 } from '@/nucleo/checkouts/mercadopago';
-import { provedorPara, gatewayDe, meioDe } from '@/nucleo/checkouts/gateway';
+import { provedorPara, gatewayDe, meioDe, provedorDe } from '@/nucleo/checkouts/gateway';
+import { ErroDeGatewayIndisponivel } from '@/nucleo/checkouts/wiven';
 import type { DadosCaktoDoFront } from '@/nucleo/checkouts/cakto';
 import type { DadosCriacaoWiven } from '@/nucleo/checkouts/wiven';
 import { reportarVenda } from '@/lib/reportar-venda';
@@ -161,11 +162,39 @@ export async function POST(
   });
   registrarEvento('pagamento_tentado', id);
 
-  try {
-    const resultado = await provedor.criarPagamento({
+  /**
+   * A cobrança, com uma segunda chance quando o gateway não atendeu.
+   *
+   * ── Por que só no Pix ───────────────────────────────────────────────────
+   *
+   * O cartão do Mercado Pago é tokenizado pelo Brick, no navegador, e o token
+   * de um gateway não vale no outro. Uma pessoa que preencheu o formulário da
+   * Wiven não tem token do MP — não há como cobrar o cartão dela em outro
+   * lugar sem pedir os dados de novo.
+   *
+   * Quem resolve o cartão é o disjuntor (`saude.ts`): depois da primeira
+   * falha, a tela seguinte já nasce no Mercado Pago, com o Brick, e ninguém
+   * chega a preencher o formulário errado.
+   *
+   * ── Por que só neste erro ───────────────────────────────────────────────
+   *
+   * `ErroDeGatewayIndisponivel` é lançado apenas quando a cobrança **com
+   * certeza não foi criada**. Tempo esgotado não é ele: ali a resposta se
+   * perdeu e a cobrança pode existir do outro lado, e tentar de novo cobraria
+   * a mesma pessoa duas vezes.
+   */
+  /**
+   * Copiado para uma constante porque o TypeScript perde o estreitamento de
+   * `pedido` dentro da função — o `if (!pedido) return` lá em cima não
+   * atravessa o fecho.
+   */
+  const dados = pedido;
+
+  async function cobrar(provedorEscolhido: typeof provedor) {
+    return provedorEscolhido.criarPagamento({
       form,
       // Ignorado pelo Mercado Pago; é o que a Cakto precisa para cobrar.
-      ...(cakto ? { cakto: { ...cakto, cupomCodigo: pedido.cupom ?? undefined } } : {}),
+      ...(cakto ? { cakto: { ...cakto, cupomCodigo: dados.cupom ?? undefined } } : {}),
       /**
        * O IP vem do CABEÇALHO, sobrescrevendo o que o front mandar.
        *
@@ -185,13 +214,36 @@ export async function POST(
        * que a campanha anuncia a R$ 9,80. É o mesmo furo de 21/08, um degrau
        * adiante: lá a entrega saía de graça, aqui a cobrança sairia zerada.
        */
-      produto: produtoVigenteDe(pedido.produto),
+      produto: produtoVigenteDe(dados.produto),
       pedidoId: id,
-      emailDoPedido: pedido.email,
+      emailDoPedido: dados.email,
       // Lido do PEDIDO, nunca do corpo da requisição: é o cupom que já foi
       // validado contra o banco quando o pedido nasceu.
-      descontoPercentual: pedido.desconto_percentual ?? 0,
+      descontoPercentual: dados.desconto_percentual ?? 0,
     });
+  }
+
+  try {
+    let resultado;
+    try {
+      resultado = await cobrar(provedor);
+    } catch (erro) {
+      const podeCair =
+        erro instanceof ErroDeGatewayIndisponivel &&
+        meio === 'pix' &&
+        nomeDoGateway !== 'mercadopago';
+
+      if (!podeCair) throw erro;
+
+      console.warn(
+        `[api/pedido/pagamento] ${nomeDoGateway} indisponível no pedido ${id} — ` +
+          'cobrando o Pix pelo Mercado Pago.'
+      );
+      // O gateway REAL fica gravado antes da cobrança, como na primeira
+      // tentativa: é ele que o painel usa para saber a quem pedir estorno.
+      atualizarPedido(id, { gateway: 'mercadopago' });
+      resultado = await cobrar(provedorDe('mercadopago'));
+    }
 
     /**
      * O que foi tentado fica gravado AQUI, na tentativa — não na aprovação.

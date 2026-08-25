@@ -6,6 +6,7 @@ import type {
   ResultadoPagamento,
 } from './mercadopago';
 import { precoComDesconto } from '../../lib/cupons';
+import { ehIndisponibilidade, marcarIndisponivel } from './saude';
 
 /**
  * Wiven — Pix e cartão, cobrança avulsa.
@@ -503,6 +504,18 @@ export interface EnderecoWiven {
   complement?: string;
 }
 
+/**
+ * O gateway não atendeu — e a cobrança **com certeza não foi criada**.
+ *
+ * A certeza é o ponto. Quem pega este erro pode cobrar em outro gateway sem
+ * risco de cobrar a mesma pessoa duas vezes. Por isso tempo esgotado NÃO é
+ * este erro: ali a resposta se perdeu, e a cobrança pode existir do outro
+ * lado sem a gente saber.
+ */
+export class ErroDeGatewayIndisponivel extends Error {
+  readonly indisponivel = true;
+}
+
 /* ── o provedor ───────────────────────────────────────────────────────────*/
 
 export class ProvedorWiven implements ProvedorPagamento {
@@ -552,10 +565,33 @@ export class ProvedorWiven implements ProvedorPagamento {
         : {}),
     };
 
-    const resposta = await chamar(
-      extra.meio === 'pix' ? '/gateway/pix/receive' : '/gateway/card/receive',
-      { method: 'POST', body: JSON.stringify(corpo) }
-    );
+    let resposta: Response;
+    try {
+      resposta = await chamar(
+        extra.meio === 'pix' ? '/gateway/pix/receive' : '/gateway/card/receive',
+        { method: 'POST', body: JSON.stringify(corpo) }
+      );
+    } catch (erro) {
+      /**
+       * Rede caindo, DNS, TLS. **Tempo esgotado NÃO entra aqui como
+       * indisponibilidade recuperável** — ver `ErroDeGatewayIndisponivel`.
+       */
+      const tempoEsgotado =
+        erro instanceof Error && (erro.name === 'TimeoutError' || erro.name === 'AbortError');
+
+      if (!tempoEsgotado) {
+        marcarIndisponivel('wiven', `rede: ${String(erro).slice(0, 120)}`);
+        throw new ErroDeGatewayIndisponivel(`[wiven] rede indisponível: ${String(erro)}`);
+      }
+
+      /**
+       * O tempo estourou e a cobrança PODE ter sido criada do outro lado.
+       * Derruba a chave para as próximas pessoas, mas não deixa esta ser
+       * cobrada de novo em outro gateway — o webhook ainda pode chegar.
+       */
+      marcarIndisponivel('wiven', 'tempo esgotado');
+      throw new Error(`[wiven] tempo esgotado — a cobrança pode ter sido criada`);
+    }
 
     if (!resposta.ok) {
       /**
@@ -565,7 +601,25 @@ export class ProvedorWiven implements ProvedorPagamento {
        * dado de cartão mais costuma vazar, porque ninguém trata log de erro
        * como dado sensível.
        */
-      throw new Error(`[wiven] cobrança recusada (${resposta.status}): ${await resposta.text()}`);
+      const texto = await resposta.text();
+
+      /**
+       * 403 com página de desafio, 429, 5xx: o serviço não está atendendo.
+       * Derruba a chave para que a PRÓXIMA tela já nasça no gateway padrão,
+       * em vez de cada pessoa descobrir sozinha que não dá para pagar.
+       *
+       * Recusa de cartão não passa por aqui — ela volta 201 com status
+       * `FAILED`, e derrubar o gateway porque alguém digitou o número errado
+       * tiraria do ar um serviço que está funcionando.
+       */
+      if (ehIndisponibilidade(resposta.status)) {
+        marcarIndisponivel('wiven', `HTTP ${resposta.status}`);
+        throw new ErroDeGatewayIndisponivel(
+          `[wiven] indisponível (${resposta.status}): ${texto.slice(0, 200)}`
+        );
+      }
+
+      throw new Error(`[wiven] cobrança recusada (${resposta.status}): ${texto}`);
     }
 
     return traduzir((await resposta.json()) as RespostaWiven, {
