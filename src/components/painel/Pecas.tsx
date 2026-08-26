@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { DesempenhoDaPeca } from '@/lib/campanhas';
 
@@ -144,7 +145,19 @@ export function Pecas({
                   <tr key={l.peca_id ?? 'sem-peca'} className="border-t border-pergaminho/10">
                     <td className="py-2.5 pr-3">
                       <span className="font-mono text-xs opacity-60 mr-2">{l.codigo}</span>
-                      {l.nome}
+                      {/*
+                        O nome leva ao funil individual do vídeo. A tabela
+                        responde "qual vende mais"; a tela de dentro responde
+                        "onde as pessoas deste vídeo desistem", que é a
+                        pergunta que muda o criativo.
+                      */}
+                      <Link
+                        href={`/painel/campanhas/${campanhaId}/peca/${l.peca_id ?? 'sem-peca'}`}
+                        className="hover:text-vela transition underline decoration-dotted underline-offset-2"
+                        title="Abrir o funil deste vídeo"
+                      >
+                        {l.nome}
+                      </Link>
                     </td>
                     <td className="py-2.5 pr-3">
                       <button

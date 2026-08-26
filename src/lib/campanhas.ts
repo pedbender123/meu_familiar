@@ -781,3 +781,167 @@ export function desempenhoPorPeca(campanhaId: string): DesempenhoDaPeca[] {
     })
     .sort((a, b) => b.vendas - a.vendas || b.pessoas - a.pessoas);
 }
+
+/* ── o funil de um vídeo, degrau a degrau ────────────────────────────────── */
+
+export interface DegrauDaPeca {
+  rotulo: string;
+  pessoas: number;
+  /** Quanto sobrou do degrau anterior. `null` no primeiro. */
+  retencao: number | null;
+}
+
+export interface RedeDaPeca {
+  origem: string;
+  pessoas: number;
+}
+
+export interface FunilDaPeca {
+  pecaId: string | null;
+  codigo: string;
+  nome: string;
+  link: string;
+  degraus: DegrauDaPeca[];
+  redes: RedeDaPeca[];
+  vendas: number;
+  receitaCentavos: number;
+}
+
+/**
+ * O funil de UMA peça, aberto degrau a degrau.
+ *
+ * ── Por que uma tela por vídeo ────────────────────────────────────────────
+ *
+ * A tabela de `desempenhoPorPeca` responde "qual vídeo vende mais". Esta
+ * responde a pergunta seguinte, que é a que muda o criativo: **onde as
+ * pessoas deste vídeo desistem**. Um vídeo que traz 200 pessoas e perde 180
+ * na primeira cena tem problema de promessa — o anúncio prometeu outra coisa.
+ * Um que perde na oferta tem problema de preço. São conclusões opostas, e o
+ * agregado não distingue as duas.
+ *
+ * ── Por que separar por rede ──────────────────────────────────────────────
+ *
+ * O mesmo criativo rende diferente no Feed do Instagram e no do Facebook, e
+ * a Meta distribui sozinha entre os dois. Sem esta quebra, um vídeo que
+ * converte bem numa rede e mal na outra aparece como mediano nas duas.
+ *
+ * ── Uma pessoa conta uma vez por degrau ───────────────────────────────────
+ *
+ * `COUNT(DISTINCT visitante)` em todos, e não `COUNT(*)`: quem recarregou a
+ * página três vezes é uma pessoa, não três. Sem isso a retenção passa de
+ * 100% e o gráfico deixa de fazer sentido.
+ */
+export function funilDaPeca(campanhaId: string, pecaId: string | null): FunilDaPeca | null {
+  const campanha = buscarCampanha(campanhaId);
+  if (!campanha) return null;
+
+  const peca = pecaId ? listarPecas(campanhaId).find((p) => p.id === pecaId) : undefined;
+  if (pecaId && !peca) return null;
+
+  /**
+   * O filtro de peça precisa distinguir "esta peça" de "sem peça nenhuma", e
+   * `= NULL` não faz isso em SQL. Duas cláusulas, escolhidas aqui.
+   */
+  const filtro = pecaId ? 't.peca_id = @peca' : 't.peca_id IS NULL';
+  const params = pecaId ? { campanha: campanhaId, peca: pecaId } : { campanha: campanhaId };
+
+  const contar = (condicao: string): number => {
+    const linha = db
+      .prepare(
+        `SELECT COUNT(DISTINCT m.visitante) AS n
+           FROM toques t
+           JOIN marcos m ON m.visitante = t.visitante
+          WHERE t.campanha_id = @campanha AND t.conta_aquisicao = 1 AND ${filtro}
+            AND ${condicao}`
+      )
+      .get(params) as { n: number };
+    return linha?.n ?? 0;
+  };
+
+  const chegaram = (
+    db
+      .prepare(
+        `SELECT COUNT(DISTINCT t.visitante) AS n
+           FROM toques t
+          WHERE t.campanha_id = @campanha AND t.conta_aquisicao = 1 AND ${filtro}`
+      )
+      .get(params) as { n: number }
+  ).n;
+
+  /**
+   * "Terminou as 26" sai da CENA MAIS ALTA, não de um marco próprio.
+   *
+   * Não existe evento "acabou o ritual" — o que existe é `cena` com o número.
+   * `valor >= 26` é o que diz que a pessoa chegou ao fim, e usar `nome_ok`
+   * no lugar mediria outra coisa: quem preencheu o nome, que vem depois e
+   * perde gente por outro motivo.
+   */
+  const degrausBrutos: { rotulo: string; pessoas: number }[] = [
+    { rotulo: 'Chegaram pelo link', pessoas: chegaram },
+    { rotulo: 'Abriram o ritual', pessoas: contar(`m.marco IN ('ritual_aberto', 'cta')`) },
+    { rotulo: 'Responderam ao menos 1', pessoas: contar(`m.marco = 'cena'`) },
+    { rotulo: 'Terminaram as 26', pessoas: contar(`m.marco = 'cena' AND m.valor >= 26`) },
+    { rotulo: 'Viram a oferta', pessoas: contar(`m.marco IN ('plano_visto', 'oferta_simples', 'oferta_completa', 'oferta_mensal')`) },
+    { rotulo: 'Abriram o checkout', pessoas: contar(`m.marco = 'checkout_aberto'`) },
+  ];
+
+  const vendas = (
+    db
+      .prepare(
+        `SELECT COUNT(*) AS n
+           FROM pedidos
+          WHERE campanha_id = @campanha AND exemplo = 0
+            AND status IN ('pago','gerando','entregue')
+            AND ${pecaId ? 'peca_id = @peca' : 'peca_id IS NULL'}`
+      )
+      .get(params) as { n: number }
+  ).n;
+
+  degrausBrutos.push({ rotulo: 'Pagaram', pessoas: vendas });
+
+  const degraus: DegrauDaPeca[] = degrausBrutos.map((d, i) => {
+    const anterior = i === 0 ? null : degrausBrutos[i - 1].pessoas;
+    return {
+      ...d,
+      retencao: anterior && anterior > 0 ? (d.pessoas / anterior) * 100 : null,
+    };
+  });
+
+  /** De qual rede da Meta veio cada pessoa deste vídeo. */
+  const redes = db
+    .prepare(
+      `SELECT COALESCE(t.origem, 'sem origem') AS origem,
+              COUNT(DISTINCT t.visitante) AS pessoas
+         FROM toques t
+        WHERE t.campanha_id = @campanha AND t.conta_aquisicao = 1 AND ${filtro}
+        GROUP BY COALESCE(t.origem, 'sem origem')
+        ORDER BY pessoas DESC`
+    )
+    .all(params) as RedeDaPeca[];
+
+  const pagos = db
+    .prepare(
+      `SELECT produto, desconto_percentual
+         FROM pedidos
+        WHERE campanha_id = @campanha AND exemplo = 0
+          AND status IN ('pago','gerando','entregue')
+          AND ${pecaId ? 'peca_id = @peca' : 'peca_id IS NULL'}`
+    )
+    .all(params) as { produto: string; desconto_percentual: number | null }[];
+
+  const receitaCentavos = pagos.reduce((s, p) => s + precoDoPedido(p).finalCentavos, 0);
+
+  const base = process.env.BASE_URL || 'https://bruxario.com.br';
+  return {
+    pecaId,
+    codigo: peca?.codigo ?? '—',
+    nome: peca?.nome ?? 'Sem peça (link da bio ou direto)',
+    link: peca
+      ? `${base}/?c=${campanha.codigo ?? ''}${peca.codigo}`
+      : `${base}/?c=${campanha.codigo ?? ''}`,
+    degraus,
+    redes,
+    vendas,
+    receitaCentavos,
+  };
+}
