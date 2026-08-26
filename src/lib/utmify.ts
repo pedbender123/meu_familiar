@@ -86,7 +86,20 @@ function credencial(): string | null {
  */
 export async function reportarPedido(pedido: PedidoParaUtmify): Promise<boolean> {
   const token = credencial();
-  if (!token) return false;
+  if (!token) {
+    /**
+     * Silêncio aqui custou caro em 24/08.
+     *
+     * Sem token, o envio devolvia `false` e não dizia nada — e quem estava
+     * olhando o painel da Utmify vazio não tinha como saber se o problema era
+     * configuração, rede ou venda que não aconteceu. Aviso barato, uma linha
+     * por venda, só enquanto estiver desconfigurado.
+     */
+    console.warn(
+      `[utmify] pedido ${pedido.orderId} NÃO reportado: UTMIFY_API_TOKEN vazio.`
+    );
+    return false;
+  }
 
   const corpo = {
     orderId: pedido.orderId,
@@ -165,9 +178,20 @@ export async function reportarPedido(pedido: PedidoParaUtmify): Promise<boolean>
       );
       return false;
     }
+    /**
+     * O sucesso também é logado, e isso não é ruído.
+     *
+     * Antes só a falha aparecia, então "nada no log" queria dizer duas coisas
+     * opostas — deu certo, ou nem chegou a tentar. Foi exatamente essa
+     * ambiguidade que fez a venda de 24/08 passar despercebida.
+     */
+    console.log(
+      `[utmify] ${pedido.status} reportado: pedido ${pedido.orderId}, ` +
+        `R$ ${(pedido.produto.precoCentavos / 100).toFixed(2)}`
+    );
     return true;
   } catch (erro) {
-    console.error('[utmify] falhou:', erro);
+    console.error(`[utmify] falhou no pedido ${pedido.orderId}:`, erro);
     return false;
   }
 }

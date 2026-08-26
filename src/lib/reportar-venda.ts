@@ -24,35 +24,35 @@ import {
  * perdida. As duas chamadas acontecem em caminhos que mexem com dinheiro.
  */
 /**
- * Quem já avisa a Utmify sozinho — e sobre O QUÊ.
+ * A Wiven avisa a Utmify sozinha?
  *
- * ── A divisão de trabalho com a Wiven ─────────────────────────────────────
+ * ── A aposta que não se confirmou ─────────────────────────────────────────
  *
- * A conta da Wiven é ligada à Utmify por dentro, e o que ela manda é a VENDA
- * PAGA. Se a gente mandasse também, a mesma venda entraria duas vezes: a
- * Utmify agrupa por `orderId`, e o id da Wiven não é o nosso `pedidoId` —
- * seriam dois pedidos com o mesmo dinheiro. Receita inflada, ROAS inflado,
- * campanha escalada por um número que não existe.
+ * A conta da Wiven é ligada à Utmify por dentro, então em 24/08 a venda paga
+ * por lá deixou de ser reportada por nós, para a mesma venda não entrar duas
+ * vezes — a Utmify agrupa por `orderId`, e o id da Wiven não é o nosso
+ * `pedidoId`.
  *
- * Mas ela **não manda o pré-venda**. E é o pré-venda que dá o denominador:
- * sem `waiting_payment`, o painel mostra as vendas e nada de quem chegou ao
- * checkout e desistiu — não existe taxa de conversão com numerador só.
+ * **Não funcionou.** A venda de 24/08 (pedido 1d53f3f6, R$ 18,90, paga pela
+ * Wiven) não chegou à Utmify por caminho nenhum: nem pelo deles, nem pelo
+ * nosso, porque o nosso estava desligado esperando o deles. Ficou invisível
+ * nos dois painéis.
  *
- * Então a divisão é por ESTÁGIO, não por gateway:
+ * Então o padrão inverteu: **reportamos sempre**. Venda contada duas vezes é
+ * um número errado que alguém percebe e conserta; venda que não aparece em
+ * lugar nenhum é uma campanha avaliada como se não tivesse vendido — e a
+ * decisão que sai disso é pausar o que está funcionando.
  *
- *   `waiting_payment` → nós, sempre, em qualquer gateway
- *   `paid`            → nós, exceto na Wiven, que já manda
- *
- * `UTMIFY_REPORTAR_WIVEN=1` devolve os dois para a gente, caso a integração
- * nativa deles não esteja valendo. Duas fontes é ruim; nenhuma é pior.
+ * `UTMIFY_PULAR_WIVEN=1` volta ao comportamento anterior, se um dia a
+ * integração nativa deles passar a valer.
  */
 function gatewayJaReportaSozinho(
   gateway: string | null | undefined,
   status: StatusUtmify
 ): boolean {
-  if (process.env.UTMIFY_REPORTAR_WIVEN === '1') return false;
-  // Só a venda paga. O pré-venda a Wiven não manda, e é ele que dá o
-  // denominador da conversão.
+  if (process.env.UTMIFY_PULAR_WIVEN !== '1') return false;
+  // Mesmo pulando, só a venda paga: o pré-venda a Wiven nunca mandou, e é
+  // ele que dá o denominador da conversão.
   return gateway === 'wiven' && status === 'paid';
 }
 

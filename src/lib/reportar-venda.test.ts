@@ -8,44 +8,55 @@ function codigoDe(caminho: string): string {
     .replace(/\/\/.*$/gm, '');
 }
 
-describe('a mesma venda não pode ser contada duas vezes', () => {
+describe('nenhuma venda pode ficar invisível', () => {
   const fonte = codigoDe('src/lib/reportar-venda.ts');
 
   /**
-   * A conta da Wiven é ligada à Utmify por dentro: venda paga por lá chega no
-   * painel sozinha. Reportar também faria a mesma venda entrar por dois
-   * caminhos — e sem dedup, porque a Utmify agrupa por `orderId` e o id da
-   * Wiven não é o nosso `pedidoId`.
+   * ── A aposta que não se confirmou ──────────────────────────────────────
    *
-   * O resultado seria receita inflada e campanha escalada por um número que
-   * não existe. O oposto do motivo pelo qual a Utmify entrou: uma segunda via
-   * CONFERÍVEL.
+   * A conta da Wiven é ligada à Utmify por dentro, então em 24/08 a venda
+   * paga por lá deixou de ser reportada por nós, para não contar duas vezes.
+   *
+   * Não funcionou: a venda de R$ 18,90 do dia 24 não chegou à Utmify por
+   * caminho nenhum — nem pelo deles, nem pelo nosso, que estava desligado
+   * esperando o deles.
+   *
+   * Venda contada duas vezes é um número errado que alguém percebe e
+   * conserta. Venda que não aparece em lugar nenhum é uma campanha avaliada
+   * como se não tivesse vendido — e a decisão que sai disso é pausar o que
+   * está funcionando.
    */
-  test('a venda PAGA da Wiven não é reportada por nós', () => {
+  test('por padrão, reportamos toda venda', () => {
+    assert.match(fonte, /UTMIFY_PULAR_WIVEN !== '1'\) return false;/);
+  });
+
+  test('ainda dá para voltar atrás, se a integração deles passar a valer', () => {
+    assert.match(fonte, /UTMIFY_PULAR_WIVEN/);
     assert.match(fonte, /gateway === 'wiven' && status === 'paid'/);
-    assert.match(fonte, /if \(gatewayJaReportaSozinho\(pedido\.gateway, status\)\)/);
-  });
-
-  /**
-   * A Wiven não manda o pré-venda, e é ele que dá o denominador: sem
-   * `waiting_payment` o painel mostra as vendas e nada de quem chegou ao
-   * checkout e desistiu. Não existe taxa de conversão com numerador só.
-   */
-  test('o pré-venda vai sempre, inclusive na Wiven', () => {
-    assert.doesNotMatch(fonte, /return gateway === 'wiven';/);
-    assert.match(fonte, /status === 'paid'/);
-  });
-
-  /** Duas fontes é ruim; nenhuma é pior. A escotilha existe. */
-  test('dá para forçar o envio se a integração nativa falhar', () => {
-    assert.match(fonte, /UTMIFY_REPORTAR_WIVEN === '1'/);
-  });
-
-  /** Mercado Pago e Cakto não têm essa ligação — nesses, quem reporta somos nós. */
-  test('só a Wiven é pulada', () => {
-    assert.doesNotMatch(fonte, /gateway === 'mercadopago'\s*\|\|/);
   });
 });
+
+describe('o envio nunca mais é silencioso', () => {
+  const fonte = codigoDe('src/lib/utmify.ts');
+
+  /**
+   * Antes só a falha aparecia no log, então "nada no log" queria dizer duas
+   * coisas opostas: deu certo, ou nem chegou a tentar. Foi essa ambiguidade
+   * que fez a venda de 24/08 passar despercebida por dois dias.
+   */
+  test('o sucesso é logado, não só o erro', () => {
+    assert.match(fonte, /\[utmify\] \$\{pedido\.status\} reportado/);
+  });
+
+  test('token vazio avisa em vez de sumir', () => {
+    assert.match(fonte, /UTMIFY_API_TOKEN vazio/);
+  });
+
+  test('o erro diz de qual pedido', () => {
+    assert.match(fonte, /falhou no pedido \$\{pedido\.orderId\}/);
+  });
+});
+
 
 describe('o painel da Utmify não pode mentir sobre quem cobrou', () => {
   /**
