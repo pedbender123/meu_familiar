@@ -4,7 +4,7 @@ import { chavePublica, modoAtual, pagamentoEhFake } from '@/nucleo/checkouts/mer
 import { produtoDe } from '@/lib/produtos';
 import { precoDoPedido } from '@/lib/cupons';
 import { Checkout } from '@/components/checkout/Checkout';
-import { gatewayDe } from '@/nucleo/checkouts/gateway';
+import { gatewayConferido } from '@/nucleo/checkouts/gateway';
 import { PagamentoFake } from '@/components/PagamentoFake';
 import { MarcoDoCheckout } from '@/components/MarcoDoCheckout';
 import { FAMILIARES, type FamiliarId } from '@/lib/familiares';
@@ -42,8 +42,10 @@ export default async function Pagamento({
    * cartão em outro. Quem despacha é o `Checkout`; aqui só se resolve.
    */
   const campanha = pedido.campanha_id;
-  const gatewayPix = gatewayDe('pix', campanha);
-  const gatewayCartao = gatewayDe('cartao', campanha);
+  // Sonda antes de desenhar: a tela não pode nascer num gateway que não vai
+  // conseguir cobrar. Ver `gatewayConferido`.
+  const gatewayPix = await gatewayConferido('pix', campanha);
+  const gatewayCartao = await gatewayConferido('cartao', campanha);
 
   return (
     <main className="flex-1 flex flex-col items-center justify-center px-6 py-16">

@@ -79,8 +79,8 @@ describe('a tela não decide quem cobra', () => {
 
   test('a tela de pagamento resolve os dois meios no servidor', () => {
     const fonte = codigoDe('src/app/pagamento/[id]/page.tsx');
-    assert.match(fonte, /gatewayDe\('pix', campanha\)/);
-    assert.match(fonte, /gatewayDe\('cartao', campanha\)/);
+    assert.match(fonte, /await gatewayConferido\('pix', campanha\)/);
+    assert.match(fonte, /await gatewayConferido\('cartao', campanha\)/);
     // A campanha sai do PEDIDO, nunca da URL da requisição: origem mandada
     // pelo cliente seria o cliente escolhendo em que conta o dinheiro cai.
     assert.match(fonte, /const campanha = pedido\.campanha_id/);

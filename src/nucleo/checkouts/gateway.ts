@@ -1,6 +1,6 @@
 import { pagamento as mercadopago, type ProvedorPagamento } from './mercadopago';
 import { ProvedorCakto, caktoConfigurada } from './cakto';
-import { ProvedorWiven, wivenConfigurada, tokenDoWebhook } from './wiven';
+import { ProvedorWiven, wivenConfigurada, tokenDoWebhook, sondarWiven } from './wiven';
 import { buscarCampanha } from '../../lib/campanhas';
 import { NOMES_DE_GATEWAY, type NomeDoGateway } from './nomes';
 import { estaDisponivel } from './saude';
@@ -205,4 +205,29 @@ export function meioDe(bruto: string | undefined): MeioDePagamento {
   if (v === 'pix' || v === 'pix_auto') return 'pix';
   if (v === 'boleto' || v === 'bolbradesco') return 'boleto';
   return 'cartao';
+}
+
+/**
+ * O gateway de um meio, **depois de conferir se ele está de pé**.
+ *
+ * A versão síncrona (`gatewayDe`) decide pela configuração e pelo disjuntor —
+ * e o disjuntor só sabe de quedas que já derrubaram a cobrança de alguém.
+ * Esta pergunta antes, para que a tela de pagamento nunca nasça num gateway
+ * que não vai conseguir cobrar.
+ *
+ * A ordem importa: sondar primeiro (o que pode derrubar a chave) e só então
+ * resolver. Resolver antes usaria a informação velha, que é justamente a que
+ * a sonda existe para substituir.
+ *
+ * Só serve a componente de servidor. A rota de cobrança continua usando a
+ * versão síncrona: ali a sonda seria uma chamada a mais entre a pessoa e o
+ * pagamento dela, e quem responde por uma falha naquele ponto é o disjuntor
+ * mais a queda para o Mercado Pago.
+ */
+export async function gatewayConferido(
+  meio: MeioDePagamento,
+  campanhaId?: string | null
+): Promise<NomeDoGateway> {
+  if (gatewayDe(meio, campanhaId) === 'wiven') await sondarWiven();
+  return gatewayDe(meio, campanhaId);
 }

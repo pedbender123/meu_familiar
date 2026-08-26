@@ -112,3 +112,62 @@ describe('a queda no meio da cobrança é restrita', () => {
     assert.match(w, /a cobrança pode ter sido criada/);
   });
 });
+
+describe('a sonda antes de desenhar a tela', () => {
+  const fonteW = codigoDe('src/nucleo/checkouts/wiven.ts');
+  const fonteG = codigoDe('src/nucleo/checkouts/gateway.ts');
+
+  /**
+   * O disjuntor é reativo: só derruba a chave depois de alguém tentar pagar e
+   * falhar. Quem chega primeiro depois de uma queda paga o pato — vê um
+   * checkout que não cobra. Em 24/08 a Wiven passou 26 horas fora; sem sonda,
+   * seriam 26 horas de checkout quebrado.
+   */
+  test('a tela de pagamento sonda antes de escolher', () => {
+    assert.match(fonteG, /export async function gatewayConferido/);
+    assert.match(fonteG, /if \(gatewayDe\(meio, campanhaId\) === 'wiven'\) await sondarWiven\(\)/);
+  });
+
+  /**
+   * Sondar primeiro e resolver depois. Resolver antes usaria a informação
+   * velha — justamente a que a sonda existe para substituir.
+   */
+  test('a decisão é refeita depois da sonda', () => {
+    const i = fonteG.indexOf('await sondarWiven()');
+    const j = fonteG.indexOf('return gatewayDe(meio, campanhaId);', i);
+    assert.ok(i !== -1 && j > i, 'gatewayDe precisa ser reavaliado depois da sonda');
+  });
+
+  /**
+   * Sem cache, cada visita ao checkout viraria uma chamada extra à API deles
+   * — e foi excesso de chamada que disparou a proteção antiautomação em
+   * 24/08. Uma por minuto nunca vira rajada, por mais movimento que venha.
+   */
+  test('no máximo uma sonda por minuto', () => {
+    assert.match(fonteW, /agora - sondadaEm < VALIDADE_DA_SONDA_MS\) return;/);
+  });
+
+  /** Sonda que derruba a tela de pagamento é pior que gateway fora do ar. */
+  test('a sonda nunca lança', () => {
+    const i = fonteW.indexOf('export async function sondarWiven');
+    const trecho = fonteW.slice(i, fonteW.indexOf('export function esquecerSonda'));
+    assert.match(trecho, /catch \(erro\)/);
+    assert.doesNotMatch(trecho, /throw /);
+  });
+
+  /**
+   * O bloqueio de 24/08 voltava 403, mas desafio de Cloudflare também vem
+   * como 200 com HTML. Confiar só no código de status deixaria a sonda dizer
+   * "está tudo bem" enquanto a cobrança quebra no parse.
+   */
+  test('200 que não é JSON também conta como fora', () => {
+    assert.match(fonteW, /sonda: resposta não é JSON/);
+  });
+
+  /** A cobrança não sonda: ali seria uma chamada a mais entre a pessoa e o pagamento. */
+  test('a rota de cobrança continua síncrona', () => {
+    const rota = codigoDe('src/app/api/pedido/[id]/pagamento/route.ts');
+    assert.doesNotMatch(rota, /gatewayConferido/);
+    assert.match(rota, /gatewayDe\(meio, pedido\.campanha_id\)/);
+  });
+});

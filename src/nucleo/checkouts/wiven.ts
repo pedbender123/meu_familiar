@@ -145,6 +145,87 @@ async function chamar(caminho: string, init: RequestInit = {}): Promise<Response
   });
 }
 
+/* ── sonda de saúde ───────────────────────────────────────────────────────*/
+
+/** Quanto tempo uma sonda vale antes de a próxima ser feita. */
+export const VALIDADE_DA_SONDA_MS = 60 * 1000;
+
+/**
+ * A sonda é curta de propósito: alguém está esperando a tela de pagamento
+ * abrir. Melhor decidir "está fora" em dois segundos e meio e mostrar o
+ * Mercado Pago do que segurar o checkout esperando um gateway que talvez
+ * nem responda.
+ */
+const TEMPO_DA_SONDA_MS = 2500;
+
+let sondadaEm = 0;
+
+/**
+ * Pergunta à Wiven se ela está de pé, ANTES de a tela de pagamento existir.
+ *
+ * ── Por que não basta o disjuntor ─────────────────────────────────────────
+ *
+ * O disjuntor de `saude.ts` é reativo: ele só derruba a chave depois de
+ * alguém tentar pagar e falhar. Ou seja, a primeira pessoa depois de uma
+ * queda paga o pato — vê um checkout que não cobra.
+ *
+ * A sonda tira esse custo de cima de quem está comprando. Foi o que faltou em
+ * 24/08, quando a Wiven passou 26 horas devolvendo 403 e o checkout teria
+ * ficado quebrado esse tempo todo.
+ *
+ * ── Por que uma por minuto ────────────────────────────────────────────────
+ *
+ * Sem cache, cada visita à tela de pagamento viraria uma chamada extra à API
+ * deles — e foi excesso de chamada que disparou a proteção antiautomação
+ * daquele dia. Uma por minuto mantém a informação fresca o bastante e nunca
+ * vira rajada, por mais movimento que a campanha traga.
+ *
+ * Não lança nunca: sonda que derruba a tela de pagamento é pior que gateway
+ * fora do ar.
+ */
+export async function sondarWiven(agora = Date.now()): Promise<void> {
+  if (!wivenConfigurada()) return;
+  if (agora - sondadaEm < VALIDADE_DA_SONDA_MS) return;
+  sondadaEm = agora;
+
+  try {
+    const { publica, secreta } = chaves();
+    const resposta = await fetch(`${BASE}${furarCache('/gateway/producer/credentials')}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-public-key': publica,
+        'x-secret-key': secreta,
+      },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(TEMPO_DA_SONDA_MS),
+    });
+
+    if (!resposta.ok) {
+      marcarIndisponivel('wiven', `sonda: HTTP ${resposta.status}`);
+      return;
+    }
+
+    /**
+     * Resposta 200 que não é JSON também é indisponibilidade.
+     *
+     * O bloqueio de 24/08 voltava 403, mas um desafio de Cloudflare pode vir
+     * como 200 com HTML. Confiar no código de status sozinho deixaria a sonda
+     * dizer "está tudo bem" enquanto a cobrança quebra no parse.
+     */
+    const tipo = resposta.headers.get('content-type') ?? '';
+    if (!tipo.includes('json')) {
+      marcarIndisponivel('wiven', 'sonda: resposta não é JSON');
+    }
+  } catch (erro) {
+    marcarIndisponivel('wiven', `sonda: ${String(erro).slice(0, 80)}`);
+  }
+}
+
+/** Só para os testes: obriga a próxima sonda a acontecer. */
+export function esquecerSonda(): void {
+  sondadaEm = 0;
+}
+
 /* ── dinheiro ─────────────────────────────────────────────────────────────*/
 
 /**
