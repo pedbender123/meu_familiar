@@ -703,11 +703,24 @@ export class ProvedorWiven implements ProvedorPagamento {
       throw new Error(`[wiven] cobrança recusada (${resposta.status}): ${texto}`);
     }
 
-    return traduzir((await resposta.json()) as RespostaWiven, {
+    const resultado = traduzir((await resposta.json()) as RespostaWiven, {
       identifier,
       meio: extra.meio,
       brutoCentavos: preco.finalCentavos,
     });
+
+    /**
+     * Quanto saiu para outras contas, gravado com a cobrança.
+     *
+     * O webhook chega depois e só sabe dizer o que SOBROU. Sem este número,
+     * a taxa do gateway é deduzida por subtração e engole o split junto — foi
+     * o que fez a venda de 27/08 aparecer com R$ 12,57 de taxa numa venda de
+     * R$ 18,90.
+     */
+    return {
+      ...resultado,
+      splitCentavos: splits.reduce((soma, s) => soma + Math.round(s.amount * 100), 0),
+    };
   }
 
   /**

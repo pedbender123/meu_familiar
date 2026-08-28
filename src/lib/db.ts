@@ -651,6 +651,13 @@ export interface Pedido {
   /** Valor cobrado, taxa do MP e o que sobrou — em centavos, como o MP conta. */
   /** JSON com os UTMs da chegada. Ver a migração 026. */
   utm_json: string | null;
+  /**
+   * Quanto desta venda foi repassado a outras contas (split da Wiven).
+   *
+   * Gravado na cobrança, não deduzido no webhook: o webhook só sabe o que
+   * SOBROU, e a subtração confundiria repasse com taxa de gateway.
+   */
+  split_centavos: number | null;
   /** Quem cobrou: `cakto`, `mercadopago`, ou NULL nos pedidos antigos (= MP). */
   gateway: string | null;
   /** Exigido pela Cakto em qualquer cobrança. Coletado na tela de pagamento. */

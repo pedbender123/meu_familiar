@@ -179,6 +179,28 @@ export async function POST(req: NextRequest) {
 
   const resultado = traduzirWebhook(corpo);
 
+  /**
+   * Repasse não é taxa.
+   *
+   * A Wiven manda `commissionAmount`: o que sobra para quem cobrou, já
+   * descontados a taxa dela E os splits. `traduzirWebhook` deduz a taxa por
+   * subtração, e a subtração não sabe distinguir as duas coisas — na venda de
+   * 27/08 os R$ 9,44 repassados apareceram somados à taxa, que virou R$ 12,57
+   * numa venda de R$ 18,90.
+   *
+   * O número certo está gravado no pedido desde a cobrança. Subtraí-lo devolve
+   * a taxa real, e é ela que o painel financeiro e a Utmify recebem — sem
+   * isso, o custo de gateway aparece como 66% da venda e o lucro da campanha
+   * afunda num número que nunca existiu.
+   */
+  const pedidoDaVenda = resultado.referenciaExterna
+    ? buscarPedido(resultado.referenciaExterna)
+    : undefined;
+  const splitCentavos = pedidoDaVenda?.split_centavos ?? 0;
+  if (splitCentavos > 0 && resultado.taxaCentavos !== null) {
+    resultado.taxaCentavos = Math.max(resultado.taxaCentavos - splitCentavos, 0);
+  }
+
   console.log(
     `[webhook/wiven] ${corpo.event ?? '?'} → ${resultado.status} ` +
       `transacao=${resultado.idExterno} pedido=${resultado.referenciaExterna ?? '(sem identifier)'}`
@@ -206,7 +228,7 @@ export async function POST(req: NextRequest) {
    * pagou mais do que devia não está fraudando ninguém.
    */
   if (resultado.referenciaExterna && resultado.brutoCentavos !== null) {
-    const pedido = buscarPedido(resultado.referenciaExterna);
+    const pedido = pedidoDaVenda;
     if (pedido) {
       const esperadoCentavos = precoDoPedido(pedido).finalCentavos;
       if (resultado.brutoCentavos < esperadoCentavos) {

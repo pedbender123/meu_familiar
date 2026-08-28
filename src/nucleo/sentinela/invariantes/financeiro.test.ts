@@ -10,6 +10,7 @@ function pedido(sobrescreve: Partial<Pedido> = {}): Pedido {
     email: 'helena@exemplo.com',
     cpf: null,
     respostas_json: '{}',
+    split_centavos: null,
     familiar: 'coruja',
     lua: 'cheia',
     signo_sol: null,

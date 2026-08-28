@@ -81,6 +81,14 @@ export interface ResultadoPagamento {
   /** `pix`, `master`, `visa`, ... conforme o MP. */
   metodo: string | null;
   /**
+   * Quanto desta venda foi repassado a outras contas (split).
+   *
+   * Só a Wiven tem isso hoje. Existe no tipo compartilhado porque é o webhook
+   * — que fala este vocabulário — quem precisa separar repasse de taxa; sem a
+   * separação, a subtração transforma um no outro.
+   */
+  splitCentavos?: number;
+  /**
    * Só em Pix: código copia-e-cola e imagem do QR.
    *
    * `qrUrl` existe porque a Wiven **deprecou o base64** — o campo dela volta

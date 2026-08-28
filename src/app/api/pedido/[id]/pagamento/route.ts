@@ -263,6 +263,15 @@ export async function POST(
         ? null
         : resultado.statusDetalhe || null,
       ...(resultado.pix ? { pix_copia_e_cola: resultado.pix.copiaECola } : {}),
+      /**
+       * O que foi repassado a outras contas, gravado JUNTO da cobrança.
+       *
+       * O webhook chega depois e só sabe o que sobrou; sem este número a taxa
+       * do gateway é deduzida por subtração e engole o split. Fato consumado
+       * se grava — recalcular na hora do webhook leria a configuração de
+       * então, e mudar o percentual reescreveria vendas antigas.
+       */
+      ...(resultado.splitCentavos ? { split_centavos: resultado.splitCentavos } : {}),
     });
     registrarEvento(`pagamento_criado_${resultado.status}`, id);
 
