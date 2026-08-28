@@ -1,4 +1,6 @@
+import db from './db';
 import type { Pedido } from './db';
+import { buscarCampanha, listarPecas } from './campanhas';
 import { produtoVigenteDe } from './modelo-de-venda';
 import { precoDoPedido } from './cupons';
 import {
@@ -71,6 +73,68 @@ function plataformaDe(gateway: string | null | undefined): string {
   return process.env.UTMIFY_PLATAFORMA ?? 'MercadoPago';
 }
 
+/**
+ * O rastreio de uma venda que chegou sem UTM na URL.
+ *
+ * ── O buraco que isto tapa ────────────────────────────────────────────────
+ *
+ * O link do anúncio carrega duas coisas independentes: o nosso `?c=`, que
+ * identifica campanha e peça aqui dentro, e os `utm_*`, que a Meta preenche.
+ * Um anúncio pode ter o primeiro e não o segundo — e foi o que aconteceu com
+ * a venda de 27/08.
+ *
+ * Sem UTM, a Utmify arquiva a venda como direta. Ela ENTRA no painel, mas
+ * fora de qualquer campanha — que é o mesmo que sumir, para quem está olhando
+ * o resultado de uma campanha específica.
+ *
+ * Nós sabemos de qual campanha e de qual peça a pessoa veio: está gravado no
+ * pedido desde o primeiro toque. Faltava só dizer isso a eles.
+ *
+ * ── Por que reaproveitar o utm_campaign de outra venda ────────────────────
+ *
+ * A Meta manda o ID numérico da campanha (`120248890724340044`), não o nome.
+ * Se aqui mandássemos "Comeccou!", a Utmify passaria a mostrar DUAS campanhas
+ * para a mesma coisa — uma com o id, outra com o nome — e o resultado ficaria
+ * dividido entre as duas.
+ *
+ * Então procuramos o id que a própria campanha já trouxe em alguma venda
+ * anterior e usamos o mesmo. O nome só entra quando ela nunca recebeu um UTM
+ * na vida, e aí não há identidade prévia para conflitar.
+ */
+function rastreioDaCampanha(pedido: Pedido): ParametrosDeRastreio {
+  const campanha = pedido.campanha_id ? buscarCampanha(pedido.campanha_id) : undefined;
+  if (!campanha) return {};
+
+  const peca = pedido.peca_id
+    ? listarPecas(campanha.id).find((p) => p.id === pedido.peca_id)
+    : undefined;
+
+  /** O identificador que esta campanha já usou na Utmify, se usou algum. */
+  let idDaCampanha: string | null = null;
+  try {
+    const anterior = db
+      .prepare(
+        `SELECT utm_json FROM pedidos
+          WHERE campanha_id = ? AND utm_json IS NOT NULL AND length(utm_json) > 2
+          ORDER BY criado_em DESC LIMIT 1`
+      )
+      .get(campanha.id) as { utm_json: string } | undefined;
+    if (anterior) {
+      idDaCampanha = (JSON.parse(anterior.utm_json) as ParametrosDeRastreio).utm_campaign ?? null;
+    }
+  } catch {
+    // Sem histórico utilizável, cai no nome da campanha.
+  }
+
+  return {
+    utm_source: pedido.origem ?? 'desconhecido',
+    utm_medium: 'paid',
+    utm_campaign: idDaCampanha ?? campanha.nome,
+    // A peça é o criativo. É o que responde "qual vídeo trouxe esta venda".
+    utm_content: peca ? `${peca.codigo}-${peca.nome}` : undefined,
+  };
+}
+
 export async function reportarVenda(
   pedido: Pedido,
   status: StatusUtmify,
@@ -106,6 +170,10 @@ export async function reportarVenda(
       if (pedido.utm_json) rastreio = JSON.parse(pedido.utm_json);
     } catch {
       // UTM malformado não pode impedir a venda de ser reportada.
+    }
+
+    if (!rastreio.utm_campaign && pedido.campanha_id) {
+      rastreio = { ...rastreio, ...rastreioDaCampanha(pedido) };
     }
 
     /**
