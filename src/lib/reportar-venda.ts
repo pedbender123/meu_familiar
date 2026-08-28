@@ -108,8 +108,26 @@ export async function reportarVenda(
       // UTM malformado não pode impedir a venda de ser reportada.
     }
 
+    /**
+     * O lucro DELES, não o bolo da venda.
+     *
+     * Quem lê o painel da Utmify é a agência, e o número que sustenta a
+     * decisão de escalar ou pausar é "quanto entra para nós por venda". Da
+     * venda saem três coisas antes disso: a taxa do gateway, e a fatia do
+     * dono da plataforma. Nenhuma das duas é resultado da campanha deles.
+     *
+     * O que sobra — a conta que cobrou mais o sócio dela — é o que vai como
+     * comissão. E a diferença entre o preço e esse número vai como taxa: é
+     * tudo que foi retirado antes do lucro, que é a leitura correta do ponto
+     * de vista de quem recebe.
+     */
+    const retiradoCentavos =
+      (extras.taxaCentavos ?? pedido.taxa_centavos ?? 0) +
+      (pedido.split_do_dono_centavos ?? 0);
+
     await reportarPedido({
       plataforma: plataformaDe(pedido.gateway),
+      retiradoCentavos,
       orderId: pedido.id,
       status,
       metodo: metodoParaUtmify(extras.metodo ?? pedido.metodo_pagamento),

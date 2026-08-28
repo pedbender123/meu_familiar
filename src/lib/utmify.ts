@@ -52,6 +52,11 @@ export interface PedidoParaUtmify {
   orderId: string;
   /** Quem cobrou este pedido. Vira o `platform` do relatório dela. */
   plataforma?: string;
+  /**
+   * Tudo que saiu da venda antes do lucro de quem lê o relatório: a taxa do
+   * gateway mais a fatia do dono da plataforma. Ver `reportar-venda.ts`.
+   */
+  retiradoCentavos?: number;
   status: StatusUtmify;
   metodo: MetodoUtmify;
   criadoEm: Date;
@@ -146,7 +151,13 @@ export async function reportarPedido(pedido: PedidoParaUtmify): Promise<boolean>
     },
     commission: {
       totalPriceInCents: pedido.produto.precoCentavos,
-      gatewayFeeInCents: pedido.taxaCentavos ?? 0,
+      /**
+       * Tudo que foi retirado antes do lucro de quem lê — taxa do gateway
+       * mais a fatia da plataforma. A Utmify só tem um campo de dedução, e
+       * do ponto de vista de quem recebe as duas coisas são a mesma: dinheiro
+       * que saiu da venda antes de chegar nele.
+       */
+      gatewayFeeInCents: pedido.retiradoCentavos ?? pedido.taxaCentavos ?? 0,
       /**
        * O que sobra para quem vende, depois da taxa. A Utmify usa este número
        * como receita no relatório — mandar o valor cheio infla o resultado de
@@ -154,7 +165,7 @@ export async function reportarPedido(pedido: PedidoParaUtmify): Promise<boolean>
        */
       userCommissionInCents: Math.max(
         0,
-        pedido.produto.precoCentavos - (pedido.taxaCentavos ?? 0)
+        pedido.produto.precoCentavos - (pedido.retiradoCentavos ?? pedido.taxaCentavos ?? 0)
       ),
       currency: 'BRL' as const,
     },

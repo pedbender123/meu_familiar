@@ -32,13 +32,28 @@ import type { Migracao } from './tipos';
  */
 const migracao: Migracao = {
   id: '031_split_no_pedido',
-  descricao: 'Quanto da venda foi repassado a outras contas',
+  descricao: 'Quanto da venda foi repassado, e quanto disso é da plataforma',
   up: (db) => {
     const colunas = (db.prepare(`PRAGMA table_info(pedidos)`).all() as { name: string }[]).map(
       (c) => c.name
     );
     if (!colunas.includes('split_centavos')) {
       db.exec(`ALTER TABLE pedidos ADD COLUMN split_centavos INTEGER`);
+    }
+    /**
+     * A parte do repasse que é do dono da PLATAFORMA, separada do resto.
+     *
+     * Quem lê o painel da Utmify é a agência, e o número que sustenta a
+     * decisão dela é "quanto entra para nós por venda". A fatia da plataforma
+     * não é resultado da campanha deles — é custo de plataforma, como a taxa
+     * do gateway.
+     *
+     * Sem separar, só existiria o total repassado, e não haveria como
+     * distinguir a parte do sócio da parte da plataforma na hora de dizer a
+     * eles quanto foi o lucro.
+     */
+    if (!colunas.includes('split_do_dono_centavos')) {
+      db.exec(`ALTER TABLE pedidos ADD COLUMN split_do_dono_centavos INTEGER`);
     }
   },
 };

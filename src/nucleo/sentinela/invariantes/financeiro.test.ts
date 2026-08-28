@@ -11,6 +11,7 @@ function pedido(sobrescreve: Partial<Pedido> = {}): Pedido {
     cpf: null,
     respostas_json: '{}',
     split_centavos: null,
+    split_do_dono_centavos: null,
     familiar: 'coruja',
     lua: 'cheia',
     signo_sol: null,

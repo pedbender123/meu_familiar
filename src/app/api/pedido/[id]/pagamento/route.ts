@@ -272,6 +272,9 @@ export async function POST(
        * então, e mudar o percentual reescreveria vendas antigas.
        */
       ...(resultado.splitCentavos ? { split_centavos: resultado.splitCentavos } : {}),
+      ...(resultado.splitDoDonoCentavos
+        ? { split_do_dono_centavos: resultado.splitDoDonoCentavos }
+        : {}),
     });
     registrarEvento(`pagamento_criado_${resultado.status}`, id);
 

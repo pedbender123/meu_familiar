@@ -88,6 +88,8 @@ export interface ResultadoPagamento {
    * separação, a subtração transforma um no outro.
    */
   splitCentavos?: number;
+  /** Quanto do repasse é a fatia do dono da plataforma. Ver `wiven.ts`. */
+  splitDoDonoCentavos?: number;
   /**
    * Só em Pix: código copia-e-cola e imagem do QR.
    *

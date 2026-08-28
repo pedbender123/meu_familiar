@@ -717,9 +717,26 @@ export class ProvedorWiven implements ProvedorPagamento {
      * o que fez a venda de 27/08 aparecer com R$ 12,57 de taxa numa venda de
      * R$ 18,90.
      */
+    /**
+     * Qual das fatias é a da plataforma.
+     *
+     * `WIVEN_PRODUCER_DO_DONO` é o `producerId` de quem é dono do sistema. A
+     * fatia dele sai do lucro reportado à agência: para quem lê o painel de
+     * campanha, plataforma é custo, não resultado.
+     *
+     * Vazio = nenhuma fatia é tratada como da plataforma, e o lucro reportado
+     * passa a ser tudo que sobrou da taxa. É o comportamento certo para quem
+     * não divide com plataforma nenhuma.
+     */
+    const dono = process.env.WIVEN_PRODUCER_DO_DONO?.trim();
+    const emCentavos = (s: SplitWiven) => Math.round(s.amount * 100);
+
     return {
       ...resultado,
-      splitCentavos: splits.reduce((soma, s) => soma + Math.round(s.amount * 100), 0),
+      splitCentavos: splits.reduce((soma, s) => soma + emCentavos(s), 0),
+      splitDoDonoCentavos: dono
+        ? splits.filter((s) => s.producerId === dono).reduce((soma, s) => soma + emCentavos(s), 0)
+        : 0,
     };
   }
 

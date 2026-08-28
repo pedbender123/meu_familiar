@@ -658,6 +658,13 @@ export interface Pedido {
    * SOBROU, e a subtração confundiria repasse com taxa de gateway.
    */
   split_centavos: number | null;
+  /**
+   * Quanto do repasse é a fatia do dono da plataforma.
+   *
+   * Sai do lucro reportado à agência: para quem lê o painel de campanha,
+   * plataforma é custo, não resultado.
+   */
+  split_do_dono_centavos: number | null;
   /** Quem cobrou: `cakto`, `mercadopago`, ou NULL nos pedidos antigos (= MP). */
   gateway: string | null;
   /** Exigido pela Cakto em qualquer cobrança. Coletado na tela de pagamento. */
