@@ -3,6 +3,7 @@ import { podeEditarPainel } from '@/lib/autenticacao';
 import { contatosAbertos, comentariosPendentes } from '@/lib/db';
 import { Shell, type Area } from '@/components/painel/Shell';
 import { listarEnvios } from '@/lib/remarketing';
+import { resumoDaSaude } from '@/nucleo/saude/sinais';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,8 +48,19 @@ export default async function LayoutDoPainel({
   const pendentes = comentariosPendentes().length;
   const rascunhosPendentes = listarEnvios('rascunho').length;
 
+  /*
+    Quantos sinais vitais estão ruins. Tem memória de um minuto por dentro,
+    senão cada navegação no painel pagaria uma sonda de gateway.
+
+    Esta bolinha é o que faz a tela de saúde existir de verdade: ninguém abre
+    uma tela para descobrir que está tudo bem, então o caminho até ela precisa
+    ser um número aparecendo numa tela que já se abre todo dia.
+  */
+  const sinaisRuins = await resumoDaSaude();
+
   const areas: Area[] = [
     { href: '/painel/central', rotulo: 'Central', icone: 'grafico' },
+    { href: '/painel/saude', rotulo: 'Saúde', icone: 'pulso', alerta: sinaisRuins },
     { href: '/painel/campanhas', rotulo: 'Campanhas', icone: 'alvo' },
     { href: '/painel/rastreio', rotulo: 'Rastreio', icone: 'grafico' },
     { href: '/painel/pedidos', rotulo: 'Pedidos', icone: 'caixa' },

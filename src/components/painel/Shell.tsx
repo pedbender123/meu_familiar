@@ -270,6 +270,7 @@ const ICONES = {
   abrir: 'M9 6l6 6-6 6',
   fechar: 'M15 6l-6 6 6 6',
   menu: 'M4 7h16M4 12h16M4 17h16',
+  pulso: 'M3 12h4l2.5-7 4 14 2.5-7h5',
 } as const;
 
 function Icone({ nome }: { nome: keyof typeof ICONES }) {

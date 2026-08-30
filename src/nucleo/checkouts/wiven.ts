@@ -6,7 +6,7 @@ import type {
   ResultadoPagamento,
 } from './mercadopago';
 import { precoComDesconto } from '../../lib/cupons';
-import { ehIndisponibilidade, marcarIndisponivel } from './saude';
+import { ehIndisponibilidade, marcarIndisponivel, marcarDisponivel } from './saude';
 
 /**
  * Wiven — Pix e cartão, cobrança avulsa.
@@ -215,7 +215,10 @@ export async function sondarWiven(agora = Date.now()): Promise<void> {
     const tipo = resposta.headers.get('content-type') ?? '';
     if (!tipo.includes('json')) {
       marcarIndisponivel('wiven', 'sonda: resposta não é JSON');
+      return;
     }
+
+    marcarDisponivel('wiven');
   } catch (erro) {
     marcarIndisponivel('wiven', `sonda: ${String(erro).slice(0, 80)}`);
   }

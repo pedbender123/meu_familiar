@@ -36,6 +36,27 @@ export const QUARENTENA_MS = 5 * 60 * 1000;
 const caidoAte = new Map<NomeDoGateway, number>();
 
 /**
+ * O que a última medição viu, por gateway.
+ *
+ * O disjuntor sozinho responde "posso cobrar agora?", que é o suficiente para
+ * ROTEAR e insuficiente para MOSTRAR. Passada a quarentena, `caidoAte` se
+ * apaga e o gateway volta a parecer intocado — some o fato de que ele caiu às
+ * 3h da manhã e voltou sozinho. Este mapa guarda esse fato.
+ *
+ * `ok: false` sem quarentena ativa é exatamente o caso que importa: já
+ * voltou, mas houve queda — e é isso que a tela de saúde precisa dizer para
+ * alguém desconfiar antes da próxima.
+ */
+interface Medicao {
+  ok: boolean;
+  /** Vazio quando `ok`. Frase curta e legível, nunca um stack. */
+  motivo: string;
+  em: number;
+}
+
+const ultimaMedicao = new Map<NomeDoGateway, Medicao>();
+
+/**
  * Marca o gateway como fora do ar.
  *
  * Chamado só para falha de INFRAESTRUTURA — 401, 403, 429, 5xx, rede caindo.
@@ -45,10 +66,30 @@ const caidoAte = new Map<NomeDoGateway, number>();
  */
 export function marcarIndisponivel(nome: NomeDoGateway, motivo: string): void {
   caidoAte.set(nome, Date.now() + QUARENTENA_MS);
+  ultimaMedicao.set(nome, { ok: false, motivo, em: Date.now() });
   console.error(
     `[saude] ${nome} fora por ${QUARENTENA_MS / 60000} min — ${motivo}. ` +
       'As cobranças vão para o gateway padrão.'
   );
+}
+
+/**
+ * A medição passou. Só a sonda chama: uma cobrança que deu certo prova menos
+ * do que parece — ela pode ter ido para o gateway de queda, não para este.
+ */
+export function marcarDisponivel(nome: NomeDoGateway): void {
+  ultimaMedicao.set(nome, { ok: true, motivo: '', em: Date.now() });
+}
+
+/**
+ * A última medição, ou `null` se ninguém mediu desde que o processo subiu.
+ *
+ * `null` não é "está bem" nem "está mal" — é falta de dado, e a tela de saúde
+ * tem um estado próprio para isso. Pintar de verde o que não foi medido é a
+ * forma mais rápida de tornar um painel de saúde inútil.
+ */
+export function ultimaMedicaoDe(nome: NomeDoGateway): Medicao | null {
+  return ultimaMedicao.get(nome) ?? null;
 }
 
 export function estaDisponivel(nome: NomeDoGateway, agora = Date.now()): boolean {
@@ -72,6 +113,7 @@ export function segundosAteVoltar(nome: NomeDoGateway, agora = Date.now()): numb
 /** Só para os testes: devolve tudo ao estado inicial. */
 export function limparSaude(): void {
   caidoAte.clear();
+  ultimaMedicao.clear();
 }
 
 /**

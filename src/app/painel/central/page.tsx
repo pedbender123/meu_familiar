@@ -1,8 +1,10 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
 import { sessaoAtual } from '@/lib/sessao-servidor';
 import { relatorioDoPeriodo } from '@/lib/campanhas';
 import { online, ondeEstaoAgora } from '@/lib/analitica';
+import { resumoDaSaude } from '@/nucleo/saude/sinais';
 import { TOTAL_DE_ITENS } from '@/lib/quiz/itens';
 import {
   deUtcParaLocal,
@@ -111,6 +113,8 @@ export default async function Central({
 
   const agora = online();
   const olhando = ondeEstaoAgora();
+  // Memória de um minuto por dentro: não custa uma sonda a cada visita aqui.
+  const sinaisRuins = await resumoDaSaude();
 
   const lucro = r.liquidoCentavos - r.custoIaCentavos;
   const conversao = r.visitantes > 0 ? (r.vendas / r.visitantes) * 100 : 0;
@@ -149,6 +153,29 @@ export default async function Central({
             </span>
           )}
         </section>
+
+        {/*
+          A faixa de saúde só aparece quando há o que dizer.
+
+          Um aviso permanente vira papel de parede: quem vê "tudo bem" todo dia
+          para de ler a faixa, e no dia em que ela mudar ninguém repara. Ela
+          existindo só no dia ruim é o que a torna impossível de ignorar.
+        */}
+        {sinaisRuins > 0 && (
+          <Link href="/painel/saude"
+            className="w-full rounded-xl border px-5 py-3 flex items-center gap-3 no-underline transition-colors hover:bg-[rgba(248,113,113,0.06)]"
+            style={{ borderColor: 'rgba(248,113,113,0.45)' }}>
+            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: '#F87171' }} aria-hidden="true" />
+            <span className="font-corpo text-sm" style={{ color: '#F87171' }}>
+              {sinaisRuins === 1
+                ? '1 sinal do fluxo pedindo atenção'
+                : `${sinaisRuins} sinais do fluxo pedindo atenção`}
+            </span>
+            <span className="font-corpo text-[11px] text-pergaminho/40 ml-auto">
+              ver o que é e o que fazer →
+            </span>
+          </Link>
+        )}
 
         {/* ── os números ── */}
         <div className="w-full grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
