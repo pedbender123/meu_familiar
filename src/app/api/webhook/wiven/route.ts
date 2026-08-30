@@ -123,6 +123,62 @@ function captar(req: NextRequest, cru: string) {
   }
 }
 
+/**
+ * O diário do formato — a resposta da Fase 2, esperando a próxima venda.
+ *
+ * ── Por que a captação existente não serve para isto ──────────────────────
+ *
+ * Ela se apaga sozinha em 15 minutos, de propósito: foi feita para uma sessão
+ * de diagnóstico com alguém olhando. As perguntas da Fase 2 dependem de uma
+ * venda ORGÂNICA, que pode acontecer às 4 da manhã de terça.
+ *
+ * ── As três perguntas que ele responde ────────────────────────────────────
+ *
+ * `docs/PLANO-WIVEN-PRODUTOS.md` §4 (Fase 2) precisa saber, de uma venda de
+ * verdade: o `offerCode` volta preenchido? veio algum campo de `products`? a
+ * coprodução dividiu (aparece `commissionAmount` menor que o esperado)?
+ * Nenhuma delas se responde chutando o formato do corpo — e chutar campo de
+ * API de pagamento é como se derruba um checkout.
+ *
+ * ── O que ele grava, e o que nunca grava ──────────────────────────────────
+ *
+ * NOMES de campo, e só os valores de `offerCode`/`products`/`subscription`,
+ * que são códigos de catálogo. Nome, e-mail, CPF e token não entram: arquivo
+ * vira backup, backup sai da máquina.
+ */
+const ARQUIVO_FORMATO = 'var/wiven-formato.jsonl';
+
+function anotarFormato(corpo: CorpoWebhookWiven): void {
+  try {
+    const t = (corpo.transaction ?? {}) as Record<string, unknown>;
+    const interessantes = ['offerCode', 'products', 'product', 'offer', 'subscription', 'splits'];
+
+    appendFileSync(
+      ARQUIVO_FORMATO,
+      JSON.stringify({
+        em: new Date().toISOString(),
+        evento: corpo.event ?? null,
+        // A pergunta 1: se um destes vier preenchido, a Fase 1 tem contrato.
+        achados: Object.fromEntries(
+          interessantes
+            .filter((k) => t[k] !== undefined && t[k] !== null)
+            .map((k) => [k, t[k]])
+        ),
+        // O mapa do corpo, para ver campo novo aparecer sem precisar de sorte.
+        camposDoTopo: Object.keys(corpo),
+        camposDaTransacao: Object.keys(t),
+        // A pergunta 2: com coprodução, este número muda sem `splits` no corpo.
+        amount: t.amount ?? null,
+        commissionAmount: t.commissionAmount ?? null,
+      }) + '\n',
+      'utf8'
+    );
+  } catch (erro) {
+    // Um diário de diagnóstico nunca pode custar uma entrega.
+    console.error('[webhook/wiven] diário do formato falhou:', erro);
+  }
+}
+
 export async function POST(req: NextRequest) {
   const esperados = tokensDoWebhook();
 
@@ -176,6 +232,8 @@ export async function POST(req: NextRequest) {
     );
     return NextResponse.json({ erro: 'não autorizado' }, { status: 401 });
   }
+
+  anotarFormato(corpo);
 
   const resultado = traduzirWebhook(corpo);
 

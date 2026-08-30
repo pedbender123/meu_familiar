@@ -63,6 +63,41 @@ export function Pecas({
     }
   }
 
+  /**
+   * Renomear.
+   *
+   * Virou necessário quando as peças passaram a nascer sozinhas do
+   * `utm_content` do anúncio: elas chegam chamadas pelo `{{ad.id}}` da Meta,
+   * dezessete dígitos, que identificam com precisão e não dizem nada a quem
+   * abre esta tela um mês depois.
+   *
+   * `prompt` em vez de campo editável de propósito: renomear acontece uma vez
+   * por criativo, e um formulário inteiro numa célula de tabela custaria mais
+   * atenção do que a tarefa merece.
+   */
+  async function renomear(id: string, nomeAtual: string) {
+    const novo = prompt(
+      'Como você quer chamar este criativo?\n\n' +
+        'O vínculo com o anúncio não se perde — quem identifica é o código, não o nome.',
+      nomeAtual
+    );
+    if (novo === null) return;
+    const limpo = novo.trim();
+    if (limpo.length < 3 || limpo === nomeAtual) return;
+
+    const r = await fetch('/api/painel/peca', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ id, nome: limpo }),
+    });
+    if (!r.ok) {
+      const { erro } = await r.json().catch(() => ({ erro: 'Falha ao renomear.' }));
+      setErro(erro ?? 'Falha ao renomear.');
+      return;
+    }
+    router.refresh();
+  }
+
   async function apagar(id: string, nomeDaPeca: string) {
     if (!confirm(`Tirar "${nomeDaPeca}" da lista?\n\nAs visitas e vendas que ela já trouxe continuam no histórico.`)) return;
     await fetch(`/api/painel/peca?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
@@ -185,15 +220,24 @@ export function Pecas({
                         </span>
                       )}
                     </td>
-                    <td className="py-2.5 text-right">
+                    <td className="py-2.5 text-right whitespace-nowrap">
                       {l.peca_id && (
-                        <button
-                          onClick={() => apagar(l.peca_id!, l.nome)}
-                          className="text-xs opacity-40 hover:opacity-100 hover:text-red-400"
-                          title="Tirar da lista"
-                        >
-                          ×
-                        </button>
+                        <>
+                          <button
+                            onClick={() => renomear(l.peca_id!, l.nome)}
+                            className="text-xs opacity-40 hover:opacity-100 mr-2"
+                            title="Dar um nome que você reconheça depois"
+                          >
+                            ✎
+                          </button>
+                          <button
+                            onClick={() => apagar(l.peca_id!, l.nome)}
+                            className="text-xs opacity-40 hover:opacity-100 hover:text-red-400"
+                            title="Tirar da lista"
+                          >
+                            ×
+                          </button>
+                        </>
                       )}
                     </td>
                   </tr>

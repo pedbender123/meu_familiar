@@ -31,10 +31,11 @@ import m029 from './029_gateway_da_campanha';
 import m030 from './030_campanha_na_visita';
 import m031 from './031_split_no_pedido';
 import m032 from './032_split_do_dono';
+import m033 from './033_campanha_pelo_utm';
 
 /**
  * A ordem de execução. Só se acrescenta ao fim — nunca reordena, nunca edita
  * uma migração já aplicada em produção. Uma migração errada se corrige com
  * uma migração nova que desfaz o efeito, não editando a antiga.
  */
-export const MIGRACOES: Migracao[] = [m001, m002, m003, m004, m005, m006, m007, m008, m009, m010, m011, m012, m013, m014, m015, m016, m017, m018, m019, m020, m021, m022, m023, m024, m025, m026, m027, m028, m029, m030, m031, m032];
+export const MIGRACOES: Migracao[] = [m001, m002, m003, m004, m005, m006, m007, m008, m009, m010, m011, m012, m013, m014, m015, m016, m017, m018, m019, m020, m021, m022, m023, m024, m025, m026, m027, m028, m029, m030, m031, m032, m033];

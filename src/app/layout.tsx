@@ -77,11 +77,17 @@ export default function RootLayout({
           <Farejador />
           <MetaPixel />
           {/*
-            O captador de UTM da Utmify. Não substitui o pixel da Meta acima:
-            ele guarda de onde a pessoa veio entre as páginas, e quem conta a
-            venda continua sendo o `MetaPixel` no navegador — a Utmify só
-            manda evento para a Meta quando houver token da API de Conversões
-            configurado no painel dela, e hoje não há.
+            O captador de UTM da Utmify, e hoje o ÚNICO tracker do navegador.
+
+            O `MetaPixel` acima está desligado desde 24/08 pela variável vazia,
+            e é decisão, não esquecimento: com os dois ligados, o mesmo
+            `Purchase` ia para o mesmo destino por dois caminhos e a Meta
+            contava duas vezes — foi assim que 5 vendas viraram 17 no
+            gerenciador. Quem fala com a Meta agora é a Utmify.
+
+            Ele fica desligado, e não apagado, porque é o único caminho que
+            resta se a Utmify falhar. A tela de Saúde acende se algum dia os
+            dois voltarem a ficar ligados juntos.
           */}
           <ScriptUtmify />
         </Suspense>

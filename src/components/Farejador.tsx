@@ -38,6 +38,16 @@ export function Farejador() {
         // significa é `lib/rastreio.ts`, no servidor — aqui só transporta.
         de: busca.get('de') ?? busca.get('utm_source') ?? undefined,
         c: busca.get('c') ?? undefined,
+        /*
+          Os dois UTMs que a Meta preenche sozinha em toda entrega:
+          `utm_campaign={{campaign.id}}` e `utm_content={{ad.id}}`.
+
+          É por eles que campanha e criativo passam a existir sem ninguém
+          cadastrar nada — o link do anúncio deixa de precisar do nosso `?c=`.
+          Aqui só transportam; quem decide o que significam é o servidor.
+        */
+        utmCampanha: busca.get('utm_campaign') ?? undefined,
+        utmConteudo: busca.get('utm_content') ?? undefined,
         s: busca.get('s') ?? undefined,
         e: busca.get('e') ?? undefined,
         referencia: document.referrer || undefined,

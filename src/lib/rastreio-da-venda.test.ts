@@ -36,9 +36,30 @@ describe('venda sem UTM na URL ainda tem campanha', () => {
     assert.match(fonte, /idDaCampanha \?\? campanha\.nome/);
   });
 
-  /** A peça é o criativo: é ela que responde "qual vídeo trouxe esta venda". */
-  test('a peça vai como utm_content', () => {
-    assert.match(fonte, /utm_content: peca \? `\$\{peca\.codigo\}-\$\{peca\.nome\}`/);
+  /**
+   * A varredura do histórico acima era um jeito engenhoso de ADIVINHAR o ID
+   * que a campanha já tinha usado. Desde a migração 033 o ID está guardado na
+   * própria campanha, e adivinhar deixou de ser necessário — a busca fica
+   * só como rede para as campanhas antigas, cadastradas à mão antes disso.
+   */
+  test('o ID guardado na campanha vem antes da adivinhação', () => {
+    const guardado = fonte.indexOf('campanha.utm_campanha');
+    const historico = fonte.indexOf('WHERE campanha_id = ? AND utm_json IS NOT NULL');
+    assert.ok(guardado > 0, 'a campanha precisa ser consultada');
+    assert.ok(guardado < historico, 'o guardado tem que ser lido primeiro');
+    assert.match(fonte, /if \(!idDaCampanha\) \{/);
+  });
+
+  /**
+   * A peça é o criativo: é ela que responde "qual vídeo trouxe esta venda".
+   *
+   * Desde que as peças passaram a nascer do `utm_content` do anúncio, o ID
+   * cru da Meta vem primeiro — é ele que faz o criativo aparecer no painel
+   * deles com o mesmo nome que tem no gerenciador. `codigo-nome` continua
+   * atrás, para as peças cadastradas à mão, que nunca tiveram ID nenhum.
+   */
+  test('a peça vai como utm_content, preferindo o ID do anúncio', () => {
+    assert.match(fonte, /utm_content: peca \? \(peca\.utm_conteudo \?\? `\$\{peca\.codigo\}-\$\{peca\.nome\}`\)/);
   });
 
   /** O UTM que veio na URL sempre ganha: ele é o que a Meta realmente mandou. */

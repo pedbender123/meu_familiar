@@ -1,4 +1,7 @@
+'use client';
+
 import Script from 'next/script';
+import { usePathname } from 'next/navigation';
 
 /**
  * O script da Utmify no navegador.
@@ -18,10 +21,31 @@ import Script from 'next/script';
  *
  * Retorna `null`. Não há script morto na página nem erro no console de quem
  * ainda não conectou a conta.
+ *
+ * ── Por que ele não roda no painel ────────────────────────────────────────
+ *
+ * O componente mora no layout raiz, que embrulha o site INTEIRO — inclusive
+ * a área administrativa. Sem esta guarda, cada vez que o dono abre a Central
+ * para conferir as vendas do dia, a UTMify registra uma visita.
+ *
+ * O estrago é sutil e cumulativo: são dezenas de visitas por dia, todas sem
+ * UTM, e todas arquivadas como tráfego direto no painel de quem compra a
+ * mídia. Isso derruba a taxa de conversão que a agência mede — o
+ * denominador cresce com gente que nunca foi cliente — e some com o rastro
+ * dentro da própria ferramenta que deveria mostrá-lo.
+ *
+ * `/conta` entra pelo mesmo motivo: é a área de quem JÁ comprou, e visita de
+ * cliente voltando não é aquisição.
  */
+const FORA_DO_FUNIL = ['/painel', '/conta'];
+
 export function ScriptUtmify() {
+  const caminho = usePathname();
   const pixel = process.env.NEXT_PUBLIC_UTMIFY_PIXEL_ID?.trim();
   if (!pixel) return null;
+  if (caminho && FORA_DO_FUNIL.some((p) => caminho === p || caminho.startsWith(`${p}/`))) {
+    return null;
+  }
 
   return (
     <>

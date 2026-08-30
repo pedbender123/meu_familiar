@@ -17,6 +17,17 @@ export interface Campanha {
    */
   codigo: string | null;
   /**
+   * O `utm_campaign` cru do anúncio — o ID numérico que a Meta preenche.
+   *
+   * A segunda chave da campanha, e a única que o time de marketing precisa
+   * conhecer (ele nem sabe que ela existe: a macro preenche sozinha). Nula
+   * nas campanhas cadastradas à mão, que continuam vivendo pelo `codigo`.
+   *
+   * As duas nunca se traduzem uma na outra. Traduzir é o que faz a mesma
+   * campanha aparecer duas vezes no painel de quem compra a mídia.
+   */
+  utm_campanha: string | null;
+  /**
    * Quem cobra as vendas desta campanha.
    *
    * `mercadopago` · `cakto` · `wiven`. Nulo = o padrão do `.env`, que é como
@@ -162,6 +173,8 @@ export interface Peca {
   id: string;
   campanha_id: string;
   codigo: string;
+  /** O `utm_content` cru — o `{{ad.id}}` da Meta. Nula nas peças à mão. */
+  utm_conteudo?: string | null;
   nome: string;
   nota: string | null;
   ativa: number;
@@ -216,6 +229,22 @@ export function criarPeca(p: {
     criado_em: new Date().toISOString(),
   });
   return { ok: true, id, codigo };
+}
+
+/**
+ * Troca o nome da peça, mantendo tudo que aponta para ela.
+ *
+ * Existe porque as peças passaram a nascer sozinhas do `utm_content`, e o
+ * nome com que nascem é o `{{ad.id}}` da Meta — dezessete dígitos. Isso
+ * identifica com precisão e não diz nada a quem abre o relatório um mês
+ * depois: a régua de um bom nome de peça continua sendo "gata preta olhando
+ * pra câmera", não "120248978282210044".
+ *
+ * O `utm_conteudo` e o `codigo` não se tocam: são as chaves, e são elas que
+ * ligam a peça ao anúncio e à URL. Renomear é conforto nosso.
+ */
+export function renomearPeca(id: string, nome: string): void {
+  db.prepare('UPDATE pecas SET nome = ? WHERE id = ?').run(nome, id);
 }
 
 export function apagarPeca(id: string): void {
@@ -944,4 +973,182 @@ export function funilDaPeca(campanhaId: string, pecaId: string | null): FunilDaP
     vendas,
     receitaCentavos,
   };
+}
+
+/* ── campanha e peça nascidas do UTM ──────────────────────────────────────
+ *
+ * Até aqui, campanha e peça só existiam se alguém as cadastrasse no painel e
+ * colasse `?c=XXYY` no anúncio. O time que compra a mídia não pensa assim: ele
+ * pensa "conectei a UTMify ao Meta, logo está rastreado" — e essa leitura está
+ * certa, porque é assim que quase toda página de vendas do mercado funciona.
+ *
+ * O custo de insistir no nosso dialeto apareceu inteiro numa venda: 27/08,
+ * R$ 18,90, criativo identificado no NOSSO painel e invisível no deles.
+ *
+ * Daqui em diante o link do anúncio carrega só o que a Meta preenche sozinha
+ * (`utm_campaign={{campaign.id}}`, `utm_content={{ad.id}}`) e a campanha
+ * **nasce** da primeira visita. Ver `docs/PLANO-FLUXO-UTM.md` §3.1.
+ */
+
+/**
+ * Quantas campanhas o sistema aceita criar sozinho por dia.
+ *
+ * Sem teto, qualquer um pode chamar `/?utm_campaign=<aleatório>` num laço e
+ * encher a tabela — e o painel de campanhas, que é uma tela de decisão, vira
+ * uma lista de lixo. Com teto, o pior caso é um dia de ruído que se apaga.
+ *
+ * O número é folgado de propósito: uma conta de anúncios real não estreia
+ * cinquenta campanhas num dia, então ele nunca encosta em uso legítimo.
+ */
+export const TETO_DE_CAMPANHAS_AUTOMATICAS = 50;
+
+/**
+ * O valor de um `utm_*`, reduzido ao que pode virar chave.
+ *
+ * `null` quando não sobra nada utilizável. Aceita letra, número, ponto, traço
+ * e sublinhado — o ID da Meta é só dígito, mas quem escreve UTM à mão usa
+ * `promo-agosto`, e recusar isso jogaria fora tráfego bom.
+ */
+export function chaveDeUtm(bruto: string | null | undefined): string | null {
+  if (typeof bruto !== 'string') return null;
+  const cru = bruto.trim();
+
+  /*
+    A macro não substituída se recusa AQUI, no valor cru, antes de qualquer
+    limpeza — a limpeza tira as chaves e `{{campaign.id}}` viraria
+    `campaign.id`, um nome perfeitamente válido.
+
+    Isso importa mais do que parece: todo anúncio montado errado manda a mesma
+    string literal, então essa campanha fantasma recolheria o tráfego de todos
+    eles num balde só — e apareceria no painel como a campanha que mais
+    converte, porque seria a soma de várias.
+  */
+  if (cru.includes('{') || cru.includes('}')) return null;
+
+  const limpo = cru.slice(0, 64).replace(/[^\w.\-]/g, '');
+  // Um caractere não identifica nada.
+  return limpo.length >= 2 ? limpo : null;
+}
+
+function campanhasAutomaticasHoje(): number {
+  const desde = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  return (
+    db
+      .prepare(
+        `SELECT COUNT(*) c FROM campanhas WHERE utm_campanha IS NOT NULL AND criado_em > ?`
+      )
+      .get(desde) as { c: number }
+  ).c;
+}
+
+/**
+ * A campanha daquele `utm_campaign` — achando, ou criando na hora.
+ *
+ * ── Por que criar, em vez de descartar ────────────────────────────────────
+ *
+ * A alternativa é o dado chegar e ser jogado fora por falta de cadastro
+ * prévio, que é exatamente o que vinha acontecendo. **Campanha criada a mais
+ * é ruído que se apaga; venda sem campanha é dinheiro que ninguém sabe de
+ * onde veio.** Das duas, só uma é recuperável depois.
+ *
+ * ── Por que o nome nasce sendo o ID ───────────────────────────────────────
+ *
+ * O ID numérico da Meta identifica; o nome humano é conforto nosso. Quem
+ * compra a mídia nunca precisa abrir este painel, então o nome bonito é
+ * trabalho de quem quiser fazer — `atualizarCampanha` renomeia sem perder o
+ * vínculo, porque a chave é `utm_campanha`, não o nome.
+ */
+export function campanhaDoUtm(
+  utmCampaign: string | null | undefined,
+  plataforma?: string | null
+): Campanha | undefined {
+  const chave = chaveDeUtm(utmCampaign);
+  if (!chave) return undefined;
+
+  const existente = db
+    .prepare('SELECT * FROM campanhas WHERE utm_campanha = ?')
+    .get(chave) as Campanha | undefined;
+  if (existente) return existente;
+
+  if (campanhasAutomaticasHoje() >= TETO_DE_CAMPANHAS_AUTOMATICAS) {
+    console.error(
+      `[campanhas] teto de ${TETO_DE_CAMPANHAS_AUTOMATICAS} criações automáticas ` +
+        `em 24 h atingido — "${chave}" não virou campanha. O tráfego continua ` +
+        'sendo medido, só não ganha campanha própria.'
+    );
+    return undefined;
+  }
+
+  const id = randomUUID();
+  const agora = new Date().toISOString();
+  try {
+    db.prepare(
+      `INSERT INTO campanhas
+         (id, nome, plataforma, codigo, funis, gateway, utm_campanha,
+          inicio, fim, investido_centavos, alcance_estimado, nota,
+          criado_em, atualizado_em)
+       VALUES (@id, @nome, @plataforma, NULL, NULL, NULL, @utm,
+               @agora, NULL, 0, NULL, @nota, @agora, @agora)`
+    ).run({
+      id,
+      nome: chave,
+      plataforma: plataforma ?? null,
+      utm: chave,
+      agora,
+      nota: 'Criada sozinha a partir do utm_campaign do anúncio. Pode renomear.',
+    });
+  } catch {
+    /*
+      Duas visitas do mesmo anúncio no mesmo instante disputam o INSERT; o
+      índice único deixa uma passar. A perdedora relê em vez de estourar —
+      criar campanha não pode derrubar a visita de quem está comprando.
+    */
+    return db.prepare('SELECT * FROM campanhas WHERE utm_campanha = ?').get(chave) as
+      | Campanha
+      | undefined;
+  }
+
+  return db.prepare('SELECT * FROM campanhas WHERE id = ?').get(id) as Campanha | undefined;
+}
+
+/**
+ * A peça daquele `utm_content` — o criativo, o vídeo, o anúncio.
+ *
+ * É o que destrava a dash por vídeo sem exigir nada de quem sobe o anúncio: o
+ * `{{ad.id}}` já vem preenchido pela Meta em toda entrega.
+ *
+ * `codigo` continua sendo o par de dígitos de sempre, porque ele é o que cabe
+ * na URL curta do `?c=`; o `utm_conteudo` é a chave de verdade.
+ */
+export function pecaDoUtm(
+  campanhaId: string,
+  utmContent: string | null | undefined
+): Peca | undefined {
+  const chave = chaveDeUtm(utmContent);
+  if (!chave) return undefined;
+
+  const existente = db
+    .prepare('SELECT * FROM pecas WHERE campanha_id = ? AND utm_conteudo = ?')
+    .get(campanhaId, chave) as Peca | undefined;
+  if (existente) return existente;
+
+  const criada = criarPeca({
+    campanha_id: campanhaId,
+    nome: chave,
+    nota: 'Criada sozinha a partir do utm_content do anúncio. Pode renomear.',
+  });
+  // 99 peças numa campanha só: o tráfego segue atribuído à campanha, que é a
+  // parte que decide dinheiro. Perder o recorte por criativo é aceitável.
+  if (!criada.ok) return undefined;
+
+  try {
+    db.prepare('UPDATE pecas SET utm_conteudo = ? WHERE id = ?').run(chave, criada.id);
+  } catch {
+    return db.prepare('SELECT * FROM pecas WHERE campanha_id = ? AND utm_conteudo = ?').get(
+      campanhaId,
+      chave
+    ) as Peca | undefined;
+  }
+
+  return db.prepare('SELECT * FROM pecas WHERE id = ?').get(criada.id) as Peca | undefined;
 }

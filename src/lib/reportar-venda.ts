@@ -109,29 +109,54 @@ function rastreioDaCampanha(pedido: Pedido): ParametrosDeRastreio {
     ? listarPecas(campanha.id).find((p) => p.id === pedido.peca_id)
     : undefined;
 
-  /** O identificador que esta campanha já usou na Utmify, se usou algum. */
-  let idDaCampanha: string | null = null;
-  try {
-    const anterior = db
-      .prepare(
-        `SELECT utm_json FROM pedidos
-          WHERE campanha_id = ? AND utm_json IS NOT NULL AND length(utm_json) > 2
-          ORDER BY criado_em DESC LIMIT 1`
-      )
-      .get(campanha.id) as { utm_json: string } | undefined;
-    if (anterior) {
-      idDaCampanha = (JSON.parse(anterior.utm_json) as ParametrosDeRastreio).utm_campaign ?? null;
+  /**
+   * O identificador que esta campanha já usou na Utmify, se usou algum.
+   *
+   * A resposta boa está em `campanha.utm_campanha`: o ID cru que a Meta
+   * mandou no link, guardado no momento em que a campanha nasceu. Reportar
+   * ELE é reportar exatamente a string que a plataforma deles conhece.
+   *
+   * Traduzir para o nome interno é o que cria duas identidades para a mesma
+   * campanha no painel de quem compra a mídia — uma com o ID, vinda dos
+   * cliques, outra com o nome, vinda das nossas vendas — e aí nenhuma das
+   * duas fecha a conta sozinha.
+   *
+   * A varredura no histórico abaixo continua como rede: ela cobre as
+   * campanhas antigas, cadastradas à mão antes de `utm_campanha` existir.
+   */
+  let idDaCampanha: string | null = campanha.utm_campanha ?? null;
+
+  if (!idDaCampanha) {
+    try {
+      const anterior = db
+        .prepare(
+          `SELECT utm_json FROM pedidos
+            WHERE campanha_id = ? AND utm_json IS NOT NULL AND length(utm_json) > 2
+            ORDER BY criado_em DESC LIMIT 1`
+        )
+        .get(campanha.id) as { utm_json: string } | undefined;
+      if (anterior) {
+        idDaCampanha =
+          (JSON.parse(anterior.utm_json) as ParametrosDeRastreio).utm_campaign ?? null;
+      }
+    } catch {
+      // Sem histórico utilizável, cai no nome da campanha.
     }
-  } catch {
-    // Sem histórico utilizável, cai no nome da campanha.
   }
 
   return {
     utm_source: pedido.origem ?? 'desconhecido',
     utm_medium: 'paid',
     utm_campaign: idDaCampanha ?? campanha.nome,
-    // A peça é o criativo. É o que responde "qual vídeo trouxe esta venda".
-    utm_content: peca ? `${peca.codigo}-${peca.nome}` : undefined,
+    /*
+      A peça é o criativo — é o que responde "qual vídeo trouxe esta venda".
+
+      Quando ela nasceu do anúncio, o `utm_conteudo` é o `{{ad.id}}` cru e vai
+      cru: é assim que o criativo aparece no painel deles com o mesmo nome que
+      tem no gerenciador. `codigo-nome` fica para as peças cadastradas à mão,
+      que nunca tiveram ID da Meta nenhum.
+    */
+    utm_content: peca ? (peca.utm_conteudo ?? `${peca.codigo}-${peca.nome}`) : undefined,
   };
 }
 

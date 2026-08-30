@@ -11,7 +11,12 @@ import {
   serializarAtribuicao,
 } from '@/lib/rastreio';
 import { registrarToque, toqueRecenteIgual } from '@/lib/toques';
-import { buscarCampanhaPorCodigo, buscarPeca } from '@/lib/campanhas';
+import {
+  buscarCampanhaPorCodigo,
+  buscarPeca,
+  campanhaDoUtm,
+  pecaDoUtm,
+} from '@/lib/campanhas';
 import { buscarPedidoPorCodigoCurto } from '@/lib/db';
 import { COOKIE_DO_FUNIL, ehFunil } from '@/lib/funis';
 import { anotarIdentidade } from '@/lib/identidade';
@@ -54,6 +59,8 @@ export async function POST(req: NextRequest) {
     caminho?: string;
     de?: string;
     c?: string;
+    utmCampanha?: string;
+    utmConteudo?: string;
     s?: string;
     e?: string;
     referencia?: string;
@@ -142,27 +149,56 @@ export async function POST(req: NextRequest) {
     referer: corpo.referencia ?? null,
   });
 
-  const campanha = toque.codigoCampanha
-    ? buscarCampanhaPorCodigo(toque.codigoCampanha)
-    : undefined;
-  const peca =
-    campanha && toque.codigoPeca
-      ? buscarPeca(campanha.id, toque.codigoPeca)
-      : undefined;
+  /**
+   * A campanha desta chegada, por dois caminhos.
+   *
+   * ── A ordem importa, e é esta ─────────────────────────────────────────
+   *
+   * **O que veio no link sempre ganha, e o `?c=` vem primeiro** porque ele é
+   * explícito: alguém montou aquele link à mão, para um lugar específico —
+   * bio, indicação, teste interno. O UTM é o caminho automático, do tráfego
+   * pago, onde ninguém escolheu nada.
+   *
+   * Quando os dois vêm juntos (um link de campanha nossa que também carrega
+   * as macros da Meta), o nosso vence e o UTM não cria campanha nenhuma —
+   * senão a mesma campanha existiria duas vezes, cada metade com metade das
+   * vendas.
+   */
+  const campanha =
+    (toque.codigoCampanha ? buscarCampanhaPorCodigo(toque.codigoCampanha) : undefined) ??
+    campanhaDoUtm(corpo.utmCampanha, origem);
+
+  const peca = !campanha
+    ? undefined
+    : ((toque.codigoPeca ? buscarPeca(campanha.id, toque.codigoPeca) : undefined) ??
+      pecaDoUtm(campanha.id, corpo.utmConteudo));
   const indicador = toque.codigoIndicacao
     ? buscarPedidoPorCodigoCurto(toque.codigoIndicacao)
     : undefined;
 
+  /**
+   * Chegou por campanha é chegar por campanha, com `?c=` ou sem.
+   *
+   * `lerToque` só sabe classificar como `campanha` quem trouxe o nosso código
+   * na URL — ele não vê o UTM. Sem esta linha, o tráfego pago da Meta (que
+   * traz `utm_source=ig`) entraria como **rede social**, e o relatório
+   * mostraria anúncio pago somado ao alcance orgânico do Instagram: dois
+   * canais com custo e significado opostos no mesmo balde.
+   *
+   * A campanha resolvida é a prova. Se ela existe, foi campanha.
+   */
+  const tipoDoToque = campanha ? 'campanha' : toque.tipo;
+
   // Campanha manda na origem: o código não diz a plataforma, a campanha diz.
   const origemDoToque =
-    toque.tipo === 'campanha' ? (campanha?.plataforma ?? 'anuncio') : toque.origem;
+    tipoDoToque === 'campanha' ? (campanha?.plataforma ?? 'anuncio') : toque.origem;
 
   try {
     // Um por tipo a cada meia hora — sem isso, recarregar a página vira toque.
-    if (!toqueRecenteIgual(visitante, toque.tipo)) {
+    if (!toqueRecenteIgual(visitante, tipoDoToque)) {
       registrarToque({
         visitante,
-        tipo: toque.tipo,
+        tipo: tipoDoToque,
         origem: origemDoToque,
         campanhaId: campanha?.id ?? null,
         pecaId: peca?.id ?? null,
@@ -170,7 +206,7 @@ export async function POST(req: NextRequest) {
         // Código de campanha que não existe no banco não pode contar como
         // aquisição: seria creditar uma campanha inventada na URL.
         contaAquisicao:
-          toque.contaAquisicao && (toque.tipo !== 'campanha' || !!campanha),
+          toque.contaAquisicao && (tipoDoToque !== 'campanha' || !!campanha),
         caminho,
         referencia: dominioDe(corpo.referencia),
       });
@@ -237,7 +273,11 @@ export async function POST(req: NextRequest) {
     resposta.cookies.set(
       COOKIE_ATRIBUICAO,
       serializarAtribuicao({
-        tipo: toque.tipo,
+        // O mesmo tipo que foi para `toques`: cookie dizendo "social" e
+        // tabela dizendo "campanha" seria a mesma visita contada de dois
+        // jeitos, e o dia em que os dois relatórios discordassem ninguém
+        // saberia qual acreditar.
+        tipo: tipoDoToque,
         origem: origemDoToque,
         campanhaId: campanha?.id ?? null,
         pecaId: peca?.id ?? null,
