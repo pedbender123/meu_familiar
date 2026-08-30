@@ -12,6 +12,8 @@ import {
   destinoDepoisDaEntrega,
   ofertaDepoisDaEntrega,
   CHAVE_OFERTA_FECHADA,
+  CHAVE_DESCONTO_VISIVEL,
+  descontoVisivel,
 } from './modelo-de-venda';
 
 /**
@@ -210,5 +212,33 @@ describe('nenhum caminho de cobrança escapa do interruptor', () => {
       precoDoPedido({ produto: 'revelacao', desconto_percentual: null }).gratis,
       false
     );
+  });
+});
+
+describe('o desconto na tela de pagamento', () => {
+  /**
+   * `LANCAMENTO20` incide sobre TODO pedido, então o "preço cheio" riscado
+   * nunca foi cobrado de ninguém. Enquanto os preços viviam só aqui, era
+   * inofensivo; com os produtos da Wiven cadastrados pelo preço praticado,
+   * o riscado passa a afirmar algo falso — na tela em que a pessoa decide
+   * pagar, que é o pior lugar possível para uma afirmação falsa.
+   */
+  test('nasce escondido', () => {
+    assert.equal(descontoVisivel(), false);
+  });
+
+  /**
+   * Não foi deletado porque desconto de verdade — Black Friday, resgate de
+   * carrinho — vai querer exatamente este bloco de volta.
+   */
+  test('o interruptor devolve o riscado', () => {
+    definirInterruptor({ chave: CHAVE_DESCONTO_VISIVEL, ligado: true, percentual: 100 });
+    assert.equal(descontoVisivel(), true);
+  });
+
+  /** A tela de pagamento só passa o cupom adiante quando ele deve aparecer. */
+  test('a tela consulta o interruptor', () => {
+    const fonte = readFileSync('src/app/pagamento/[id]/page.tsx', 'utf8');
+    assert.match(fonte, /pedido\.cupom && descontoVisivel\(\)/);
   });
 });

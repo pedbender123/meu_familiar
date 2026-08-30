@@ -181,3 +181,26 @@ export function ofertaDepoisDaEntrega(): boolean {
 export function destinoDepoisDaEntrega(pedidoId: string): string {
   return ofertaDepoisDaEntrega() ? `/oferta/${pedidoId}` : `/revelacao/${pedidoId}`;
 }
+
+/**
+ * O desconto aparece na tela de pagamento?
+ *
+ * ── Por que virou interruptor em vez de sumir ─────────────────────────────
+ *
+ * O cupom `LANCAMENTO20` é aplicado a todo pedido, então o "preço cheio"
+ * riscado nunca foi cobrado de ninguém. Enquanto os preços da Wiven eram
+ * cadastrados como oferta, isso era coerente com o resto; a partir do momento
+ * em que os produtos passam a ser cadastrados **pelo preço praticado**, o
+ * riscado vira uma afirmação falsa na tela onde a pessoa está decidindo pagar.
+ *
+ * Não é deletado porque desconto de verdade — Black Friday, resgate de
+ * carrinho — vai querer exatamente este bloco de volta. `desconto_visivel`
+ * ligado devolve.
+ *
+ * Ausente = escondido, que é o estado desejado agora.
+ */
+export const CHAVE_DESCONTO_VISIVEL = 'desconto_visivel';
+
+export function descontoVisivel(): boolean {
+  return interruptorLigado(CHAVE_DESCONTO_VISIVEL);
+}

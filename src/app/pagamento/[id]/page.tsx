@@ -3,6 +3,7 @@ import { buscarPedido } from '@/lib/db';
 import { chavePublica, modoAtual, pagamentoEhFake } from '@/nucleo/checkouts/mercadopago';
 import { produtoDe } from '@/lib/produtos';
 import { precoDoPedido } from '@/lib/cupons';
+import { descontoVisivel } from '@/lib/modelo-de-venda';
 import { Checkout } from '@/components/checkout/Checkout';
 import { gatewayConferido } from '@/nucleo/checkouts/gateway';
 import { PagamentoFake } from '@/components/PagamentoFake';
@@ -60,8 +61,12 @@ export default async function Pagamento({
           nomeProduto={produto.nome}
           generoDoFamiliar={FAMILIARES[pedido.familiar as FamiliarId]?.genero}
           itens={itensDoProduto(produto.id)}
+          // O riscado só aparece com desconto de verdade: `LANCAMENTO20`
+          // incide sobre todo pedido, então o "preço cheio" nunca foi cobrado
+          // de ninguém — e com os produtos da Wiven cadastrados pelo preço
+          // praticado, mostrá-lo afirma algo falso na tela da decisão.
           cupom={
-            pedido.cupom
+            pedido.cupom && descontoVisivel()
               ? { codigo: pedido.cupom, descontoPercentual: preco.descontoPercentual, cheioEmReais: preco.cheioCentavos / 100 }
               : undefined
           }
