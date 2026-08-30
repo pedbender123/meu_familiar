@@ -138,11 +138,9 @@ Em ordem de valor, e cada passo é entregável sozinho:
 
 ## 5. O que NÃO fazer
 
-- **Não migrar para produtos da Wiven só para a integração nativa dela
-  funcionar.** O problema que ela resolveria já está resolvido do nosso lado,
-  com mais controle e com os números certos. Coprodução em vez de `splits` é
-  uma discussão separada e legítima — mas as duas não podem coexistir, sob
-  risco de descontar duas vezes.
+- **Não deixar `splits` e coprodução ligados ao mesmo tempo.** As duas
+  descontariam da mesma venda, e o dinheiro sairia dobrado. Ao migrar para
+  produtos, `WIVEN_SPLITS` é esvaziado no mesmo restart.
 - **Não pedir nada ao time de marketing além do link com macros.** Cada
   exigência a mais é um lugar onde o dado vai se perder, e a culpa vai voltar
   para cá — com razão.
@@ -161,3 +159,106 @@ O plano está pronto quando o time de marketing puder:
 3. Ver a venda aparecer na UTMify, dentro da campanha e do criativo certos
 
 **Sem abrir o painel do Bruxário uma única vez.**
+
+---
+
+## 7. O link único, e a UTMify ligada como qualquer um ligaria
+
+### 7.1 O link
+
+Um só, para tudo:
+
+```
+https://bruxario.com.br/vendas?utm_source={{site_source_name}}
+   &utm_medium=paid&utm_campaign={{campaign.id}}
+   &utm_content={{ad.id}}&utm_term={{adset.id}}
+```
+
+`/vendas` já é a porta do tráfego pago — só o formulário, sem preço, sem
+explicação, sem menu. É a "PV" no vocabulário deles.
+
+### 7.2 A UTMify ligada do jeito padrão
+
+O time conecta a UTMify à página de vendas como conecta em qualquer outra:
+cola o pixel, aponta o webhook da Wiven, e pronto. **Nada de configuração
+nossa, nada de código de campanha.**
+
+Do nosso lado isso exige três garantias, e nenhuma delas aparece para ele:
+
+1. **O script da UTMify carrega em toda tela do funil** — `/vendas`, as 26
+   cenas, a oferta, o checkout e o obrigado. Se faltar numa etapa, os cookies
+   `_fbp`/`_fbc` daquela sessão podem não existir na hora da venda, e a Meta
+   perde o casamento com o clique.
+2. **Os `utm_*` sobrevivem à navegação inteira.** Já sobrevivem, via a própria
+   UTMify e via `utm_json` no pedido.
+3. **A venda chega à UTMify com os mesmos `utm_*` que entraram.** Sem
+   tradução, sem substituição pelo nome interno.
+
+### 7.3 Produtos e ofertas na Wiven
+
+Decisão de 28/08: **passar a usar produtos e ofertas**, não cobrança avulsa.
+
+É o que faz a integração nativa Wiven↔UTMify disparar (ela escuta venda de
+produto — o `offerCode` do webhook é descrito como "vendas via checkout
+interno", e o nosso vem sempre nulo), e é o que permite coprodução no painel
+em vez de `WIVEN_SPLITS` no `.env`.
+
+**Não há API de produtos.** Sondado em 28/08:
+
+| Rota | Resposta |
+| --- | --- |
+| `GET /gateway/producer/products` | `404 NOT_FOUND` |
+| `GET /gateway/checkout` | `405` — existe, aceita **POST** |
+| `GET /gateway/subscriptions` | existe, exige parâmetro |
+
+Então os produtos são criados **à mão, no painel**, uma vez. O que precisa
+existir:
+
+| Produto | Preço cheio | Com o cupom de 20% |
+| --- | --- | --- |
+| Revelação | R$ 12,25 | R$ 9,80 |
+| Revelação Completa | R$ 23,62 | R$ 18,90 |
+| Melhoria (upgrade) | R$ 4,90 | — |
+| Assinatura mensal | R$ 29,90 | — |
+
+Em cada um, os coprodutores nos percentuais combinados (40/40/20).
+
+**O preço cadastrado não pode virar a fonte da verdade do preço cobrado.** É
+o cupom que hoje permite ajustar de 12,90 para 9,80 sem deploy, e essa
+alavanca não se abre mão. Se a Wiven exigir que a cobrança bata com o preço do
+produto, a saída é uma oferta por preço praticado, e aí o cadastro passa a ser
+manutenção — a ser medido antes de migrar tudo.
+
+### 7.4 A ordem de migração, produto a produto
+
+Migrar tudo de uma vez é apostar. A ordem:
+
+1. **Só a Completa**, que é a que mais vende. Cobrança com `products` apontando
+   para o produto do catálogo, **sem `splits`**.
+2. Conferir três coisas na venda de teste: a coprodução dividiu? o `offerCode`
+   veio preenchido? a UTMify recebeu **da Wiven**?
+3. Se as três derem certo, migrar os outros e esvaziar `WIVEN_SPLITS`.
+4. Se a coprodução não pegar em cobrança por API, o caminho é o **checkout
+   interno** (`POST /gateway/checkout`) — e aí entra em conflito com o SPEC
+   10.3, que proíbe mandar a pessoa para tela de terceiro. Essa troca é
+   decisão do dono, não minha.
+
+**Enquanto o teste não passar, `WIVEN_SPLITS` continua ligado.** Ele está
+pagando corretamente hoje, e não se desliga o que funciona antes de o
+substituto provar que funciona.
+
+### 7.5 O que eu preciso, e o que é você quem faz
+
+**Você, no painel da Wiven:**
+- Criar os produtos da tabela acima
+- Adicionar você e o João como coprodutores, 40/40/20
+- Me passar **o id de cada produto**
+
+**Você, no gerenciador de anúncios:**
+- Trocar o link para o de macros da §7.1
+
+**Eu, no código:**
+- Mandar `products` na cobrança
+- Garantir a UTMify em todas as telas do funil
+- Campanha e criativo nascendo do UTM (§3.1)
+- Esvaziar `WIVEN_SPLITS` quando a coprodução provar que funciona
