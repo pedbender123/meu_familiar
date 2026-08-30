@@ -1,6 +1,12 @@
 # Uma tela que responde "está tudo de pé?"
 
-Escrito em 30/08/2026. **Nada aqui foi implementado ainda.**
+Escrito em 30/08/2026. **Fases 1, 2 e 3 implementadas em 30/08.** A tela vive
+em `/painel/saude`, o código em `src/nucleo/saude/`, e os cinco incidentes da
+§1 são um teste cada em `sinais.test.ts` — a régua da §7 está verde.
+
+Falta a **Fase 4** (aviso ativo por e-mail/push), que é última de propósito:
+alarme que dispara errado ensina a ignorar, então ele só entra depois de as
+regras terem passado um tempo sendo observadas na tela.
 
 ---
 

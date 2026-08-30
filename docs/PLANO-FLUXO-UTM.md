@@ -124,6 +124,17 @@ dispara em cobrança por API, e depender dela é depender de algo que já falhou
 
 ## 4. Por onde começar
 
+**Os cinco passos abaixo foram feitos em 30/08** (migração 033,
+`campanhaDoUtm`/`pecaDoUtm` em `lib/campanhas.ts`, e o `?c=` continua tendo
+precedência sobre o UTM). Testado contra `teste.bruxario.com.br`: quatro
+cliques do mesmo anúncio criaram uma campanha e uma peça, o toque saiu
+classificado como `campanha` e a macro não substituída (`{{campaign.id}}`) foi
+recusada.
+
+O que **não** foi feito é a §7.3 — mandar `products` na cobrança. O formato
+exato do campo não está documentado publicamente e chutar campo de API de
+pagamento derruba checkout. Ver a nota no fim deste arquivo.
+
 Em ordem de valor, e cada passo é entregável sozinho:
 
 1. **Aceitar `utm_content` como criativo** no rastreio, com criação
@@ -262,3 +273,32 @@ substituto provar que funciona.
 - Garantir a UTMify em todas as telas do funil
 - Campanha e criativo nascendo do UTM (§3.1)
 - Esvaziar `WIVEN_SPLITS` quando a coprodução provar que funciona
+
+
+---
+
+## 8. O que ficou parado, e por quê
+
+**A §7.3 — `products` na cobrança.** Não implementado, e não por falta de
+tempo: o formato do campo não está em lugar nenhum que eu alcance. A
+documentação da Wiven responde 403 a qualquer coisa que não seja um
+navegador, e os HTMLs salvos na raiz do projeto são só a casca do SPA (o
+conteúdo é carregado por JavaScript, então o arquivo salvo não tem texto
+nenhum dentro).
+
+Chutar não é opção aqui. Campo desconhecido no corpo de uma cobrança é, no
+melhor caso, ignorado — e aí a migração inteira parece funcionar sem estar
+funcionando; no pior, a requisição é recusada e **ninguém consegue pagar**.
+
+Para destravar, basta uma destas três:
+
+1. A página da documentação do endpoint de cobrança, copiada e colada (o
+   exemplo de corpo da requisição já resolve)
+2. Um print da seção de `products` na doc deles
+3. A resposta do suporte deles à pergunta: *"como aponto uma cobrança da API
+   para um produto e uma oferta do catálogo?"*
+
+Enquanto isso, a Fase 2 está armada: `var/wiven-formato.jsonl` grava o
+formato de cada webhook que chega — nomes de campo e os valores de
+`offerCode`/`products`/`subscription`, nunca dado de cliente. **A próxima
+venda real responde as três perguntas sozinha**, sem eu precisar adivinhar.
