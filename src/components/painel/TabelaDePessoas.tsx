@@ -5,9 +5,102 @@ import type { PessoaDoPeriodo } from '@/lib/campanhas';
 import { dataHoraBr } from '@/lib/periodo';
 
 type Ordem = 'longe' | 'visitas' | 'recente';
-type Recorte = 'todos' | 'voltaram' | 'largaram' | 'email' | 'compraram';
+type Recorte = 'todos' | 'compraram' | 'tentaram' | 'largaram' | 'email' | 'voltaram';
 
 const brl = (c: number) => `R$ ${(c / 100).toFixed(2).replace('.', ',')}`;
+
+/** Comprou = o dinheiro entrou. Independe de a entrega já ter saído. */
+const comprou = (p: PessoaDoPeriodo) => p.pagoEm !== null;
+
+/**
+ * Chegou na tela de pagamento, apertou pagar, e não pagou.
+ *
+ * É o recorte mais acionável da tela e o que não existia: essa pessoa já
+ * decidiu comprar. Ela não desistiu do produto — ou o cartão recusou, ou o
+ * Pix expirou, ou algo do nosso lado falhou. Antes ela aparecia idêntica a
+ * quem fechou a aba na primeira cena.
+ */
+const tentouENaoPagou = (p: PessoaDoPeriodo) => !comprou(p) && p.tentativasPagamento > 0;
+
+/** Como o gateway chama cada bandeira, traduzido para quem lê o painel. */
+const NOME_DO_METODO: Record<string, string> = {
+  pix: 'Pix',
+  master: 'Mastercard',
+  visa: 'Visa',
+  elo: 'Elo',
+  amex: 'Amex',
+  hipercard: 'Hipercard',
+  debvisa: 'Visa débito',
+  debmaster: 'Master débito',
+  bolbradesco: 'Boleto',
+  account_money: 'Saldo MP',
+  cartao: 'Cartão',
+  fake: 'Modo teste',
+};
+
+const legivel = (m: string | null) => (m ? (NOME_DO_METODO[m] ?? m) : null);
+
+/**
+ * O ícone da situação — a coluna que se lê sem ler.
+ *
+ * Quem abre esta tela quer varrer trezentas linhas procurando padrão, não
+ * decifrar palavra por palavra. Cor e forma resolvem isso; o texto ao lado
+ * fica para quem parou numa linha específica.
+ *
+ * As quatro situações são deliberadamente distintas: comprou, tentou e não
+ * conseguiu, chegou perto, e passou batido. Juntar as duas do meio — que era
+ * o comportamento antigo — apaga a diferença entre desinteresse e falha
+ * nossa.
+ */
+function Situacao({ p }: { p: PessoaDoPeriodo }) {
+  if (comprou(p)) {
+    const metodo = legivel(p.metodoPagamento);
+    return (
+      <span className="inline-flex items-center gap-1.5 whitespace-nowrap" style={{ color: '#4ADE80' }}>
+        <span aria-hidden="true">●</span>
+        <span>
+          {p.pagouCentavos ? brl(p.pagouCentavos) : 'pagou'}
+          {metodo && <span className="opacity-60"> · {metodo}</span>}
+        </span>
+      </span>
+    );
+  }
+
+  if (tentouENaoPagou(p)) {
+    const metodo = legivel(p.metodoTentado);
+    return (
+      <span
+        className="inline-flex items-center gap-1.5 whitespace-nowrap"
+        style={{ color: '#F87171' }}
+        title={p.motivoRecusa ?? 'Apertou pagar e a cobrança não confirmou.'}
+      >
+        <span aria-hidden="true">▲</span>
+        <span>
+          tentou{metodo ? ` no ${metodo}` : ''}
+          {p.tentativasPagamento > 1 && (
+            <span className="opacity-60"> · {p.tentativasPagamento}×</span>
+          )}
+        </span>
+      </span>
+    );
+  }
+
+  if (p.cenaMaxima > 0) {
+    return (
+      <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-pergaminho/45">
+        <span aria-hidden="true">◐</span>
+        <span>parou na cena {p.cenaMaxima}</span>
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-pergaminho/25">
+      <span aria-hidden="true">○</span>
+      <span>só passou</span>
+    </span>
+  );
+}
 
 /**
  * A tabela pessoa a pessoa — o lado CRM do painel.
@@ -37,15 +130,15 @@ export function TabelaDePessoas({ pessoas }: { pessoas: PessoaDoPeriodo[] }) {
 
     if (recorte === 'voltaram') lista = lista.filter((p) => p.visitas > 1);
     if (recorte === 'largaram')
-      lista = lista.filter((p) => p.cenaMaxima > 0 && p.statusPedido === null);
+      lista = lista.filter((p) => p.cenaMaxima > 0 && !comprou(p) && p.tentativasPagamento === 0);
     if (recorte === 'email') lista = lista.filter((p) => p.email);
-    if (recorte === 'compraram')
-      lista = lista.filter((p) => p.statusPedido === 'entregue');
+    if (recorte === 'compraram') lista = lista.filter(comprou);
+    if (recorte === 'tentaram') lista = lista.filter(tentouENaoPagou);
 
     const q = busca.trim().toLowerCase();
     if (q) {
       lista = lista.filter((p) =>
-        [p.nome, p.email, p.origem, p.familiar, p.visitante]
+        [p.nome, p.email, p.origem, p.familiar, p.visitante, p.metodoPagamento, p.metodoTentado]
           .filter(Boolean)
           .some((v) => v!.toLowerCase().includes(q))
       );
@@ -60,20 +153,27 @@ export function TabelaDePessoas({ pessoas }: { pessoas: PessoaDoPeriodo[] }) {
     return copia;
   }, [pessoas, recorte, ordem, busca]);
 
-  const RECORTES: { id: Recorte; rotulo: string; n: number }[] = [
+  /*
+    A ordem é do dinheiro para longe dele: comprou, tentou e não conseguiu,
+    chegou perto, deixou contato, voltou. Quem abre esta tela está atrás de
+    uma dessas cinco coisas, e as duas primeiras são as que viram ação hoje.
+  */
+  const RECORTES: { id: Recorte; rotulo: string; n: number; cor?: string }[] = [
     { id: 'todos', rotulo: 'Todos', n: pessoas.length },
-    { id: 'voltaram', rotulo: 'Voltaram', n: pessoas.filter((p) => p.visitas > 1).length },
+    { id: 'compraram', rotulo: 'Compraram', n: pessoas.filter(comprou).length, cor: '#4ADE80' },
+    {
+      id: 'tentaram',
+      rotulo: 'Tentaram e não pagaram',
+      n: pessoas.filter(tentouENaoPagou).length,
+      cor: '#F87171',
+    },
     {
       id: 'largaram',
       rotulo: 'Largaram no meio',
-      n: pessoas.filter((p) => p.cenaMaxima > 0 && p.statusPedido === null).length,
+      n: pessoas.filter((p) => p.cenaMaxima > 0 && !comprou(p) && p.tentativasPagamento === 0).length,
     },
     { id: 'email', rotulo: 'Deixaram e-mail', n: pessoas.filter((p) => p.email).length },
-    {
-      id: 'compraram',
-      rotulo: 'Compraram',
-      n: pessoas.filter((p) => p.statusPedido === 'entregue').length,
-    },
+    { id: 'voltaram', rotulo: 'Voltaram', n: pessoas.filter((p) => p.visitas > 1).length },
   ];
 
   function baixarCsv() {
@@ -81,12 +181,15 @@ export function TabelaDePessoas({ pessoas }: { pessoas: PessoaDoPeriodo[] }) {
       'visitante', 'visitas', 'cena_maxima', 'origem', 'dispositivo',
       'primeira_vez', 'ultima_vez', 'email', 'nome', 'nascimento',
       'familiar', 'status', 'pagou_centavos',
+      'pago_em', 'metodo_pago', 'metodo_tentado', 'tentativas', 'motivo_recusa',
     ];
     const linhas = filtradas.map((p) =>
       [
         p.visitante, p.visitas, p.cenaMaxima, p.origem ?? '', p.dispositivo ?? '',
         p.primeiraVez, p.ultimaVez, p.email ?? '', p.nome ?? '', p.nascimento ?? '',
         p.familiar ?? '', p.statusPedido ?? '', p.pagouCentavos ?? '',
+        p.pagoEm ?? '', p.metodoPagamento ?? '', p.metodoTentado ?? '',
+        p.tentativasPagamento, p.motivoRecusa ?? '',
       ]
         .map((c) => `"${String(c).replace(/"/g, '""')}"`)
         .join(',')
@@ -114,6 +217,16 @@ export function TabelaDePessoas({ pessoas }: { pessoas: PessoaDoPeriodo[] }) {
                 : 'border-pergaminho/15 text-pergaminho/50 hover:text-pergaminho',
             ].join(' ')}
           >
+            {/*
+              A bolinha colorida só nos recortes que valem dinheiro, e só
+              quando há alguém neles. Pintar um zero chamaria atenção para
+              nada — que é como um painel ensina a ignorar cor.
+            */}
+            {rc.cor && rc.n > 0 && (
+              <span className="mr-1.5" style={{ color: rc.cor }} aria-hidden="true">
+                ●
+              </span>
+            )}
             {rc.rotulo} <span className="tabular-nums opacity-60">{rc.n}</span>
           </button>
         ))}
@@ -148,10 +261,18 @@ export function TabelaDePessoas({ pessoas }: { pessoas: PessoaDoPeriodo[] }) {
         <table className="w-full border-collapse font-corpo text-[11px] min-w-[58rem]">
           <thead>
             <tr className="text-pergaminho/40">
-              {['pessoa', 'visitas', 'foi até', 'origem', 'aparelho', 'e-mail', 'nome', 'nasceu', 'familiar', 'situação', 'última vez'].map(
+              {/*
+                A situação vem PRIMEIRO, e não no fim da linha.
+
+                Ela é a única coluna que responde "isso aqui deu dinheiro?", e
+                estava depois de nove outras — fora da tela sem rolar na
+                horizontal. Quem varre trezentas linhas atrás de padrão nunca
+                a via.
+              */}
+              {['situação', 'pessoa', 'visitas', 'foi até', 'origem', 'aparelho', 'e-mail', 'nome', 'nasceu', 'familiar', 'última vez'].map(
                 (c, i) => (
                   <th key={c} scope="col"
-                    className={`font-medium px-2.5 py-2 whitespace-nowrap ${i === 0 ? 'text-left' : i < 3 ? 'text-right' : 'text-left'}`}>
+                    className={`font-medium px-2.5 py-2 whitespace-nowrap ${i < 2 ? 'text-left' : i < 5 ? 'text-right' : 'text-left'}`}>
                     {c}
                   </th>
                 )
@@ -168,6 +289,9 @@ export function TabelaDePessoas({ pessoas }: { pessoas: PessoaDoPeriodo[] }) {
             )}
             {filtradas.slice(0, mostrar).map((p) => (
               <tr key={p.visitante} className="border-t border-pergaminho/8 hover:bg-pergaminho/[0.03]">
+                <td className="px-2.5 py-1.5">
+                  <Situacao p={p} />
+                </td>
                 <td className="px-2.5 py-1.5 font-mono text-[10px] text-pergaminho/35">
                   {p.visitante.slice(0, 8)}
                 </td>
@@ -187,15 +311,6 @@ export function TabelaDePessoas({ pessoas }: { pessoas: PessoaDoPeriodo[] }) {
                 <td className="px-2.5 py-1.5">{p.nome ?? '—'}</td>
                 <td className="px-2.5 py-1.5 tabular-nums">{p.nascimento ?? '—'}</td>
                 <td className="px-2.5 py-1.5">{p.familiar ?? '—'}</td>
-                <td className="px-2.5 py-1.5">
-                  {p.statusPedido === 'entregue' ? (
-                    <span className="text-vela">
-                      pagou{p.pagouCentavos ? ` ${brl(p.pagouCentavos)}` : ''}
-                    </span>
-                  ) : (
-                    p.statusPedido ?? '—'
-                  )}
-                </td>
                 <td className="px-2.5 py-1.5 text-pergaminho/45 whitespace-nowrap">
                   {dataHoraBr(p.ultimaVez)}
                 </td>

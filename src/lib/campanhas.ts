@@ -290,6 +290,35 @@ export interface PessoaDoPeriodo {
   familiar: string | null;
   statusPedido: string | null;
   pagouCentavos: number | null;
+  /**
+   * ISO do momento em que o dinheiro entrou. `null` = não pagou.
+   *
+   * Existe separado de `statusPedido` porque "comprou" e "recebeu" são
+   * perguntas diferentes: quem pagou há dois minutos está em `gerando`, e
+   * contar só `entregue` faria a venda mais recente sumir da lista de quem
+   * comprou — justamente a que alguém está procurando quando abre a tela.
+   */
+  pagoEm: string | null;
+  /**
+   * Como ela **tentou** pagar, mesmo que não tenha conseguido.
+   *
+   * ── Por que isto faltava, e por que importa ─────────────────────────────
+   *
+   * O painel só sabia mostrar o método de quem PAGOU. Quem chegou até a tela
+   * de pagamento, escolheu cartão e foi recusado aparecia igualzinho a quem
+   * fechou a aba na primeira cena — as duas como "—".
+   *
+   * São situações opostas. Uma é desinteresse; a outra é alguém que decidiu
+   * comprar e o sistema não deixou. A segunda é a mais recuperável que
+   * existe, e era invisível.
+   */
+  metodoTentado: string | null;
+  /** O método que de fato aprovou. `pix`, `master`, `visa`... */
+  metodoPagamento: string | null;
+  /** Quantas vezes ela apertou pagar. 0 = nunca chegou lá. */
+  tentativasPagamento: number;
+  /** O que o gateway respondeu ao recusar. Diz se o problema é dela ou nosso. */
+  motivoRecusa: string | null;
 }
 
 export interface RelatorioDoPeriodo {
@@ -429,6 +458,10 @@ export function relatorioDoPeriodo(
               desconto_percentual, respostas_json, bruto_centavos, taxa_centavos,
               liquido_centavos, custo_ia_centavos, origem, criado_em,
               metodo_tentado, metodo_pagamento, motivo_recusa,
+              -- pago_em responde "comprou?"; status responde "recebeu?".
+              -- Quem pagou há dois minutos ainda está gerando, e contar só
+              -- os entregues esconderia justamente a venda mais recente.
+              pago_em, tentativas_pagamento,
               -- Necessário para receitaDoPedido distinguir entrega gratuita
               -- de cobrança sem valor gravado. Sem ela, toda campanha aparece
               -- com receita zero.
@@ -456,6 +489,8 @@ export function relatorioDoPeriodo(
     metodo_tentado: string | null;
     metodo_pagamento: string | null;
     motivo_recusa: string | null;
+    pago_em: string | null;
+    tentativas_pagamento: number;
   }[];
 
   const mapaPedido = new Map(
@@ -513,6 +548,11 @@ export function relatorioDoPeriodo(
           pedido && pedido.status === 'entregue'
             ? receitaDoPedido(pedido)
             : null,
+        pagoEm: pedido?.pago_em ?? null,
+        metodoTentado: pedido?.metodo_tentado ?? null,
+        metodoPagamento: pedido?.metodo_pagamento ?? null,
+        tentativasPagamento: pedido?.tentativas_pagamento ?? 0,
+        motivoRecusa: pedido?.motivo_recusa ?? null,
       };
     })
     .sort((a, b) => b.cenaMaxima - a.cenaMaxima || b.visitas - a.visitas);

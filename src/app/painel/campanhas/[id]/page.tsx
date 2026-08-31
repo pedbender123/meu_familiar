@@ -204,7 +204,15 @@ export default async function RelatorioDaCampanha({
             aqui. O agregado responde "como foi a campanha", que é a pergunta
             do dia seguinte, não a da hora.
           */}
-          <Bloco titulo="Os vídeos desta campanha" largo>
+          <Bloco
+            titulo="Os vídeos desta campanha"
+            nota={
+              campanha.utm_campanha
+                ? 'Esta campanha nasceu sozinha do link do anúncio, e os criativos aparecem aqui pelo ID que a Meta manda — pode renomear no lápis, o vínculo não se perde. Os links abaixo são OPCIONAIS: servem para link de bio, indicação e teste interno. O anúncio não precisa deles.'
+                : 'Os links abaixo são OPCIONAIS. Anúncio no gerenciador não precisa de nenhum deles: basta o link normal com as macros de UTM, e a campanha e o criativo aparecem aqui sozinhos. Estes servem para o que a Meta não preenche — link de bio, indicação e teste interno.'
+            }
+            largo
+          >
             <Pecas
               campanhaId={campanha.id}
               linhas={desempenhoPorPeca(campanha.id)}

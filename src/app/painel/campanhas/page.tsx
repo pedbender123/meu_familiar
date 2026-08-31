@@ -4,6 +4,7 @@ import { sessaoAtual } from '@/lib/sessao-servidor';
 import { listarCampanhas, janelaDaCampanha, relatorioDoPeriodo } from '@/lib/campanhas';
 import { dataHoraBr } from '@/lib/periodo';
 import { FormularioDeCampanha } from '@/components/painel/FormularioDeCampanha';
+import { LinkDoAnuncio } from '@/components/painel/LinkDoAnuncio';
 import { brl, OURO, VERDE, VERMELHO } from '@/components/painel/GraficosPeriodo';
 
 export const metadata = { title: 'Campanhas', robots: { index: false, follow: false } };
@@ -39,14 +40,22 @@ export default async function Campanhas() {
       <div className="flex flex-wrap items-start justify-between gap-3">
 
         <p className="font-corpo font-light text-xs text-pergaminho/45 leading-relaxed max-w-[62ch]">
-          Cada campanha é uma janela de tempo. Tudo que aconteceu no site
-          naquele intervalo entra no relatório dela — inclusive tráfego que não
-          veio do anúncio, porque o site não tem como saber a diferença. Use
-          janelas apertadas e compare com um período parado para separar o que
-          foi do anúncio.
+          Campanha nova aparece aqui sozinha assim que o primeiro clique do
+          anúncio chegar — não precisa cadastrar nada antes. Cadastrar à mão
+          serve para o que a Meta não preenche: link de bio, indicação e teste
+          interno.
+          <br />
+          <span className="opacity-70">
+            Atenção ao ler os números: a campanha também é uma janela de tempo,
+            e o que não trouxe marcação nenhuma entra no relatório dela por
+            estar no mesmo intervalo. A coluna de vendas é atribuída de
+            verdade; o alcance, não.
+          </span>
         </p>
         <FormularioDeCampanha />
       </div>
+
+      <LinkDoAnuncio base={process.env.BASE_URL || 'https://bruxario.com.br'} />
 
         {comResultado.length === 0 && (
           <div className="w-full rounded-xl border px-6 py-10 text-center superficie" style={{ borderColor: 'var(--admin-borda)' }}>
@@ -77,6 +86,23 @@ export default async function Campanhas() {
                       <span className="font-corpo text-[10px] uppercase tracking-[0.14em] px-2 py-0.5 rounded-full border"
                         style={{ color: OURO, borderColor: 'rgba(217,164,65,0.4)' }}>
                         no ar
+                      </span>
+                    )}
+                    {/*
+                      Distingue a campanha que nasceu do anúncio da que alguém
+                      cadastrou. Não é enfeite: as duas se leem diferente. A
+                      de UTM tem atribuição de verdade — cada visita chegou
+                      carregando o ID dela. A cadastrada à mão é uma janela de
+                      tempo, e o alcance dela inclui quem passou pelo site sem
+                      ter vindo do anúncio.
+                    */}
+                    {c.utm_campanha && (
+                      <span
+                        className="font-corpo text-[10px] uppercase tracking-[0.14em] px-2 py-0.5 rounded-full border"
+                        style={{ color: VERDE, borderColor: 'rgba(74,222,128,0.35)' }}
+                        title={`Nasceu do anúncio. ID da Meta: ${c.utm_campanha}`}
+                      >
+                        do anúncio
                       </span>
                     )}
                     {c.plataforma && (
