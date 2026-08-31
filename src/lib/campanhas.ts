@@ -381,15 +381,60 @@ export interface RelatorioDoPeriodo {
 export function relatorioDoPeriodo(
   de: string,
   ate: string,
-  minutosPorBalde = 60
+  minutosPorBalde = 60,
+  /**
+   * Quando vem, o relatório passa a contar **só quem chegou marcado com esta
+   * campanha** — e não tudo que aconteceu no site na mesma janela de tempo.
+   *
+   * ── Por que isto precisou existir ───────────────────────────────────────
+   *
+   * A campanha nasceu como "uma janela de tempo", e naquele momento era o
+   * máximo que dava para saber. A consequência é que o relatório dela somava
+   * quem digitou o endereço, quem veio do link da bio e quem clicou no
+   * anúncio — três coisas com custo completamente diferente.
+   *
+   * Isso empurra a conversão medida para BAIXO (o denominador cresce com
+   * gente que nunca viu o anúncio) e faz o CPA parecer pior do que é. Quem
+   * decide escalar ou pausar decidia com esse número.
+   *
+   * Agora que a atribuição existe de verdade — `?c=` ou os UTMs do anúncio —
+   * dá para contar só quem é. O que não trouxe marcação nenhuma continua
+   * existindo, na Central e no recorte de tráfego direto.
+   */
+  campanhaId?: string | null
 ): RelatorioDoPeriodo {
-  const j = { de, ate };
+  const j = { de, ate, campanha: campanhaId ?? null };
+
+  /**
+   * Quem pertence a esta campanha.
+   *
+   * São duas fontes, e as duas são necessárias:
+   *
+   * - **visitas** marcadas com a campanha — o clique no anúncio
+   * - **pedidos** marcados com a campanha — porque a pessoa pode clicar hoje,
+   *   voltar amanhã digitando o endereço e só então comprar. A segunda visita
+   *   não carrega marcação nenhuma, mas o pedido carrega, herdado do cookie
+   *   de atribuição que dura um ano.
+   *
+   * Contar só pelas visitas perderia exatamente a venda mais valiosa: a de
+   * quem pensou antes de comprar.
+   */
+  const soDaCampanha = campanhaId
+    ? `AND visitante IN (
+         SELECT visitante FROM visitas
+          WHERE campanha_id = @campanha AND criado_em >= @de AND criado_em < @ate
+          UNION
+         SELECT visitante FROM pedidos
+          WHERE campanha_id = @campanha AND visitante IS NOT NULL
+            AND criado_em >= @de AND criado_em < @ate
+       )`
+    : '';
 
   const visitasLinhas = db
     .prepare(
       `SELECT visitante, count(*) n, min(criado_em) primeira, max(criado_em) ultima,
               max(origem) origem, max(dispositivo) dispositivo
-         FROM visitas WHERE criado_em >= @de AND criado_em < @ate
+         FROM visitas WHERE criado_em >= @de AND criado_em < @ate ${soDaCampanha}
         GROUP BY visitante`
     )
     .all(j) as {
@@ -405,7 +450,7 @@ export function relatorioDoPeriodo(
     .prepare(
       `SELECT visitante, max(valor) alto FROM marcos
         WHERE marco = 'cena' AND valor IS NOT NULL
-          AND criado_em >= @de AND criado_em < @ate
+          AND criado_em >= @de AND criado_em < @ate ${soDaCampanha}
         GROUP BY visitante`
     )
     .all(j) as { visitante: string; alto: number }[];
@@ -416,7 +461,8 @@ export function relatorioDoPeriodo(
       db
         .prepare(
           `SELECT DISTINCT visitante FROM marcos
-            WHERE marco = 'ritual_aberto' AND criado_em >= @de AND criado_em < @ate`
+            WHERE marco = 'ritual_aberto' AND criado_em >= @de AND criado_em < @ate
+              ${soDaCampanha}`
         )
         .all(j) as { visitante: string }[]
     ).map((r) => r.visitante)
@@ -427,7 +473,8 @@ export function relatorioDoPeriodo(
       db
         .prepare(
           `SELECT DISTINCT visitante FROM marcos
-            WHERE marco = 'plano_visto' AND criado_em >= @de AND criado_em < @ate`
+            WHERE marco = 'plano_visto' AND criado_em >= @de AND criado_em < @ate
+              ${soDaCampanha}`
         )
         .all(j) as { visitante: string }[]
     ).map((r) => r.visitante)
@@ -439,7 +486,8 @@ export function relatorioDoPeriodo(
       db
         .prepare(
           `SELECT count(DISTINCT visitante) n FROM marcos
-            WHERE marco = @marco AND criado_em >= @de AND criado_em < @ate`
+            WHERE marco = @marco AND criado_em >= @de AND criado_em < @ate
+              ${soDaCampanha}`
         )
         .get({ ...j, marco }) as { n: number }
     ).n;
@@ -447,7 +495,7 @@ export function relatorioDoPeriodo(
   const rascunhos = db
     .prepare(
       `SELECT visitante, email, cena FROM rascunhos
-        WHERE criado_em >= @de AND criado_em < @ate`
+        WHERE criado_em >= @de AND criado_em < @ate ${soDaCampanha}`
     )
     .all(j) as { visitante: string; email: string; cena: number }[];
   const mapaRascunho = new Map(rascunhos.map((r) => [r.visitante, r]));
@@ -467,7 +515,8 @@ export function relatorioDoPeriodo(
               -- com receita zero.
               pagamento_id
          FROM pedidos
-        WHERE exemplo = 0 AND criado_em >= @de AND criado_em < @ate`
+        WHERE exemplo = 0 AND criado_em >= @de AND criado_em < @ate
+          ${campanhaId ? 'AND campanha_id = @campanha' : ''}`
     )
     .all(j) as {
     id: string;
@@ -588,7 +637,7 @@ export function relatorioDoPeriodo(
     .prepare(
       `SELECT valor, count(DISTINCT visitante) n FROM marcos
         WHERE marco = 'cena' AND valor IS NOT NULL
-          AND criado_em >= @de AND criado_em < @ate
+          AND criado_em >= @de AND criado_em < @ate ${soDaCampanha}
         GROUP BY valor ORDER BY valor`
     )
     .all(j) as { valor: number; n: number }[];

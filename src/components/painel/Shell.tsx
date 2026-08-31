@@ -45,6 +45,7 @@ export function Shell({
   areas,
   email,
   somenteLeitura = false,
+  visao = 'admin',
   children,
 }: {
   areas: Area[];
@@ -58,6 +59,8 @@ export function Shell({
    * defeito.
    */
   somenteLeitura?: boolean;
+  /** O recorte da tela. Ver `lib/visao-do-painel.ts`. */
+  visao?: 'admin' | 'vendedor';
   children: React.ReactNode;
 }) {
   const caminho = usePathname();
@@ -115,9 +118,44 @@ export function Shell({
             recolhida={recolhida}
           />
           {!recolhida && (
-            <p className="font-corpo text-[10px] text-pergaminho/35 px-3 pt-2 truncate">
-              {email}
-            </p>
+            <>
+              {/*
+                O alternador de visão.
+
+                Fica junto do e-mail, no rodapé da barra, e não no topo: ele é
+                usado uma vez por sessão — quando alguém senta para olhar de
+                outro lugar — e um controle de troca de contexto no topo
+                competiria com a navegação que se usa o tempo todo.
+
+                É um link, não um botão: ele grava o cookie e recarrega a
+                página no mesmo passo, e o menu já chega filtrado do servidor.
+              */}
+              <a
+                /*
+                  Volta para onde a pessoa já estava — a não ser que a tela
+                  atual deixe de existir na visão nova, e aí a rota decide um
+                  destino que existe. Jogar todo mundo na Central a cada troca
+                  faria perder o lugar sem motivo.
+                */
+                href={`/painel/visao?para=${visao === 'vendedor' ? 'admin' : 'vendedor'}&voltar=${encodeURIComponent(caminho)}`}
+                className="mx-3 mt-2 font-corpo text-[10px] px-2 py-1.5 rounded-lg border text-center no-underline transition block"
+                style={{
+                  borderColor:
+                    visao === 'vendedor' ? 'rgba(217,164,65,0.45)' : 'var(--admin-borda)',
+                  color: visao === 'vendedor' ? 'var(--vela)' : undefined,
+                }}
+                title={
+                  visao === 'vendedor'
+                    ? 'Você está vendo o painel enxuto. Clique para ver tudo.'
+                    : 'Ver só o que interessa a quem compra a mídia.'
+                }
+              >
+                {visao === 'vendedor' ? 'vendo como vendedor ✓' : 'ver como vendedor'}
+              </a>
+              <p className="font-corpo text-[10px] text-pergaminho/35 px-3 pt-2 truncate">
+                {email}
+              </p>
+            </>
           )}
         </div>
       </aside>

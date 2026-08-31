@@ -4,6 +4,7 @@ import { contatosAbertos, comentariosPendentes } from '@/lib/db';
 import { Shell, type Area } from '@/components/painel/Shell';
 import { listarEnvios } from '@/lib/remarketing';
 import { resumoDaSaude } from '@/nucleo/saude/sinais';
+import { areaVisivel, visaoAtual } from '@/lib/visao-do-painel';
 
 export const dynamic = 'force-dynamic';
 
@@ -58,6 +59,14 @@ export default async function LayoutDoPainel({
   */
   const sinaisRuins = await resumoDaSaude();
 
+  /*
+    O recorte da tela. Não é permissão — quem pode o quê continua vindo de
+    `podeEditarPainel`. É o reconhecimento de que o painel de quem cuida do
+    produto e o de quem compra a mídia são telas diferentes, e misturá-las faz
+    as duas piorarem.
+  */
+  const visao = await visaoAtual();
+
   const areas: Area[] = [
     { href: '/painel/central', rotulo: 'Central', icone: 'grafico' },
     { href: '/painel/saude', rotulo: 'Saúde', icone: 'pulso', alerta: sinaisRuins },
@@ -86,6 +95,8 @@ export default async function LayoutDoPainel({
       : []),
   ];
 
+  const areasVisiveis = areas.filter((a) => areaVisivel(a.href, visao));
+
   return (
     /*
       `suppressHydrationWarning` porque o script abaixo TROCA `data-tema` antes
@@ -96,7 +107,7 @@ export default async function LayoutDoPainel({
     */
     <div className="admin" data-tema="escuro" suppressHydrationWarning>
       <script dangerouslySetInnerHTML={{ __html: SCRIPT_DO_TEMA }} />
-      <Shell areas={areas} email={sessao.email} somenteLeitura={!dono}>
+      <Shell areas={areasVisiveis} email={sessao.email} somenteLeitura={!dono} visao={visao}>
         {children}
       </Shell>
     </div>

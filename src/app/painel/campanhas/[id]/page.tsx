@@ -101,7 +101,13 @@ export default async function RelatorioDaCampanha({
 
   const janela = janelaDaCampanha(campanha);
   const gran = granularidade({ ...janela, rotulo: '' });
-  const r = relatorioDoPeriodo(janela.de, janela.ate, gran.minutos);
+  /*
+    O quarto argumento é o que separa "o que aconteceu no site nesta janela"
+    de "o que esta campanha trouxe". Sem ele, o relatório somava quem digitou
+    o endereço e quem veio da bio ao tráfego do anúncio — três coisas com
+    custo diferente — e a conversão medida saía mais baixa do que a real.
+  */
+  const r = relatorioDoPeriodo(janela.de, janela.ate, gran.minutos, campanha.id);
 
   const investido = campanha.investido_centavos;
   const lucro = r.liquidoCentavos - r.custoIaCentavos - investido;
@@ -166,6 +172,37 @@ export default async function RelatorioDaCampanha({
             </Link>
           </div>
         </header>
+
+        {/*
+          Zero aqui quase nunca quer dizer "ninguém veio" — quer dizer "veio
+          e chegou sem marcação".
+
+          Esta faixa existe porque a mudança para atribuição real tem um efeito
+          colateral honesto e assustador: campanha cujo link nunca carregou os
+          UTMs nem o ?c= passou a mostrar zero, e antes mostrava o movimento
+          inteiro do site naquela janela. Sem esta explicação, alguém abre a
+          tela, vê zero e conclui que o painel quebrou — quando o que quebrou
+          foi o link do anúncio, semanas atrás.
+        */}
+        {r.visitantes === 0 && (
+          <section
+            className="w-full rounded-xl border px-5 py-4 flex flex-col gap-2"
+            style={{ borderColor: 'rgba(250,204,21,0.4)' }}
+          >
+            <span className="font-corpo text-sm" style={{ color: '#FACC15' }}>
+              Nenhum acesso marcado com esta campanha
+            </span>
+            <p className="font-corpo font-light text-[11.5px] leading-relaxed text-pergaminho/50 max-w-[78ch]">
+              O relatório conta só quem chegou carregando a identificação desta
+              campanha. Quem entrou sem marcação nenhuma existe e está contado —
+              só que na Central, como tráfego direto, porque não há como saber
+              de onde veio.
+              {campanha.utm_campanha
+                ? ' Esta campanha veio do anúncio, então isto costuma significar que ele ainda não entregou no período escolhido.'
+                : ' Para o tráfego cair aqui, o anúncio precisa usar o link com as macros de UTM (está no topo da lista de campanhas), ou o link curto desta campanha.'}
+            </p>
+          </section>
+        )}
 
         {/* ── o veredicto ── */}
         <div className="w-full grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">

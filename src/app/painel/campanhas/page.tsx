@@ -30,7 +30,7 @@ export default async function Campanhas() {
   const campanhas = listarCampanhas();
   const comResultado = campanhas.map((c) => {
     const j = janelaDaCampanha(c);
-    const r = relatorioDoPeriodo(j.de, j.ate, 1440);
+    const r = relatorioDoPeriodo(j.de, j.ate, 1440, c.id);
     const lucro = r.liquidoCentavos - r.custoIaCentavos - c.investido_centavos;
     return { campanha: c, r, lucro, noAr: !c.fim };
   });
@@ -46,10 +46,10 @@ export default async function Campanhas() {
           interno.
           <br />
           <span className="opacity-70">
-            Atenção ao ler os números: a campanha também é uma janela de tempo,
-            e o que não trouxe marcação nenhuma entra no relatório dela por
-            estar no mesmo intervalo. A coluna de vendas é atribuída de
-            verdade; o alcance, não.
+            Os números de cada campanha contam só quem chegou marcado com ela —
+            pelas macros de UTM do anúncio ou pelo link curto. Quem entrou sem
+            marcação aparece na Central, como tráfego direto. Campanha zerada
+            quase sempre quer dizer link sem marcação, não ausência de gente.
           </span>
         </p>
         <FormularioDeCampanha />
