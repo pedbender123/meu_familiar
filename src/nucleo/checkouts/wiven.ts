@@ -893,6 +893,31 @@ export interface CorpoWebhookWiven {
   event?: string;
   /** O que prova que a notificação é dela. Viaja no CORPO, não em header. */
   token?: string;
+  /**
+   * Código da oferta — e a documentação é explícita: **"vendas via checkout
+   * interno"**, anulável.
+   *
+   * Ou seja: ele é propriedade da SESSÃO de checkout hospedado deles, não da
+   * transação. Cobrança criada pela API não abre sessão nenhuma, então este
+   * campo vem nulo por definição — não por bug nosso, e não por falta de
+   * mandar `products` no corpo.
+   *
+   * Isso decide a §7.3 do `PLANO-FLUXO-UTM.md`: se a integração nativa
+   * Wiven↔UTMify escuta venda de oferta, ela não vai disparar enquanto a
+   * cobrança for por API. **Quem avisa a UTMify continua sendo o nosso
+   * código.**
+   */
+  offerCode?: string | null;
+  /**
+   * A URL do checkout que o cliente acessou, com sessão, oferta, afiliação e
+   * UTMs. **"Vazia quando não há sessão de checkout associada"** — de novo, o
+   * caso da cobrança por API.
+   *
+   * Fica registrado porque é a única via pela qual os UTMs voltariam para nós
+   * pelo lado deles. Como ela vem vazia aqui, os UTMs continuam sendo
+   * responsabilidade nossa, guardados em `utm_json` no pedido.
+   */
+  checkoutUrl?: string | null;
   client?: { name?: string; email?: string; cpf?: string };
   transaction?: {
     id?: string;

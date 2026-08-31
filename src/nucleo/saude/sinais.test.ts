@@ -1,5 +1,6 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { julgar, haQuanto, type Leitura, SEM_RASTREIO_PCT, TAXA_IMPLAUSIVEL_PCT } from './sinais';
 import { quantosRuins, piorEstado, type GrupoDeSinais, type Sinal } from './tipos';
 
@@ -317,5 +318,44 @@ describe('haQuanto', () => {
     assert.equal(haQuanto(300_000), 'há 5 min');
     assert.equal(haQuanto(3 * 3600_000), 'há 3 h');
     assert.equal(haQuanto(3 * 24 * 3600_000), 'há 3 dias');
+  });
+});
+
+/**
+ * ── O diário do formato, e o nível em que ele procura ─────────────────────
+ *
+ * A documentação do webhook da Wiven põe `offerCode` e `checkoutUrl` no TOPO
+ * do corpo, irmãos de `event` e `token` — não dentro de `transaction`, que é
+ * onde ficam id, status e os valores.
+ *
+ * Procurar só na transação faria o diário registrar "não veio offerCode" para
+ * sempre. E essa resposta errada é pior que resposta nenhuma: ela encerraria
+ * a investigação da Fase 2 com uma conclusão falsa, e a decisão de migrar (ou
+ * não) para produtos sairia dela.
+ */
+describe('o diário do formato do webhook', () => {
+  const fonte = readFileSync('src/app/api/webhook/wiven/route.ts', 'utf8');
+
+  test('procura nos dois níveis do corpo, não só na transação', () => {
+    assert.match(fonte, /const topo = corpo as unknown as Record<string, unknown>/);
+    assert.match(fonte, /const achar = \(k: string\) => t\[k\] \?\? topo\[k\]/);
+  });
+
+  test('offerCode e checkoutUrl estão na lista do que se procura', () => {
+    const lista = fonte.slice(fonte.indexOf('const interessantes'), fonte.indexOf('const achar'));
+    assert.match(lista, /'offerCode'/);
+    assert.match(lista, /'checkoutUrl'/);
+  });
+
+  /** Arquivo de diagnóstico vira backup, e backup sai da máquina. */
+  test('não grava dado de cliente', () => {
+    const bloco = fonte.slice(fonte.indexOf('function anotarFormato'), fonte.indexOf('export async function POST'));
+    for (const proibido of ['client', 'email', 'cpf', 'name', 'phone']) {
+      assert.doesNotMatch(
+        bloco,
+        new RegExp(`\\b${proibido}\\b\\s*:`),
+        `o diário não pode gravar ${proibido}`
+      );
+    }
   });
 });

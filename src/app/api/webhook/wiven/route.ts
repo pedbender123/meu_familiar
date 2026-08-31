@@ -151,7 +151,28 @@ const ARQUIVO_FORMATO = 'var/wiven-formato.jsonl';
 function anotarFormato(corpo: CorpoWebhookWiven): void {
   try {
     const t = (corpo.transaction ?? {}) as Record<string, unknown>;
-    const interessantes = ['offerCode', 'products', 'product', 'offer', 'subscription', 'splits'];
+    const topo = corpo as unknown as Record<string, unknown>;
+
+    /*
+      Procura NOS DOIS NÍVEIS, e isso não é excesso de zelo.
+
+      A documentação do webhook põe `offerCode` e `checkoutUrl` no TOPO do
+      corpo, irmãos de `event` e `token` — não dentro de `transaction`, que é
+      onde ficam id, status e os valores. Olhar só a transação faria o diário
+      registrar "não veio offerCode" para sempre, e essa resposta errada é
+      pior que resposta nenhuma: ela encerraria a investigação da Fase 2 com
+      uma conclusão falsa.
+    */
+    const interessantes = [
+      'offerCode',
+      'checkoutUrl',
+      'products',
+      'product',
+      'offer',
+      'subscription',
+      'splits',
+    ];
+    const achar = (k: string) => t[k] ?? topo[k];
 
     appendFileSync(
       ARQUIVO_FORMATO,
@@ -161,8 +182,8 @@ function anotarFormato(corpo: CorpoWebhookWiven): void {
         // A pergunta 1: se um destes vier preenchido, a Fase 1 tem contrato.
         achados: Object.fromEntries(
           interessantes
-            .filter((k) => t[k] !== undefined && t[k] !== null)
-            .map((k) => [k, t[k]])
+            .filter((k) => achar(k) !== undefined && achar(k) !== null)
+            .map((k) => [k, achar(k)])
         ),
         // O mapa do corpo, para ver campo novo aparecer sem precisar de sorte.
         camposDoTopo: Object.keys(corpo),
