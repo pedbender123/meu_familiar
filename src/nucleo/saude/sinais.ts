@@ -62,6 +62,14 @@ export interface Leitura {
   travadosGerando: number;
   /** Quando a última venda foi confirmada. `null` = nunca houve. */
   ultimoPagamentoEm: number | null;
+  /**
+   * Vendas pagas nas últimas 24 h que a UTMify NÃO aceitou — ou que nem
+   * chegaram a ser tentadas.
+   *
+   * É o sinal que sustenta a frase dita à agência: "a Wiven avisa a nós, e
+   * nós avisamos a UTMify". Sem ele, essa frase é fé.
+   */
+  vendasNaoRelatadas: { id: string; erro: string | null }[];
   taxasImplausiveis: { id: string; pct: number }[];
   splitsQueNaoFecham: string[];
   env: {
@@ -155,6 +163,14 @@ export async function colher(agora = Date.now()): Promise<Leitura> {
     )
     .all(desde) as { id: string }[];
 
+  const naoRelatadas = db
+    .prepare(
+      `SELECT id, utmify_erro FROM pedidos
+        WHERE ${real} AND pago_em > ?
+          AND (utmify_erro IS NOT NULL OR utmify_em IS NULL)`
+    )
+    .all(desde) as { id: string; utmify_erro: string | null }[];
+
   const ultimo = db
     .prepare(`SELECT MAX(pago_em) AS q FROM pedidos WHERE ${real} AND pago_em IS NOT NULL`)
     .get() as { q: string | null };
@@ -195,6 +211,7 @@ export async function colher(agora = Date.now()): Promise<Leitura> {
       limiteGeracao
     ),
     ultimoPagamentoEm: ultimo.q ? Date.parse(ultimo.q) : null,
+    vendasNaoRelatadas: naoRelatadas.map((v) => ({ id: v.id, erro: v.utmify_erro })),
     taxasImplausiveis: taxas.map((t) => ({
       id: t.id,
       pct: Math.round((t.taxa_centavos / t.bruto_centavos) * 100),
@@ -454,7 +471,40 @@ function rastreio(l: Leitura): GrupoDeSinais {
 }
 
 function relatorio(l: Leitura): GrupoDeSinais {
+  /*
+    O sinal que sustenta a frase dita à agência.
+
+    A arquitetura é: a Wiven avisa a NÓS (ela não avisa a UTMify em cobrança
+    por API — o `offerCode` dela é do checkout hospedado deles), e o nosso
+    código repassa. Isso funciona, e põe o relatório inteiro da campanha
+    dependendo deste envio.
+
+    Antes desta linha, "a UTMify está recebendo" era uma afirmação que só se
+    conferia abrindo o log e sabendo o que procurar. Foi assim que a venda de
+    27/08 passou uma noite parecendo reportada.
+  */
+  const relato: Sinal =
+    l.pagos24h === 0
+      ? { nome: 'UTMify recebeu', estado: 'desconhecido', valor: 'sem venda em 24 h' }
+      : l.vendasNaoRelatadas.length === 0
+        ? {
+            nome: 'UTMify recebeu',
+            estado: 'ok',
+            valor: `${l.pagos24h} de ${l.pagos24h} vendas aceitas`,
+          }
+        : {
+            nome: 'UTMify recebeu',
+            estado: 'quebrado',
+            valor: `${l.vendasNaoRelatadas.length} de ${l.pagos24h} não chegaram — ${l.vendasNaoRelatadas
+              .slice(0, 3)
+              .map((v) => `${v.id.slice(0, 8)}${v.erro ? ` (${v.erro.slice(0, 40)})` : ' (nem tentou)'}`)
+              .join(', ')}`,
+            oQueFazer:
+              'A agência está vendo menos venda do que houve. Confira UTMIFY_API_TOKEN e o pm2 logs; para reenviar, corrija a causa antes — cada reenvio gera um Purchase novo se o pixel da Meta estiver ligado.',
+          };
+
   const sinais: Sinal[] = [
+    relato,
     l.env.utmifyToken
       ? { nome: 'Token da UTMify', estado: 'ok', valor: 'preenchido' }
       : {

@@ -22,6 +22,7 @@ function saudavel(): Leitura {
     entregasAtrasadas: 0,
     travadosGerando: 0,
     ultimoPagamentoEm: AGORA - 600_000,
+    vendasNaoRelatadas: [],
     taxasImplausiveis: [],
     splitsQueNaoFecham: [],
     env: {
@@ -278,6 +279,7 @@ describe('todo sinal ruim diz o que fazer', () => {
       pagosSemUtm24h: 3,
       entregasAtrasadas: 4,
       travadosGerando: 2,
+      vendasNaoRelatadas: [{ id: 'ped_z', erro: 'timeout' }],
       taxasImplausiveis: [{ id: 'ped_x', pct: 66 }],
       splitsQueNaoFecham: ['ped_y'],
       env: {
@@ -309,6 +311,59 @@ describe('todo sinal ruim diz o que fazer', () => {
     const sinal = achar(julgar(l), 'Token da UTMify');
     assert.equal(sinal.estado, 'quebrado');
     assert.ok(sinal.oQueFazer!.length > 30, 'conselho curto demais para ser acionável');
+  });
+});
+
+/**
+ * A arquitetura contada à agência é: a Wiven avisa a NÓS, e o nosso código
+ * avisa a UTMify. Isso é verdade e funciona — e transfere para cá o
+ * relatório inteiro da campanha deles. Este grupo de testes é o que impede
+ * essa frase de virar fé.
+ */
+describe('a UTMify recebendo', () => {
+  test('todas aceitas: verde', () => {
+    const sinal = achar(julgar(saudavel()), 'UTMify recebeu');
+    assert.equal(sinal.estado, 'ok');
+    assert.match(sinal.valor!, /4 de 4/);
+  });
+
+  test('uma venda não chegou: vermelho, com o pedido nomeado', () => {
+    const l = saudavel();
+    l.vendasNaoRelatadas = [{ id: 'abcdef1234', erro: 'timeout' }];
+
+    const sinal = achar(julgar(l), 'UTMify recebeu');
+    assert.equal(sinal.estado, 'quebrado');
+    assert.match(sinal.valor!, /abcdef12/);
+    assert.match(sinal.valor!, /timeout/);
+  });
+
+  /**
+   * `utmify_em` nulo e sem erro quer dizer que o envio nem foi tentado — o
+   * caso mais silencioso, e o que mais se parece com "está tudo bem".
+   */
+  test('venda que nem foi tentada também acende', () => {
+    const l = saudavel();
+    l.vendasNaoRelatadas = [{ id: 'abcdef1234', erro: null }];
+
+    const sinal = achar(julgar(l), 'UTMify recebeu');
+    assert.equal(sinal.estado, 'quebrado');
+    assert.match(sinal.valor!, /nem tentou/);
+  });
+
+  /**
+   * E o aviso que evita piorar a situação: reenviar não é de graça enquanto
+   * houver pixel da Meta ligado — foi assim que 5 vendas viraram 17.
+   */
+  test('o conselho avisa do custo de reenviar', () => {
+    const l = saudavel();
+    l.vendasNaoRelatadas = [{ id: 'abcdef1234', erro: 'timeout' }];
+    assert.match(achar(julgar(l), 'UTMify recebeu').oQueFazer!, /reenvio|reenviar/i);
+  });
+
+  test('sem venda no período é desconhecido, não vermelho', () => {
+    const l = saudavel();
+    l.pagos24h = 0;
+    assert.equal(achar(julgar(l), 'UTMify recebeu').estado, 'desconhecido');
   });
 });
 

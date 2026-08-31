@@ -218,7 +218,7 @@ export async function reportarVenda(
       (extras.taxaCentavos ?? pedido.taxa_centavos ?? 0) +
       (pedido.split_do_dono_centavos ?? 0);
 
-    await reportarPedido({
+    const aceito = await reportarPedido({
       plataforma: plataformaDe(pedido.gateway),
       retiradoCentavos,
       orderId: pedido.id,
@@ -239,7 +239,42 @@ export async function reportarVenda(
       taxaCentavos: extras.taxaCentavos ?? pedido.taxa_centavos ?? 0,
       rastreio,
     });
+
+    anotarEnvio(pedido.id, aceito ? null : `${status} recusado ou sem resposta`);
   } catch (erro) {
     console.error('[utmify] reportar venda falhou:', erro);
+    anotarEnvio(pedido.id, String(erro).slice(0, 200));
+  }
+}
+
+/**
+ * Grava o resultado do envio no próprio pedido.
+ *
+ * ── Por que isto não podia ficar só no log ────────────────────────────────
+ *
+ * A arquitetura escolhida é: a Wiven avisa a NÓS, e nós avisamos a UTMify.
+ * Isso é verdade e funciona — mas põe o relatório inteiro da agência
+ * dependendo deste envio dar certo. Enquanto o resultado morria no
+ * `console`, "a UTMify está recebendo" era uma afirmação que ninguém
+ * conseguia conferir sem abrir log e saber o que procurar.
+ *
+ * Com isto gravado, a tela de Saúde responde sozinha, e a resposta sobrevive
+ * ao log rotacionar.
+ *
+ * ── Por que ela nunca deixa exceção subir ─────────────────────────────────
+ *
+ * Roda dentro do webhook do gateway, no mesmo caminho que ENTREGA o produto.
+ * Falhar ao anotar um diagnóstico não pode custar a entrega de quem pagou.
+ */
+function anotarEnvio(pedidoId: string, erro: string | null): void {
+  try {
+    db.prepare(
+      `UPDATE pedidos
+          SET utmify_em = CASE WHEN @erro IS NULL THEN @agora ELSE utmify_em END,
+              utmify_erro = @erro
+        WHERE id = @id`
+    ).run({ id: pedidoId, agora: new Date().toISOString(), erro });
+  } catch (e) {
+    console.error('[utmify] não consegui anotar o envio:', e);
   }
 }
