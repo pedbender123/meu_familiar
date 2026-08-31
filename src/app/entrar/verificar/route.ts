@@ -7,6 +7,7 @@ import {
   COOKIE_DA_SESSAO,
 } from '@/lib/autenticacao';
 import { registrarEvento } from '@/lib/db';
+import { destinoAbsoluto } from '@/lib/destino-absoluto';
 
 /**
  * Troca o link mágico por uma sessão.
@@ -15,18 +16,6 @@ import { registrarEvento } from '@/lib/db';
  * ser renderizado em HTML, e a resposta já sai como um redirecionamento com o
  * cookie posto. O token some da barra de endereço no mesmo passo.
  */
-/**
- * Monta o destino a partir de `BASE_URL`, **não de `req.url`**.
- *
- * Atrás do nginx, `req.url` é o endereço interno (`http://localhost:3000`).
- * Redirecionar a partir dele mandava a pessoa para um host que não existe no
- * navegador dela — ou seja, **todo login quebrava em produção** enquanto
- * funcionava perfeitamente em desenvolvimento. Pego em teste no ar.
- */
-function destinoAbsoluto(caminho: string, req: NextRequest): URL {
-  const base = process.env.BASE_URL?.trim();
-  return new URL(caminho, base || req.url);
-}
 
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get('t') ?? '';

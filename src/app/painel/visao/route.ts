@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sessaoAtual } from '@/lib/sessao-servidor';
 import { COOKIE_DA_VISAO, areaVisivel, ehVisao } from '@/lib/visao-do-painel';
+import { destinoAbsoluto } from '@/lib/destino-absoluto';
 
 /**
  * Troca o recorte do painel e volta para onde a pessoa estava.
@@ -21,7 +22,7 @@ import { COOKIE_DA_VISAO, areaVisivel, ehVisao } from '@/lib/visao-do-painel';
 export async function GET(req: NextRequest) {
   const sessao = await sessaoAtual();
   if (!sessao || sessao.tipo !== 'admin') {
-    return NextResponse.redirect(new URL('/painel/entrar', req.url));
+    return NextResponse.redirect(destinoAbsoluto('/painel/entrar', req));
   }
 
   const para = req.nextUrl.searchParams.get('para');
@@ -45,7 +46,7 @@ export async function GET(req: NextRequest) {
   const destino =
     interno && ehVisao(para) && areaVisivel(voltar!, para) ? voltar! : '/painel/central';
 
-  const resposta = NextResponse.redirect(new URL(destino, req.url));
+  const resposta = NextResponse.redirect(destinoAbsoluto(destino, req));
   if (ehVisao(para)) {
     resposta.cookies.set(COOKIE_DA_VISAO, para, {
       httpOnly: true,
