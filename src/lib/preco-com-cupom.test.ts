@@ -2,21 +2,26 @@ import test, { describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import db from './db';
 import { precoComDesconto } from './cupons';
-import { produtoVigente, precoVigenteCentavos } from './modelo-de-venda';
+import {
+  produtoVigente,
+  precoVigenteCentavos,
+  riscadoDe,
+  PRECO_RISCADO_CENTAVOS,
+} from './modelo-de-venda';
 
 /**
- * O que o cliente paga DEPOIS do cupom de lançamento.
+ * O que entra no caixa — e a separação que faz isso ser simples de conferir.
  *
  * ── O erro que isto trava ─────────────────────────────────────────────────
  *
- * O `LANCAMENTO20` é aplicado automaticamente a todo pedido. Durante 12 horas
- * o preço cheio da Revelação foi R$ 9,80 — o valor que o anúncio promete —, e
+ * Houve um tempo em que o `LANCAMENTO20` era aplicado automaticamente a todo
+ * pedido, e o número no código era um "cheio" do qual ele descia. Durante 12
+ * horas o cheio da Revelação foi R$ 9,80 — o valor que o anúncio promete — e
  * o cupom cobrou **R$ 7,84**. O desconto comeu a margem em vez de servir de
- * argumento de venda.
+ * argumento.
  *
- * O preço cheio precisa ABSORVER o cupom. O que estes testes garantem não é
- * qual é o preço cheio, e sim **quanto entra no caixa** — que é o número que
- * o dono confere no extrato.
+ * Hoje o número no código É o preço. O riscado é decoração, mora à parte, e
+ * não participa de conta nenhuma. Mudar preço é trocar um número.
  */
 
 const DESCONTO_DE_LANCAMENTO = 20;
@@ -26,42 +31,48 @@ beforeEach(() => {
 });
 
 describe('o valor que o cliente paga', () => {
-  test('Simples sai a R$ 18,90 com o cupom aplicado', () => {
-    const preco = precoComDesconto(produtoVigente('revelacao'), DESCONTO_DE_LANCAMENTO);
-    assert.equal(preco.finalCentavos, 1890, 'é o preço anunciado; não pode sair diferente');
+  /**
+   * ── O que mudou, e por que ────────────────────────────────────────────────
+   *
+   * Estes preços já foram "cheios" dos quais um cupom de 20% descia até o
+   * valor real: o código dizia 1225 para o cliente pagar 9,80. Mudar preço
+   * virava conta reversa com arredondamento para cima, e errá-la cobrava um
+   * centavo a mais ou comia a margem — aconteceu, por doze horas, com uma
+   * venda anunciada a 9,80 saindo por 7,84.
+   *
+   * Agora o número no código É o preço. O riscado da vitrine é decoração e
+   * vive separado, em `PRECO_RISCADO_CENTAVOS`.
+   */
+  test('Simples custa R$ 18,90, sem conta por cima', () => {
+    assert.equal(precoVigenteCentavos('revelacao'), 1890);
+    assert.equal(precoComDesconto(produtoVigente('revelacao'), 0).finalCentavos, 1890);
   });
 
-  test('Completa sai a R$ 24,90 com o cupom aplicado', () => {
-    const preco = precoComDesconto(produtoVigente('completa'), DESCONTO_DE_LANCAMENTO);
-    assert.equal(preco.finalCentavos, 2490);
-  });
-
-  /** Sem cupom, o cheio é o cheio — e é ele que apareceria riscado na tela. */
-  test('sem cupom, cobra o cheio', () => {
-    assert.equal(precoVigenteCentavos('revelacao'), 2362);
-    assert.equal(precoVigenteCentavos('completa'), 3112);
+  test('Completa custa R$ 24,90', () => {
+    assert.equal(precoVigenteCentavos('completa'), 2490);
+    assert.equal(precoComDesconto(produtoVigente('completa'), 0).finalCentavos, 2490);
   });
 
   /**
-   * `precoComDesconto` arredonda para CIMA. 2363 × 0,8 = 1890,4 vira 1891 —
-   * um centavo a mais do que o anunciado. É a diferença entre um cheio
-   * escolhido no olho e um calculado.
-   *
-   * O que este teste trava de verdade é o PREÇO FINAL. O cheio é consequência
-   * dele, e recalculá-lo é o passo que se esquece quando alguém sobe preço com
-   * pressa — foi assim que a venda anunciada a R$ 9,80 saiu por R$ 7,84 uma
-   * vez, por doze horas.
+   * O riscado não pode encostar no que se cobra. Se um dia ele virar base de
+   * cálculo, o cliente passa a pagar o número de vitrine.
    */
-  test('o arredondamento é para cima, e os cheios foram escolhidos por isso', () => {
-    assert.equal(Math.ceil(2362 * 0.8), 1890);
-    assert.equal(Math.ceil(3112 * 0.8), 2490);
-    assert.equal(Math.ceil(2363 * 0.8), 1891, 'o valor ingênuo erraria por um centavo');
-    assert.equal(Math.ceil(3113 * 0.8), 2491, 'idem na Completa');
+  test('o riscado é decoração e é maior que o preço', () => {
+    assert.equal(riscadoDe('revelacao'), 2990);
+    assert.equal(riscadoDe('completa'), 3990);
+    assert.ok(riscadoDe('revelacao')! > precoVigenteCentavos('revelacao'));
+    assert.ok(riscadoDe('completa')! > precoVigenteCentavos('completa'));
   });
 
-  /** Tirar o cupom é o caminho de subir preço sem assustar. */
-  test('desligar o cupom sobe para o cheio, sem mexer em código', () => {
-    const semCupom = precoComDesconto(produtoVigente('revelacao'), 0);
-    assert.equal(semCupom.finalCentavos, 2362);
+  /** Riscado menor ou igual ao preço é erro de digitação, não promoção. */
+  test('riscado que não é maior que o preço não aparece', () => {
+    assert.equal(PRECO_RISCADO_CENTAVOS.revelacao! > 1890, true);
+  });
+
+  /** Cupom de verdade continua funcionando — para remarketing e resgate. */
+  test('cupom manual ainda desconta', () => {
+    const com45 = precoComDesconto(produtoVigente('completa'), 45);
+    assert.equal(com45.finalCentavos, Math.ceil(2490 * 0.55));
   });
 });
+

@@ -57,39 +57,57 @@ export function modeloNovoLigado(): boolean {
  * arrastaria o `better-sqlite3` para o pacote do navegador.
  */
 const PRECOS_DO_MODELO_ANTIGO: Partial<Record<ProdutoId, number>> = {
-  /**
-   * **Preço CHEIO, antes do cupom de lançamento.**
-   *
-   * O `LANCAMENTO20` é aplicado sozinho a todo pedido (ver
-   * `CUPOM_DE_LANCAMENTO`), então o número aqui não é o que entra no caixa —
-   * é o que entra menos 20%. Ficou 12 horas com 980 aqui, e o resultado foi
-   * cobrar R$ 7,84 por uma venda anunciada a R$ 9,80: o desconto comeu a
-   * margem em vez de servir de argumento.
-   *
-   * Agora o cheio absorve o cupom:
-   *
-   *     Simples     23,62 − 20%  =  18,90
-   *     Completa    31,12 − 20%  =  24,90
-   *
-   * **`precoComDesconto` arredonda para CIMA** (`Math.ceil`), não para o mais
-   * próximo. Por isso a Simples é 2362 e não 2363: 2363 × 0,8 = 1890,4, que o
-   * `ceil` empurra para 1891 e faz o cliente pagar um centavo a mais do que o
-   * anunciado. Com 2362 dá 1889,6 → 1890, exato. Mesma conta na Completa:
-   * 3112 × 0,8 = 2489,6 → 2490; 3113 daria 2491.
-   *
-   * Mexer num destes números sem refazer a conta muda o que o cliente paga —
-   * o teste ao lado trava os dois resultados, não os dois preços cheios.
-   */
-  revelacao: 2362,
-  /**
-   * A Completa também passa por aqui agora.
-   *
-   * Antes ela não estava neste mapa e caía no valor de `produtos.ts` (1890),
-   * que virava 15,12 depois do cupom. Só o preço da Revelação tinha sido
-   * pensado com o desconto; o da Completa vazava.
-   */
-  completa: 3112,
+  /*
+    O PREÇO COBRADO. É este número, direto — sem conta nenhuma por cima.
+
+    Ele já foi um "preço cheio" do qual um cupom de 20% descia até o valor
+    real, e por isso precisava ser 1225 para o cliente pagar 9,80. Toda
+    mudança de preço virava uma conta reversa com arredondamento para cima, e
+    errá-la cobrava um centavo a mais ou comia a margem — aconteceu, por doze
+    horas, com uma venda anunciada a 9,80 saindo por 7,84.
+
+    O riscado da vitrine agora é outra coisa, e mora em `PRECO_RISCADO_CENTAVOS`
+    logo abaixo. Subir ou descer preço aqui é trocar o número e mais nada.
+  */
+  revelacao: 1890,
+  completa: 2490,
 };
+
+/**
+ * O "de" riscado na vitrine. **Decoração, e nada mais.**
+ *
+ * ── O que ele é, e o que ele não é ────────────────────────────────────────
+ *
+ * Não desconta nada, não entra em conta nenhuma e não chega perto do
+ * gateway. Quem cobra lê `precoVigenteCentavos` acima. Este número existe
+ * para a oferta ter uma âncora ao lado do preço, e é escolhido a olho —
+ * redondo, bonito, do tamanho que o argumento pedir.
+ *
+ * Antes isto era o subproduto de um cupom de 20% aplicado a todo pedido: o
+ * riscado saía 23,62 e 31,12, números que ninguém escolheria, e mexer no
+ * preço obrigava a refazer a conta dos dois lados.
+ *
+ * ── O que conferir antes de mudar ─────────────────────────────────────────
+ *
+ * Se algum dia o riscado passar a aparecer numa tela nova, ele precisa ser um
+ * preço que a loja de fato praticou em algum momento — preço de referência
+ * que nunca existiu é publicidade enganosa, e o risco não é o número, é a
+ * multa. Hoje ele vive só na oferta de vendas.
+ */
+export const PRECO_RISCADO_CENTAVOS: Partial<Record<ProdutoId, number>> = {
+  revelacao: 2990,
+  completa: 3990,
+};
+
+/** O riscado da assinatura, que não é `ProdutoId` — vive na tabela `planos`. */
+export const PRECO_RISCADO_DA_ASSINATURA_CENTAVOS = 3790;
+
+/** `null` quando não há âncora, ou quando ela não é maior que o preço real. */
+export function riscadoDe(id: ProdutoId): number | null {
+  const riscado = PRECO_RISCADO_CENTAVOS[id];
+  if (!riscado) return null;
+  return riscado > precoVigenteCentavos(id) ? riscado : null;
+}
 
 export function precoVigenteCentavos(id: ProdutoId): number {
   const doProduto = PRODUTOS[id]?.precoCentavos ?? 0;

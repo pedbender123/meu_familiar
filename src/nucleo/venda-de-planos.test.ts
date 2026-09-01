@@ -47,7 +47,7 @@ describe('plano é vendável por padrão', () => {
     assert.equal(planosVendaveis(), true);
     assert.equal(
       precoVigenteCentavos('revelacao'),
-      2362,
+      1890,
       'e a Revelação continua com o preço cheio da campanha'
     );
   });
@@ -74,6 +74,6 @@ describe('a trava de emergência', () => {
 
   test('trancar plano não mexe no preço da Revelação', () => {
     ligar(CHAVE_PLANOS_FECHADOS, true);
-    assert.equal(precoVigenteCentavos('revelacao'), 2362);
+    assert.equal(precoVigenteCentavos('revelacao'), 1890);
   });
 });

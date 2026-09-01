@@ -14,7 +14,11 @@ import { FAMILIARES, type FamiliarId } from '@/lib/familiares';
 import { GRUPOS, ehGrupo } from '@/lib/quiz/grupos';
 import { TOTAL_DE_ITENS } from '@/lib/quiz/itens';
 import type { Eixo } from '@/lib/quiz/eixos';
-import { produtoVigente } from '@/lib/modelo-de-venda';
+import {
+  produtoVigente,
+  riscadoDe,
+  PRECO_RISCADO_DA_ASSINATURA_CENTAVOS,
+} from '@/lib/modelo-de-venda';
 
 export const metadata = {
   title: 'Alguém atravessou por você — Bruxário',
@@ -177,6 +181,16 @@ export default async function SeuFamiliar({
           precos={{
             revelacao: precoComDesconto(produtoVigente('revelacao'), desconto),
             completa: precoComDesconto(produtoVigente('completa'), desconto),
+          }}
+          /*
+            O "de" riscado. Decoração — quem cobra lê `produtoVigente` acima.
+            Desce daqui porque o número mora em `modelo-de-venda.ts`, que lê o
+            banco e não pode ser importado por componente de cliente.
+          */
+          riscados={{
+            revelacao: riscadoDe('revelacao'),
+            completa: riscadoDe('completa'),
+            assinatura: PRECO_RISCADO_DA_ASSINATURA_CENTAVOS,
           }}
           {...(pedido.ritual_completo === 1
             ? { generoDoFamiliar: familiar.genero }

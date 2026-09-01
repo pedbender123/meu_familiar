@@ -41,12 +41,21 @@ interface Cartao {
   id: EscolhaId;
   selo: string | null;
   preco: PrecoComDesconto;
+  /**
+   * O "de" riscado — decoração, e por isso mora aqui e não em `preco`.
+   *
+   * `PrecoComDesconto` é o tipo que atravessa cobrança, webhook e painel
+   * financeiro. Enfiar um número de vitrine dentro dele faria a decoração
+   * viajar junto com dinheiro de verdade, e um dia alguém somaria os dois.
+   */
+  riscadoCentavos: number | null;
   itens: string[];
   destaque: boolean;
 }
 
 /** O plano da oferta, em centavos. Espelha `planos.revelacao_mensal`. */
 const PRECO_DO_PLANO_CENTAVOS = 2990;
+
 
 const NOME_DA_ESCOLHA: Record<EscolhaId, string> = {
   revelacao: 'Revelação',
@@ -63,11 +72,20 @@ const MARCO_DA_ESCOLHA: Record<EscolhaId, Marco> = {
 export function Oferta({
   pedidoId,
   descontoPercentual,
+  riscados,
   precos,
   generoDoFamiliar,
 }: {
   pedidoId: string;
   descontoPercentual: number;
+  /**
+   * O "de" riscado de cada opção. Decoração pura — quem cobra é o servidor.
+   *
+   * Desce da página porque o número oficial mora em `modelo-de-venda.ts`, que
+   * lê o banco e não pode ser importado por componente de cliente sem
+   * arrastar o `better-sqlite3` para o pacote do navegador.
+   */
+  riscados?: { revelacao?: number | null; completa?: number | null; assinatura?: number | null };
   precos: { revelacao: PrecoComDesconto; completa: PrecoComDesconto };
   /** Sete dos doze familiares são femininos — o texto tem que concordar. */
   generoDoFamiliar?: 'm' | 'f';
@@ -207,6 +225,7 @@ export function Oferta({
       id: 'revelacao',
       selo: null,
       preco: precosAtuais.revelacao,
+      riscadoCentavos: riscados?.revelacao ?? null,
       itens: [
         `Seu familiar: nome, retrato e o nome secreto`,
         `A leitura de por que ${ele} te escolheu`,
@@ -218,6 +237,7 @@ export function Oferta({
       id: 'completa',
       selo: 'mais escolhida',
       preco: precosAtuais.completa,
+      riscadoCentavos: riscados?.completa ?? null,
       itens: [
         'Tudo da Revelação, com a leitura mais funda',
         `A leitura narrada na voz d${ele === 'ela' ? 'ela' : 'ele'}`,
@@ -243,6 +263,7 @@ export function Oferta({
         descontoPercentual: 0,
         gratis: false,
       },
+      riscadoCentavos: riscados?.assinatura ?? null,
       itens: [
         'Tudo da Completa, e o mês inteiro aberto',
         'O Oráculo respondendo todo dia',
@@ -315,9 +336,16 @@ export function Oferta({
                   )}
                 </span>
                 <span className="flex items-baseline gap-2 shrink-0">
-                  {c.preco.descontoPercentual > 0 && (
+                  {/*
+                    O riscado é a âncora da vitrine, e não o resultado de uma
+                    conta: ele aparece quando existe um "de" maior que o
+                    preço, e some quando não existe. Antes dependia de haver
+                    um cupom de verdade aplicado, o que amarrava a decoração à
+                    cobrança e fazia mudar preço exigir refazer as duas.
+                  */}
+                  {c.riscadoCentavos != null && c.riscadoCentavos > c.preco.finalCentavos && (
                     <span className="font-corpo text-sm text-pergaminho/40 line-through tabular-nums">
-                      {brl(c.preco.cheioCentavos)}
+                      {brl(c.riscadoCentavos)}
                     </span>
                   )}
                   <span className="font-corpo text-2xl text-vela tabular-nums">

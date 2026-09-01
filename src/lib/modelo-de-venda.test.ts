@@ -44,8 +44,8 @@ describe('desligado — o modelo de produção', () => {
    * são o contrato: cheio 23,62, cobrado 18,90.
    */
   test('a Simples tem preço cheio, não zero', () => {
-    assert.equal(precoVigenteCentavos('revelacao'), 2362);
-    assert.equal(produtoVigente('revelacao').precoCentavos, 2362);
+    assert.equal(precoVigenteCentavos('revelacao'), 1890);
+    assert.equal(produtoVigente('revelacao').precoCentavos, 1890);
   });
 
   /**
@@ -81,7 +81,7 @@ describe('desligado — o modelo de produção', () => {
   });
 
   test('a Completa também tem cheio, para o cupom caber', () => {
-    assert.equal(precoVigenteCentavos('completa'), 3112);
+    assert.equal(precoVigenteCentavos('completa'), 2490);
   });
 });
 
@@ -102,7 +102,7 @@ describe('virar a chave', () => {
     ligar(true);
     assert.equal(precoVigenteCentavos('revelacao'), 0);
     ligar(false);
-    assert.equal(precoVigenteCentavos('revelacao'), 2362);
+    assert.equal(precoVigenteCentavos('revelacao'), 1890);
   });
 });
 
@@ -155,7 +155,7 @@ describe('nenhuma rota decide preço pela tabela estática', () => {
     ligar(false);
     const preco = precoVigenteCentavos('revelacao');
     assert.ok(preco > 0, 'preço zero faz o funil entregar sem cobrar');
-    assert.equal(preco, 2362);
+    assert.equal(preco, 1890);
   });
 });
 
@@ -196,7 +196,7 @@ describe('nenhum caminho de cobrança escapa do interruptor', () => {
     ligar(false);
     assert.equal(
       precoDoPedido({ produto: 'revelacao', desconto_percentual: null }).finalCentavos,
-      2362
+      1890
     );
     ligar(true);
     assert.equal(
