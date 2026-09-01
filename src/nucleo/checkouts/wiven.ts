@@ -1017,6 +1017,8 @@ export function traduzirWebhook(corpo: CorpoWebhookWiven): ResultadoPagamento {
     status: traduzirStatus(t.status),
     statusDetalhe: corpo.event ?? '',
     referenciaExterna: pedidoDoWebhook(corpo),
+    // O cru, para a renovação da assinatura poder se reencontrar por ele.
+    identificadorBruto: t.identifier ?? null,
     brutoCentavos,
     taxaCentavos:
       brutoCentavos === null || liquidoCentavos === null ? null : brutoCentavos - liquidoCentavos,

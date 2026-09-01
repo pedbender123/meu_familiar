@@ -69,6 +69,19 @@ export interface ResultadoPagamento {
    */
   referenciaExterna: string | null;
   /**
+   * O identificador CRU que o gateway mandou, sem nenhuma interpretação.
+   *
+   * `referenciaExterna` é o nosso `pedidoId` já extraído — e a extração
+   * assume que a string foi montada por nós. Na renovação de uma assinatura
+   * recorrente ela não foi: a Wiven manda o identificador DELA
+   * (`app.wiven.com.br-SUBSCRIPTION-<pedido>-<contrato>`), a extração devolve
+   * nulo, e o pagamento fica órfão.
+   *
+   * Guardar o cru deixa quem procura decidir como casar. Opcional porque nem
+   * todo gateway manda algo aqui.
+   */
+  identificadorBruto?: string | null;
+  /**
    * O dinheiro, como o Mercado Pago conta. Guardado por venda para o painel
    * saber o lucro REAL sem ninguém digitar percentual de taxa à mão — a taxa
    * muda por método (Pix é bem menor que cartão) e por parcelamento.

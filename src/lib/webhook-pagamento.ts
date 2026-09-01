@@ -5,10 +5,14 @@ import {
   registrarEvento,
 } from './db';
 import { statusLiberaAcesso, type ResultadoPagamento } from '../nucleo/checkouts/mercadopago';
+import { buscarPlano } from '../nucleo/planos';
 import {
   buscarCobranca,
   buscarCobrancaPorPagamento,
+  cobrancaDoContrato,
   confirmarPagamento,
+  ligarAssinaturaAoContrato,
+  renovarAssinatura,
 } from '../nucleo/cobrancas';
 import { calcularExpiracao, produtoDe } from './produtos';
 import { aposPagamento } from './processar';
@@ -25,7 +29,9 @@ export type DesfechoNotificacao =
   | 'ja_processado'
   | 'processado'
   /** Pagamento de PLANO (tabela `cobrancas`), não de ritual. */
-  | 'assinatura_confirmada';
+  | 'assinatura_confirmada'
+  /** A cobrança do mês seguinte, que ESTENDE o acesso em vez de criá-lo. */
+  | 'assinatura_renovada';
 
 export interface ResultadoNotificacao {
   desfecho: DesfechoNotificacao;
@@ -69,9 +75,45 @@ export async function processarNotificacaoDePagamento(
    * no `sem_pedido` e o pagamento ficaria órfão — a pessoa pagaria e não
    * ganharia plano nenhum.
    */
+  /**
+   * O terceiro caminho: a RENOVAÇÃO de uma assinatura recorrente.
+   *
+   * ── Por que os dois primeiros não bastam ────────────────────────────────
+   *
+   * A cobrança do segundo mês chega com um `transactionId` que a gente nunca
+   * viu, e com um `identifier` que **não é o nosso** — medido na primeira
+   * assinatura real:
+   *
+   *     app.wiven.com.br-SUBSCRIPTION-<pedido>-<contrato>
+   *
+   * Os dois caminhos de cima erram, e o pagamento cairia em `sem_pedido`:
+   * dinheiro cobrado do cliente, acesso vencendo no dia seguinte, e nada no
+   * sistema explicando por quê.
+   */
   const cobranca =
     buscarCobrancaPorPagamento(resultado.idExterno) ??
-    (resultado.referenciaExterna ? buscarCobranca(resultado.referenciaExterna) : undefined);
+    (resultado.referenciaExterna ? buscarCobranca(resultado.referenciaExterna) : undefined) ??
+    cobrancaDoContrato(resultado.identificadorBruto);
+
+  /*
+    Cobrança JÁ paga com dinheiro novo entrando é renovação, não repetição do
+    webhook. `confirmarPagamento` é idempotente de propósito — passar por lá
+    faria a renovação não fazer nada, e o acesso venceria com o cliente em dia.
+  */
+  if (cobranca?.status === 'pago' && cobranca.assinatura_externa_id) {
+    const plano = buscarPlano(cobranca.plano_id);
+    const renovada = plano?.duracao_dias
+      ? renovarAssinatura(cobranca.assinatura_externa_id, plano.duracao_dias)
+      : null;
+
+    if (renovada) {
+      registrarEvento('assinatura_renovada', cobranca.id);
+      console.log(
+        `[webhook] assinatura ${cobranca.assinatura_externa_id} renovada até ${renovada.fim}`
+      );
+      return { desfecho: 'assinatura_renovada' };
+    }
+  }
 
   if (cobranca) {
     const confirmada = confirmarPagamento(cobranca.id, {
@@ -96,6 +138,15 @@ export async function processarNotificacaoDePagamento(
      * reenvia a notificação, e reenviar o link mágico a cada repetição
      * encheria a caixa de entrada de quem só comprou uma vez.
      */
+    /*
+      Liga a assinatura ao contrato do gateway assim que ela nasce. Sem este
+      vínculo, a renovação do mês seguinte acha a cobrança e não acha a
+      assinatura para estender.
+    */
+    if (confirmada?.assinatura && cobranca.assinatura_externa_id) {
+      ligarAssinaturaAoContrato(confirmada.assinatura.id, cobranca.assinatura_externa_id);
+    }
+
     if (confirmada?.assinatura) {
       await entregarChaveDaPlataforma({
         email: cobranca.email,

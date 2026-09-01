@@ -19,6 +19,15 @@ export interface Cobranca {
   taxa_centavos: number | null;
   liquido_centavos: number | null;
   assinatura_id: string | null;
+  /**
+   * O contrato de recorrência do lado do gateway (migração 035).
+   *
+   * `null` em toda cobrança avulsa e em tudo que é anterior à recorrência.
+   * É por ele que a cobrança do mês seguinte se reencontra — ela chega com
+   * transação nova e identificador que não é nosso.
+   */
+  assinatura_externa_id: string | null;
+  proxima_cobranca_em: string | null;
   pago_em: string | null;
   criado_em: string;
   atualizado_em: string;
@@ -215,4 +224,90 @@ export function cobrancasDaConta(contaId: string): Cobranca[] {
   return db
     .prepare('SELECT * FROM cobrancas WHERE conta_id = ? ORDER BY criado_em DESC')
     .all(contaId) as Cobranca[];
+}
+
+/* ── renovação de assinatura recorrente ───────────────────────────────────*/
+
+/**
+ * A cobrança cujo contrato de assinatura aparece neste identificador.
+ *
+ * ── Por que `LIKE`, e não igualdade ───────────────────────────────────────
+ *
+ * A renovação chega com um `identifier` que **não é o nosso**. Medido na
+ * primeira assinatura real:
+ *
+ *     app.wiven.com.br-SUBSCRIPTION-cmti85x190wnq01q0xbi9dbcv-cmti85x1r0wns01q006r6qguc
+ *
+ * O último pedaço é o id da assinatura, que a gente guardou na criação. Casar
+ * por "o identificador CONTÉM um contrato que eu conheço" não depende do
+ * formato dessa string — e depender do formato de um identificador que o
+ * gateway monta é apostar que ele nunca vai mudar.
+ */
+export function cobrancaDoContrato(identificador: string | null | undefined): Cobranca | undefined {
+  const bruto = (identificador ?? '').trim();
+  if (bruto.length < 8) return undefined;
+
+  return db
+    .prepare(
+      `SELECT * FROM cobrancas
+        WHERE assinatura_externa_id IS NOT NULL
+          AND ? LIKE '%' || assinatura_externa_id || '%'
+        ORDER BY criado_em DESC LIMIT 1`
+    )
+    .get(bruto) as Cobranca | undefined;
+}
+
+/**
+ * Empurra o fim da assinatura para frente — a renovação que a Wiven cobrou.
+ *
+ * ── Por que não é `confirmarPagamento` de novo ────────────────────────────
+ *
+ * Aquela função é idempotente de propósito: cobrança já `pago` devolve o que
+ * existe e não cria nada. É o que impede o webhook reenviado de dar dois
+ * meses a quem pagou um.
+ *
+ * Só que a RENOVAÇÃO é o caso oposto: mesma cobrança, mês novo, dinheiro novo.
+ * Passar por lá faria a renovação não fazer nada — e o acesso venceria no dia
+ * seguinte, com o cliente pagando em dia. Silenciosamente.
+ *
+ * ── A partir de onde conta ────────────────────────────────────────────────
+ *
+ * Do `fim` atual, não de hoje. Quem paga a renovação com dois dias de
+ * antecedência não pode perder esses dois dias — e quem paga atrasado começa
+ * o ciclo novo agora, porque contar de um `fim` já vencido daria menos tempo
+ * do que o pago.
+ */
+export function renovarAssinatura(
+  contratoExterno: string,
+  duracaoDias: number,
+  agora = new Date()
+): { id: string; fim: string } | null {
+  const assinatura = db
+    .prepare(
+      `SELECT * FROM assinaturas
+        WHERE assinatura_externa_id = ? AND status IN ('ativa', 'expirada')
+        ORDER BY criado_em DESC LIMIT 1`
+    )
+    .get(contratoExterno) as { id: string; fim: string | null } | undefined;
+
+  if (!assinatura) return null;
+
+  const base = assinatura.fim && Date.parse(assinatura.fim) > agora.getTime()
+    ? new Date(assinatura.fim)
+    : agora;
+  const fim = new Date(base.getTime() + duracaoDias * 24 * 60 * 60 * 1000).toISOString();
+
+  db.prepare(
+    `UPDATE assinaturas SET fim = ?, status = 'ativa', atualizado_em = ? WHERE id = ?`
+  ).run(fim, agora.toISOString(), assinatura.id);
+
+  return { id: assinatura.id, fim };
+}
+
+/** Liga a assinatura ao contrato do gateway, para a renovação achar as duas. */
+export function ligarAssinaturaAoContrato(assinaturaId: string, contratoExterno: string): void {
+  db.prepare(`UPDATE assinaturas SET assinatura_externa_id = ? WHERE id = ?`).run(
+    contratoExterno,
+    assinaturaId
+  );
 }
