@@ -12,6 +12,33 @@ rotas próprias (`/gateway/card/subscription`), que não precisam de catálogo.
 
 ---
 
+## PARADO AQUI — 01/09, 17h
+
+Tudo que está no ar está commitado e testado (903). **A simulação do
+`religar-utmify` não alterou nada** — o banco de produção está intacto.
+
+Falta decidir e rodar, na VPS, dentro de `/root/apps/bruxario`:
+
+```bash
+npx tsx scripts/religar-utmify.ts             # simula de novo, não muda nada
+npx tsx scripts/religar-utmify.ts --aplicar   # partes 1 e 2, sem enviar nada
+```
+
+- **Parte 1** — 33 pedidos voltam para a campanha da Meta que o `utm_json`
+  deles diz (6 pagos). Cria as 4 campanhas reais. **Depois disso o
+  investimento precisa ser redistribuído à mão no painel**, senão o ROAS das
+  duas pontas fica errado.
+- **Parte 2** — a assinatura do Mauro herda a campanha do pedido `9bc9a90f`,
+  que é de 7 minutos antes dela. Aí ela aparece na campanha.
+- **Parte 3 (`--enviar`) — É A DECISÃO QUE FICOU ABERTA.** 30 vendas pagas
+  nunca chegaram à UTMify: **14 são testes seus** (`pedro.p.bender…`,
+  `teste-prod-audio@…`) e **16 são clientes reais, R$ 145,88**, quase todas de
+  agosto. Mandar tudo joga as 14 falsas no relatório da agência e dispara
+  `Purchase` na Meta para elas. O script hoje não separa — ou manda tudo, ou
+  não manda. **Antes de rodar com `--enviar`, filtrar.**
+- A assinatura de R$ 29,90 é a única do grupo que você pediu explicitamente
+  para enviar.
+
 ## O que dizer
 
 > Leia `docs/RETOMAR.md`. A reforma dos assinantes está pronta e não subiu.
