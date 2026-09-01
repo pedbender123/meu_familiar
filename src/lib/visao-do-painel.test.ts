@@ -19,6 +19,7 @@ describe('o recorte do painel', () => {
   test('vendedor vê só o que decide anúncio', () => {
     assert.equal(areaVisivel('/painel/campanhas', 'vendedor'), true);
     assert.equal(areaVisivel('/painel/central', 'vendedor'), true);
+    assert.equal(areaVisivel('/painel/midia', 'vendedor'), true);
 
     for (const href of [
       '/painel/pedidos',

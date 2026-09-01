@@ -61,6 +61,7 @@ export async function POST(req: NextRequest) {
     c?: string;
     utmCampanha?: string;
     utmConteudo?: string;
+    utmConjunto?: string;
     s?: string;
     e?: string;
     referencia?: string;
@@ -171,7 +172,7 @@ export async function POST(req: NextRequest) {
   const peca = !campanha
     ? undefined
     : ((toque.codigoPeca ? buscarPeca(campanha.id, toque.codigoPeca) : undefined) ??
-      pecaDoUtm(campanha.id, corpo.utmConteudo));
+      pecaDoUtm(campanha.id, corpo.utmConteudo, corpo.utmConjunto));
   const indicador = toque.codigoIndicacao
     ? buscarPedidoPorCodigoCurto(toque.codigoIndicacao)
     : undefined;

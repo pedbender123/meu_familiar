@@ -175,6 +175,12 @@ export interface Peca {
   codigo: string;
   /** O `utm_content` cru — o `{{ad.id}}` da Meta. Nula nas peças à mão. */
   utm_conteudo?: string | null;
+  /**
+   * O `utm_term` cru — o `{{adset.id}}`, o conjunto a que este anúncio
+   * pertence. É o degrau do meio do gerenciador, onde público e orçamento são
+   * decididos. Nulo nas peças à mão e nas anteriores à migração 036.
+   */
+  utm_conjunto?: string | null;
   nome: string;
   nota: string | null;
   ativa: number;
@@ -205,6 +211,24 @@ export function criarPeca(p: {
   nome: string;
   nota?: string | null;
 }): { ok: true; id: string; codigo: string } | { ok: false; erro: string } {
+  /*
+    ── Por que o código deixa de ser sempre dois dígitos ────────────────────
+
+    Ele existe para caber na URL curta do `?c=ab01`: duas letras de campanha
+    mais duas de peça. Isso dá 99 peças por campanha, e enquanto cada peça era
+    um vídeo cadastrado à mão, 99 era um teto que ninguém alcançava.
+
+    Deixou de ser. As peças passaram a nascer sozinhas do `utm_content`, que é
+    o ID do ANÚNCIO — e uma conta escalando passa de 99 anúncios numa campanha
+    sem esforço. Da 100ª em diante, `pecaDoUtm` devolvia `undefined` e o
+    tráfego perdia o criativo **em silêncio**: as vendas continuavam chegando,
+    atribuídas à campanha, e a dash por vídeo simplesmente parava de crescer.
+
+    Então: os dois dígitos continuam sendo a primeira escolha, porque são eles
+    que servem para link de bio e teste interno. Esgotados, a peça ganha um
+    código maior. Ele nunca vai para uma URL curta — quem nasce de anúncio é
+    identificado pelo `utm_conteudo`, não pelo código.
+  */
   const usados = new Set(listarPecas(p.campanha_id).map((x) => x.codigo));
   let codigo = '';
   for (let n = 1; n <= 99; n++) {
@@ -214,7 +238,17 @@ export function criarPeca(p: {
       break;
     }
   }
-  if (!codigo) return { ok: false, erro: 'Esta campanha já tem 99 peças.' };
+
+  if (!codigo) {
+    // Base 36 a partir de 100: `2s`, `2t`… mantém curto e não colide com os
+    // dois dígitos, que são sempre numéricos.
+    for (let n = 100; n < 100_000 && !codigo; n++) {
+      const tentativa = n.toString(36);
+      if (!usados.has(tentativa)) codigo = tentativa;
+    }
+  }
+
+  if (!codigo) return { ok: false, erro: 'Esta campanha não tem mais código de peça livre.' };
 
   const id = randomUUID();
   db.prepare(
@@ -1211,15 +1245,31 @@ export function campanhaDoUtm(
  */
 export function pecaDoUtm(
   campanhaId: string,
-  utmContent: string | null | undefined
+  utmContent: string | null | undefined,
+  utmTerm?: string | null
 ): Peca | undefined {
   const chave = chaveDeUtm(utmContent);
   if (!chave) return undefined;
+  const conjunto = chaveDeUtm(utmTerm);
 
   const existente = db
     .prepare('SELECT * FROM pecas WHERE campanha_id = ? AND utm_conteudo = ?')
     .get(campanhaId, chave) as Peca | undefined;
-  if (existente) return existente;
+
+  if (existente) {
+    /*
+      Preenche o conjunto quando ele ainda não existe — as peças criadas
+      antes desta coluna, e as de anúncios cujo primeiro clique veio sem
+      `utm_term`. Nunca sobrescreve: anúncio não muda de conjunto, e se
+      mudasse, trocar apagaria o histórico de onde as vendas anteriores
+      vieram.
+    */
+    if (conjunto && !existente.utm_conjunto) {
+      db.prepare('UPDATE pecas SET utm_conjunto = ? WHERE id = ?').run(conjunto, existente.id);
+      return { ...existente, utm_conjunto: conjunto };
+    }
+    return existente;
+  }
 
   const criada = criarPeca({
     campanha_id: campanhaId,
@@ -1231,7 +1281,11 @@ export function pecaDoUtm(
   if (!criada.ok) return undefined;
 
   try {
-    db.prepare('UPDATE pecas SET utm_conteudo = ? WHERE id = ?').run(chave, criada.id);
+    db.prepare('UPDATE pecas SET utm_conteudo = ?, utm_conjunto = ? WHERE id = ?').run(
+      chave,
+      conjunto,
+      criada.id
+    );
   } catch {
     return db.prepare('SELECT * FROM pecas WHERE campanha_id = ? AND utm_conteudo = ?').get(
       campanhaId,
@@ -1240,4 +1294,141 @@ export function pecaDoUtm(
   }
 
   return db.prepare('SELECT * FROM pecas WHERE id = ?').get(criada.id) as Peca | undefined;
+}
+
+/* ── a leitura de mídia: campanha → conjunto → criativo ───────────────────*/
+
+export interface LinhaDeMidia {
+  /** `campanha`, `conjunto` ou `criativo` — o degrau desta linha. */
+  nivel: 'campanha' | 'conjunto' | 'criativo';
+  id: string;
+  nome: string;
+  /** O ID que a Meta conhece. É por ele que se acha a linha no gerenciador. */
+  idDaMeta: string | null;
+  /** Vazio na campanha; preenche a coluna de origem nos degraus de baixo. */
+  paiId: string | null;
+  pessoas: number;
+  entraram: number;
+  viramOferta: number;
+  vendas: number;
+  receitaCentavos: number;
+}
+
+/**
+ * O funil de mídia nos três degraus do gerenciador da Meta.
+ *
+ * ── Por que os três, e não só o criativo ──────────────────────────────────
+ *
+ * A dash por peça já responde "qual vídeo vende". Ela não responde a pergunta
+ * do meio, que é onde a decisão de mídia mora: **qual público respondeu.**
+ * Público e orçamento se definem no conjunto, e um criativo excelente num
+ * conjunto errado parece um criativo ruim.
+ *
+ * Isso importa mais agora porque o mesmo vídeo passou a rodar em vários
+ * anúncios. Cada anúncio é uma peça diferente aqui (o `{{ad.id}}` muda), então
+ * um criativo que vende bem aparece dividido em cinco linhas medianas — e
+ * agrupar por conjunto é o que devolve a leitura.
+ *
+ * ── O que ele NÃO tenta ser ───────────────────────────────────────────────
+ *
+ * Não mede custo, porque custo não chega até nós: a Meta não manda gasto no
+ * link, e o investimento que existe no painel é digitado por campanha, à mão.
+ * Toda linha aqui é do lado da RECEITA. Quem quiser CPA cruza com o
+ * gerenciador — e é honesto que seja assim, em vez de inventar um rateio.
+ */
+export function funilDeMidia(campanhaId: string): LinhaDeMidia[] {
+  const campanha = buscarCampanha(campanhaId);
+  if (!campanha) return [];
+
+  const porPeca = desempenhoPorPeca(campanhaId);
+  const pecas = new Map(listarPecas(campanhaId).map((p) => [p.id, p]));
+
+  const linhas: LinhaDeMidia[] = [];
+
+  /*
+    O conjunto é derivado das peças, e não consultado à parte: ele não tem
+    linha própria em lugar nenhum — existe só como o rótulo que os anúncios
+    carregam. Somar os filhos é o único jeito de saber o que ele trouxe.
+  */
+  const conjuntos = new Map<string, LinhaDeMidia>();
+
+  for (const l of porPeca) {
+    const peca = l.peca_id ? pecas.get(l.peca_id) : undefined;
+
+    /*
+      Peça sem conjunto cai num balde próprio, e não some nem se mistura ao
+      primeiro conjunto que aparecer. São as cadastradas à mão e as de
+      anúncios cujo primeiro clique veio sem `utm_term` — tráfego real, que
+      precisa continuar somando, com o rótulo dizendo o que é.
+    */
+    const chave = peca?.utm_conjunto ?? '(sem conjunto)';
+
+    const atual = conjuntos.get(chave) ?? {
+      nivel: 'conjunto' as const,
+      id: chave,
+      nome: chave === '(sem conjunto)' ? 'Sem conjunto' : chave,
+      idDaMeta: chave === '(sem conjunto)' ? null : chave,
+      paiId: campanha.id,
+      pessoas: 0,
+      entraram: 0,
+      viramOferta: 0,
+      vendas: 0,
+      receitaCentavos: 0,
+    };
+
+    atual.pessoas += l.pessoas;
+    atual.entraram += l.entraram;
+    atual.viramOferta += l.viramOferta;
+    atual.vendas += l.vendas;
+    atual.receitaCentavos += l.receitaCentavos;
+    conjuntos.set(chave, atual);
+
+    linhas.push({
+      nivel: 'criativo',
+      id: l.peca_id ?? `sem-peca-${chave}`,
+      nome: l.nome,
+      idDaMeta: peca?.utm_conteudo ?? null,
+      paiId: chave,
+      pessoas: l.pessoas,
+      entraram: l.entraram,
+      viramOferta: l.viramOferta,
+      vendas: l.vendas,
+      receitaCentavos: l.receitaCentavos,
+    });
+  }
+
+  const doConjunto = [...conjuntos.values()].sort((a, b) => b.vendas - a.vendas || b.pessoas - a.pessoas);
+
+  const total = doConjunto.reduce(
+    (soma, c) => ({
+      pessoas: soma.pessoas + c.pessoas,
+      entraram: soma.entraram + c.entraram,
+      viramOferta: soma.viramOferta + c.viramOferta,
+      vendas: soma.vendas + c.vendas,
+      receitaCentavos: soma.receitaCentavos + c.receitaCentavos,
+    }),
+    { pessoas: 0, entraram: 0, viramOferta: 0, vendas: 0, receitaCentavos: 0 }
+  );
+
+  return [
+    {
+      nivel: 'campanha',
+      id: campanha.id,
+      nome: campanha.nome,
+      idDaMeta: campanha.utm_campanha,
+      paiId: null,
+      ...total,
+    },
+    ...doConjunto,
+    /*
+      Os criativos saem ordenados por venda dentro do conjunto a que pertencem,
+      não numa lista global: a comparação que interessa é entre anúncios do
+      MESMO público. Comparar criativos de conjuntos diferentes mede o público
+      junto e credita ao vídeo o que foi da segmentação.
+    */
+    ...linhas.sort(
+      (a, b) =>
+        a.paiId!.localeCompare(b.paiId!) || b.vendas - a.vendas || b.pessoas - a.pessoas
+    ),
+  ];
 }

@@ -71,6 +71,7 @@ export default async function LayoutDoPainel({
     { href: '/painel/central', rotulo: 'Central', icone: 'grafico' },
     { href: '/painel/saude', rotulo: 'Saúde', icone: 'pulso', alerta: sinaisRuins },
     { href: '/painel/campanhas', rotulo: 'Campanhas', icone: 'alvo' },
+    { href: '/painel/midia', rotulo: 'Mídia', icone: 'megafone' },
     { href: '/painel/rastreio', rotulo: 'Rastreio', icone: 'grafico' },
     { href: '/painel/pedidos', rotulo: 'Pedidos', icone: 'caixa' },
     /*

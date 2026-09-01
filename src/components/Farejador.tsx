@@ -48,6 +48,11 @@ export function Farejador() {
         */
         utmCampanha: busca.get('utm_campaign') ?? undefined,
         utmConteudo: busca.get('utm_content') ?? undefined,
+        // `{{adset.id}}` — o degrau do meio do gerenciador. É no conjunto que
+        // se define público e orçamento, e sem ele a leitura pula de "a
+        // campanha foi bem" para "este vídeo foi bem", perdendo QUAL PÚBLICO
+        // respondeu.
+        utmConjunto: busca.get('utm_term') ?? undefined,
         s: busca.get('s') ?? undefined,
         e: busca.get('e') ?? undefined,
         referencia: document.referrer || undefined,

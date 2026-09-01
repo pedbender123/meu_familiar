@@ -55,6 +55,12 @@ export async function visaoAtual(): Promise<Visao> {
 export const AREAS_DO_VENDEDOR: readonly string[] = [
   '/painel/central',
   '/painel/campanhas',
+  /*
+    Mídia é a tela de quem compra mídia: campanha, conjunto e criativo nos
+    mesmos três degraus do gerenciador. Se alguma área tinha que estar aqui,
+    é esta.
+  */
+  '/painel/midia',
 ];
 
 export function areaVisivel(href: string, visao: Visao): boolean {
