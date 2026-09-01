@@ -202,7 +202,23 @@ describe('o cartão só passa', () => {
 
   /** Endereço é exigência do cartão. Pedir no Pix mataria o caminho curto. */
   test('o Pix não carrega endereço', () => {
-    assert.match(fonte, /meio === 'cartao' \? \{ address: extra\.endereco \}/);
+    /*
+      A checagem é por CONTAGEM, e não pelo formato da expressão: ela mudou
+      quando o CEP passou a ser normalizado (`cepParaWiven`), e travar o
+      formato faria o teste quebrar numa mudança que não muda a regra.
+
+      A regra é esta: todo `address:` do corpo está atrás da guarda do cartão.
+      Se um deles escapar, o Pix passa a exigir endereço e o caminho curto
+      morre — sem erro nenhum, só com menos gente pagando.
+    */
+    const guardas = fonte.match(/extra\.meio === 'cartao' && extra\.endereco/g) ?? [];
+    const enderecos = fonte.match(/address: \{/g) ?? [];
+    assert.ok(guardas.length >= 2, `só ${guardas.length} guardas de cartão`);
+    assert.equal(
+      enderecos.length,
+      guardas.length,
+      'há endereço no corpo fora da guarda do cartão'
+    );
   });
 });
 

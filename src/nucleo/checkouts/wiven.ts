@@ -576,6 +576,29 @@ export interface DadosCriacaoWiven extends DadosCriacao {
   };
 }
 
+/**
+ * O CEP no formato que a Wiven valida: `#####-###`.
+ *
+ * ── Como isto apareceu ────────────────────────────────────────────────────
+ *
+ * O checkout manda o CEP só com dígitos, e o endpoint de ASSINATURA recusou
+ * com `"Invalid zip code"` — enquanto o exemplo da documentação deles traz
+ * `"12345-678"`, formatado. O endpoint de cobrança avulsa é mais tolerante,
+ * então o problema só apareceu no dia em que a assinatura foi cobrada.
+ *
+ * Normaliza aqui, num lugar só, e vale para os dois caminhos: mandar o
+ * formato do exemplo deles é sempre a aposta mais segura, e nada se perde se
+ * o outro endpoint já aceitava sem o traço.
+ *
+ * O que não bate com oito dígitos volta como veio — recusar aqui trocaria uma
+ * mensagem clara do gateway por um erro nosso, mais pobre.
+ */
+export function cepParaWiven(bruto: string | undefined | null): string {
+  const digitos = (bruto ?? '').replace(/\D/g, '');
+  if (digitos.length !== 8) return bruto ?? '';
+  return `${digitos.slice(0, 5)}-${digitos.slice(5)}`;
+}
+
 /** Só o cartão exige endereço. O Pix pede apenas nome, e-mail, telefone e CPF. */
 export interface EnderecoWiven {
   country: string;
@@ -624,7 +647,9 @@ export class ProvedorWiven implements ProvedorPagamento {
         email: dados.emailDoPedido,
         phone: extra.telefone,
         document: extra.documento,
-        ...(extra.meio === 'cartao' ? { address: extra.endereco } : {}),
+        ...(extra.meio === 'cartao' && extra.endereco
+          ? { address: { ...extra.endereco, zipCode: cepParaWiven(extra.endereco.zipCode) } }
+          : {}),
       },
       /**
        * `metadata.orderId` leva o `pedidoId` LIMPO, sem o sufixo da tentativa.
@@ -1142,7 +1167,9 @@ export async function criarAssinaturaWiven(
       email: dados.emailDoCliente,
       phone: extra.telefone,
       document: extra.documento,
-      ...(extra.meio === 'cartao' ? { address: extra.endereco } : {}),
+      ...(extra.meio === 'cartao' && extra.endereco
+        ? { address: { ...extra.endereco, zipCode: cepParaWiven(extra.endereco.zipCode) } }
+        : {}),
     },
     metadata: { provider: 'Bruxario', orderId: dados.cobrancaId },
     callbackUrl: urlDeCallback(),

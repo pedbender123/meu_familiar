@@ -1,7 +1,7 @@
 import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { periodicidadeDe } from './checkouts/wiven';
+import { cepParaWiven, periodicidadeDe } from './checkouts/wiven';
 
 function codigoDe(caminho: string): string {
   return readFileSync(caminho, 'utf8')
@@ -141,5 +141,50 @@ describe('assinatura é só no cartão', () => {
     assert.match(rota, /resultado = await cobrar\(provedor\)/);
     // A recusa é condicionada; não existe recusa solta de Pix.
     assert.match(rota, /if \(plano\.recorrente === 1 && meio === 'pix'\)/);
+  });
+});
+
+/**
+ * ── O que a primeira tentativa real ensinou ───────────────────────────────
+ *
+ * A Wiven recusou com dois erros de uma vez, e os dois eram nossos:
+ *
+ *   clientIp                   → Required, recebido undefined
+ *   client.address.zipCode     → "Invalid zip code"
+ *
+ * Nenhum dos dois aparece em teste de tipo nem em build. Só numa cobrança de
+ * verdade, com o cartão já digitado.
+ */
+describe('o que a Wiven exige e quase ficou faltando', () => {
+  test('o CEP vai no formato do exemplo deles', () => {
+    assert.equal(cepParaWiven('01304000'), '01304-000');
+    assert.equal(cepParaWiven('01304-000'), '01304-000');
+    assert.equal(cepParaWiven(' 01304000 '), '01304-000');
+  });
+
+  /**
+   * O que não tem oito dígitos volta como veio: recusar aqui trocaria uma
+   * mensagem clara do gateway por um erro nosso, mais pobre.
+   */
+  test('o que não é CEP passa direto, para o gateway explicar', () => {
+    assert.equal(cepParaWiven('123'), '123');
+    assert.equal(cepParaWiven(''), '');
+    assert.equal(cepParaWiven(null), '');
+  });
+
+  /**
+   * O IP sai do cabeçalho, nunca do corpo. Corpo vem do navegador, e IP que o
+   * cliente escolhe não serve para antifraude nenhuma.
+   */
+  test('a rota preenche o clientIp a partir do cabeçalho', () => {
+    const rota = codigoDe('src/app/api/cobranca/[id]/pagamento/route.ts');
+    assert.match(rota, /req\.headers\.get\('x-forwarded-for'\)/);
+    assert.match(rota, /\{ \.\.\.wiven, ip: ipDoCliente \}/);
+  });
+
+  /** E o corpo do cliente nunca decide o IP. */
+  test('o IP do corpo não é usado', () => {
+    const rota = codigoDe('src/app/api/cobranca/[id]/pagamento/route.ts');
+    assert.doesNotMatch(rota, /wiven: wiven[,!]/);
   });
 });

@@ -100,10 +100,24 @@ export async function POST(
   const nomeDoGateway = gatewayDe(meio);
   const provedor = provedorPara(meio);
 
+  /**
+   * O IP de quem está pagando, obrigatório no cartão da Wiven.
+   *
+   * Sai do CABEÇALHO, nunca do corpo — o corpo vem do navegador, e IP que o
+   * cliente escolhe é IP que não serve para antifraude nenhuma. A rota de
+   * pedido já fazia isso; esta nasceu sem, e a Wiven recusou a assinatura com
+   * `clientIp: Required` na primeira tentativa real.
+   */
+  const doCabecalho = req.headers.get('x-forwarded-for');
+  const ipDoCliente =
+    doCabecalho && doCabecalho !== 'local' ? doCabecalho.split(',')[0].trim() : '127.0.0.1';
+
+  const dadosWiven = wiven ? { ...wiven, ip: ipDoCliente } : undefined;
+
   async function cobrar(usando: ReturnType<typeof provedorDe>) {
     return usando.criarPagamento({
       form,
-      ...(wiven ? { wiven } : {}),
+      ...(dadosWiven ? { wiven: dadosWiven } : {}),
       // O plano é o `Cobravel`: só id, descrição e preço. O valor sai daqui,
       // do banco — nunca do que o navegador mandou.
       produto: {
@@ -149,7 +163,7 @@ export async function POST(
       );
     }
 
-    const recorrente = plano.recorrente === 1 && nomeDoGateway === 'wiven' && !!wiven;
+    const recorrente = plano.recorrente === 1 && nomeDoGateway === 'wiven' && !!dadosWiven;
 
     let resultado;
     try {
@@ -159,7 +173,7 @@ export async function POST(
           emailDoCliente: cobranca.email,
           plano: { id: plano.id, nome: plano.nome, precoCentavos: cobranca.valor_centavos },
           periodicidade: periodicidadeDe(plano.duracao_dias),
-          wiven: wiven!,
+          wiven: dadosWiven!,
         });
 
         /*
