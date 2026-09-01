@@ -10,8 +10,11 @@ Wiven, travado por falta da documentação deles — ver o fim deste arquivo.
 
 ## O que dizer
 
-> Leia `docs/RETOMAR.md`. O que falta está na §8 de `PLANO-FLUXO-UTM.md` e na
-> Fase 4 de `PLANO-PAINEL-DE-SAUDE.md`.
+> Leia `docs/RETOMAR.md`. O próximo trabalho é
+> `docs/PLANO-REFORMA-ASSINANTES.md`, na ordem da §4.
+>
+> Também aberto: a §8 de `PLANO-FLUXO-UTM.md` e a Fase 4 de
+> `PLANO-PAINEL-DE-SAUDE.md`.
 
 ---
 
@@ -123,6 +126,40 @@ nenhuma** — hoje quem divide é `WIVEN_SPLITS`.
 - `OK` na criação do Pix **não** é venda paga.
 - `transaction.identifier` é anulável — a busca tem dois caminhos.
 - A Wiven **não** avisa a UTMify em cobrança por API. Quem avisa somos nós.
+
+---
+
+## O que mudou em 01/09 (o dia mais longo)
+
+**Tudo abaixo está em produção.** 865 testes.
+
+- **Preço desmembrado do riscado.** Simples R$ 18,90, Completa R$ 24,90,
+  Assinatura R$ 29,90 — o número no código É o preço. O riscado (29,90 /
+  39,90 / 39,90) é decoração em `PRECO_RISCADO_CENTAVOS`, não entra em conta
+  nenhuma. `LANCAMENTO20` desativado no banco.
+- **Splits desligados** — tudo cai na conta que cobra. A linha está comentada
+  no `.env`, então voltar é descomentar e reiniciar.
+- **Assinatura recorrente de verdade** na Wiven (`/gateway/card/subscription`),
+  só cartão. A renovação se reencontra pelo contrato e é idempotente.
+- **A cobrança de assinatura passou pelo roteador de gateway** — era Mercado
+  Pago fixo, e o split nunca teria incidido sobre assinatura.
+- **Atribuição real nas campanhas**: o relatório conta só quem chegou marcado.
+  A "Comeccou!" saiu de 2,9% para 8,2% de conversão — parecia três vezes pior.
+- **`/painel/midia`**: campanha → conjunto → criativo, com os IDs da Meta.
+- **Visão de vendedor** (na barra lateral): Central, Campanhas e Mídia.
+- **UTMify recebe os três campos**: preço cheio, taxa do gateway, lucro.
+- **MRR conta só quem pagou** — contava dez cortesias como receita.
+
+### Bugs achados em produção, todos corrigidos
+
+| | |
+| --- | --- |
+| Teto de **99 peças** por campanha | escalando, o 100º anúncio perdia o criativo em silêncio |
+| **URL de callback duplicada** | venda paga sem confirmação, 404 seis vezes (só no teste) |
+| **Renovação somava 30 dias por reenvio** | um pagamento deu 120 dias de acesso |
+| **"pedido não encontrado"** ao assinar | checkout com rota fixa em `/api/pedido/` |
+| `clientIp` e CEP | a Wiven recusava a assinatura; o endpoint dela valida mais rígido |
+| Redirecionamento para **localhost** | `req.url` atrás do nginx; já tinha acontecido no login |
 
 ---
 
