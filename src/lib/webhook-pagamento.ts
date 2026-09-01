@@ -103,7 +103,11 @@ export async function processarNotificacaoDePagamento(
   if (cobranca?.status === 'pago' && cobranca.assinatura_externa_id) {
     const plano = buscarPlano(cobranca.plano_id);
     const renovada = plano?.duracao_dias
-      ? renovarAssinatura(cobranca.assinatura_externa_id, plano.duracao_dias)
+      ? renovarAssinatura(
+          cobranca.assinatura_externa_id,
+          plano.duracao_dias,
+          resultado.idExterno
+        )
       : null;
 
     if (renovada) {
@@ -144,7 +148,11 @@ export async function processarNotificacaoDePagamento(
       assinatura para estender.
     */
     if (confirmada?.assinatura && cobranca.assinatura_externa_id) {
-      ligarAssinaturaAoContrato(confirmada.assinatura.id, cobranca.assinatura_externa_id);
+      ligarAssinaturaAoContrato(
+        confirmada.assinatura.id,
+        cobranca.assinatura_externa_id,
+        resultado.idExterno
+      );
     }
 
     if (confirmada?.assinatura) {

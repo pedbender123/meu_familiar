@@ -280,17 +280,38 @@ export function cobrancaDoContrato(identificador: string | null | undefined): Co
 export function renovarAssinatura(
   contratoExterno: string,
   duracaoDias: number,
+  /**
+   * A transação que está pagando. **Sem ela não há renovação.**
+   *
+   * ── O que aconteceu sem este parâmetro ──────────────────────────────────
+   *
+   * A primeira assinatura real de R$ 29,90 nasceu com 120 dias em vez de 30.
+   * A Wiven reenvia o webhook até receber 200, e cada chegada esticava o
+   * acesso mais um mês: quatro entregas, quatro meses, por um pagamento.
+   *
+   * Reenvio e renovação são idênticos pelo status — os dois são "aprovado,
+   * deste contrato". O que os separa é o id: reenvio repete, renovação traz
+   * um novo.
+   */
+  transacaoExterna: string,
   agora = new Date()
 ): { id: string; fim: string } | null {
+  if (!transacaoExterna) return null;
+
   const assinatura = db
     .prepare(
       `SELECT * FROM assinaturas
         WHERE assinatura_externa_id = ? AND status IN ('ativa', 'expirada')
         ORDER BY criado_em DESC LIMIT 1`
     )
-    .get(contratoExterno) as { id: string; fim: string | null } | undefined;
+    .get(contratoExterno) as
+    | { id: string; fim: string | null; ultima_transacao: string | null }
+    | undefined;
 
   if (!assinatura) return null;
+
+  // Já foi este pagamento que comprou o período atual: é reenvio, não mês novo.
+  if (assinatura.ultima_transacao === transacaoExterna) return null;
 
   const base = assinatura.fim && Date.parse(assinatura.fim) > agora.getTime()
     ? new Date(assinatura.fim)
@@ -298,16 +319,28 @@ export function renovarAssinatura(
   const fim = new Date(base.getTime() + duracaoDias * 24 * 60 * 60 * 1000).toISOString();
 
   db.prepare(
-    `UPDATE assinaturas SET fim = ?, status = 'ativa', atualizado_em = ? WHERE id = ?`
-  ).run(fim, agora.toISOString(), assinatura.id);
+    `UPDATE assinaturas
+        SET fim = ?, status = 'ativa', ultima_transacao = ?, atualizado_em = ?
+      WHERE id = ?`
+  ).run(fim, transacaoExterna, agora.toISOString(), assinatura.id);
 
   return { id: assinatura.id, fim };
 }
 
-/** Liga a assinatura ao contrato do gateway, para a renovação achar as duas. */
-export function ligarAssinaturaAoContrato(assinaturaId: string, contratoExterno: string): void {
-  db.prepare(`UPDATE assinaturas SET assinatura_externa_id = ? WHERE id = ?`).run(
-    contratoExterno,
-    assinaturaId
-  );
+/**
+ * Liga a assinatura ao contrato do gateway, e carimba a transação que a pagou.
+ *
+ * A transação é tão importante quanto o contrato: é ela que faz o PRIMEIRO
+ * reenvio do webhook ser reconhecido como reenvio. Sem o carimbo aqui, a
+ * segunda entrega da mesma notificação encontraria a cobrança já paga, não
+ * teria com o que comparar, e esticaria o acesso um mês de graça.
+ */
+export function ligarAssinaturaAoContrato(
+  assinaturaId: string,
+  contratoExterno: string,
+  transacaoExterna?: string | null
+): void {
+  db.prepare(
+    `UPDATE assinaturas SET assinatura_externa_id = ?, ultima_transacao = ? WHERE id = ?`
+  ).run(contratoExterno, transacaoExterna ?? null, assinaturaId);
 }

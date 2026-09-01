@@ -67,7 +67,7 @@ describe('estender o acesso', () => {
     const agora = new Date('2026-09-01T00:00:00.000Z');
     assinar('2026-09-03T00:00:00.000Z');
 
-    const r = renovarAssinatura(CONTRATO, 30, agora);
+    const r = renovarAssinatura(CONTRATO, 30, 'trans-1', agora);
     assert.ok(r);
     assert.equal(r.fim, '2026-10-03T00:00:00.000Z', 'somou 30 dias sobre o fim, não sobre hoje');
   });
@@ -80,15 +80,60 @@ describe('estender o acesso', () => {
     const agora = new Date('2026-09-10T00:00:00.000Z');
     assinar('2026-09-01T00:00:00.000Z', 'expirada');
 
-    const r = renovarAssinatura(CONTRATO, 30, agora);
+    const r = renovarAssinatura(CONTRATO, 30, 'trans-2', agora);
     assert.equal(r?.fim, '2026-10-10T00:00:00.000Z');
     const linha = db.prepare("SELECT status FROM assinaturas WHERE id='a1'").get() as { status: string };
     assert.equal(linha.status, 'ativa', 'renovar destranca quem tinha expirado');
   });
 
+  /**
+   * ── O bug de produção: 120 dias por um pagamento ────────────────────────
+   *
+   * A Wiven reenvia o webhook até receber 200. A primeira assinatura real
+   * nasceu com quatro meses de acesso porque cada entrega da MESMA
+   * notificação esticava o período mais trinta dias.
+   *
+   * Reenvio e renovação são idênticos pelo status — os dois são "aprovado,
+   * deste contrato". O que os separa é o id da transação.
+   */
+  test('o mesmo pagamento não estica o acesso duas vezes', () => {
+    const agora = new Date('2026-09-01T00:00:00.000Z');
+    assinar('2026-09-01T00:00:00.000Z');
+
+    const primeira = renovarAssinatura(CONTRATO, 30, 'trans-abc', agora);
+    assert.equal(primeira?.fim, '2026-10-01T00:00:00.000Z');
+
+    for (let i = 0; i < 3; i++) {
+      assert.equal(
+        renovarAssinatura(CONTRATO, 30, 'trans-abc', agora),
+        null,
+        'reenvio da mesma transação não pode renovar'
+      );
+    }
+
+    const linha = db.prepare("SELECT fim FROM assinaturas WHERE id='a1'").get() as { fim: string };
+    assert.equal(linha.fim, '2026-10-01T00:00:00.000Z', 'o acesso andou mais de um período');
+  });
+
+  /** E o mês seguinte, que traz transação nova, renova normalmente. */
+  test('transação nova renova de verdade', () => {
+    const agora = new Date('2026-09-01T00:00:00.000Z');
+    assinar('2026-09-01T00:00:00.000Z');
+
+    renovarAssinatura(CONTRATO, 30, 'trans-mes-1', agora);
+    const segunda = renovarAssinatura(CONTRATO, 30, 'trans-mes-2', agora);
+    assert.equal(segunda?.fim, '2026-10-31T00:00:00.000Z');
+  });
+
+  /** Sem transação não há como distinguir reenvio de renovação: não renova. */
+  test('sem id de transação, não renova', () => {
+    assinar('2026-09-01T00:00:00.000Z');
+    assert.equal(renovarAssinatura(CONTRATO, 30, ''), null);
+  });
+
   test('contrato desconhecido não renova nada', () => {
     assinar('2026-09-03T00:00:00.000Z');
-    assert.equal(renovarAssinatura('contrato-que-nao-existe', 30), null);
+    assert.equal(renovarAssinatura('contrato-que-nao-existe', 30, 'trans-x'), null);
   });
 });
 
@@ -107,7 +152,21 @@ describe('o webhook trata renovação antes de confirmar', () => {
     assert.ok(i < j, 'a renovação tem que ser decidida antes da confirmação');
   });
 
-  test('a assinatura nova é ligada ao contrato do gateway', () => {
-    assert.match(fonte, /ligarAssinaturaAoContrato\(confirmada\.assinatura\.id/);
+  /**
+   * A assinatura nova é ligada ao contrato E carimbada com a transação que a
+   * pagou. O carimbo é o que faz o PRIMEIRO reenvio ser reconhecido como
+   * reenvio — sem ele, a segunda entrega da mesma notificação não teria com o
+   * que comparar e daria um mês de graça.
+   */
+  test('a assinatura nova guarda o contrato e a transação', () => {
+    const bloco = fonte.slice(fonte.indexOf('ligarAssinaturaAoContrato('));
+    assert.match(bloco, /confirmada\.assinatura\.id/);
+    assert.match(bloco, /cobranca\.assinatura_externa_id/);
+    assert.match(bloco, /resultado\.idExterno/);
+  });
+
+  /** E a renovação recebe a transação, que é o que a torna idempotente. */
+  test('a renovação é chamada com o id da transação', () => {
+    assert.match(fonte, /renovarAssinatura\(\s*cobranca\.assinatura_externa_id,\s*plano\.duracao_dias,\s*resultado\.idExterno/);
   });
 });
