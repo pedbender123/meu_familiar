@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  pagamento,
   pagamentoEhFake,
   statusLiberaAcesso,
   type FormDataBrick,
 } from '@/nucleo/checkouts/mercadopago';
+import { provedorPara, provedorDe, gatewayDe, meioDe } from '@/nucleo/checkouts/gateway';
+import { ErroDeGatewayIndisponivel, type DadosCriacaoWiven } from '@/nucleo/checkouts/wiven';
 import {
   buscarCobranca,
   anotarPagamento,
@@ -64,28 +65,75 @@ export async function POST(
   }
 
   let form: FormDataBrick;
+  let wiven: DadosCriacaoWiven['wiven'] | undefined;
   try {
     const corpo = await req.json();
     form = corpo?.formData ?? corpo;
-    if (!form?.payment_method_id) throw new Error('payment_method_id ausente');
+    wiven = corpo?.wiven;
+    if (!form?.payment_method_id && !wiven) throw new Error('payment_method_id ausente');
   } catch {
     return NextResponse.json({ erro: 'dados de pagamento inválidos' }, { status: 400 });
   }
 
-  try {
-    const resultado = await pagamento.criarPagamento({
+  /**
+   * Quem cobra a assinatura — o MESMO roteador que cobra os produtos.
+   *
+   * ── A lacuna que isto fecha ───────────────────────────────────────────────
+   *
+   * Esta rota importava o Mercado Pago direto, fixado na importação. O efeito
+   * passava despercebido porque nada quebrava: com `GATEWAY=wiven`, TODO
+   * produto ia para a Wiven e **toda assinatura continuava indo para o
+   * Mercado Pago**.
+   *
+   * E isso não é só inconsistência de gateway: é dinheiro caindo na conta
+   * errada. O split 40/40/20 vive na cobrança da Wiven, então a receita de
+   * assinatura chegava inteira numa conta só, sem repasse a ninguém — e sem
+   * nenhum sinal de que algo estivesse fora do lugar.
+   */
+  const meio = meioDe(wiven?.meio ?? form?.payment_method_id);
+  const nomeDoGateway = gatewayDe(meio);
+  const provedor = provedorPara(meio);
+
+  async function cobrar(usando: ReturnType<typeof provedorDe>) {
+    return usando.criarPagamento({
       form,
+      ...(wiven ? { wiven } : {}),
       // O plano é o `Cobravel`: só id, descrição e preço. O valor sai daqui,
       // do banco — nunca do que o navegador mandou.
       produto: {
-        id: plano.id,
-        descricao: plano.nome,
-        precoCentavos: cobranca.valor_centavos,
+        id: plano!.id,
+        descricao: plano!.nome,
+        precoCentavos: cobranca!.valor_centavos,
       },
-      pedidoId: cobranca.id,
-      emailDoPedido: cobranca.email,
+      pedidoId: cobranca!.id,
+      emailDoPedido: cobranca!.email,
       descontoPercentual: 0,
-    });
+    } as Parameters<typeof usando.criarPagamento>[0]);
+  }
+
+  try {
+    let resultado;
+    try {
+      resultado = await cobrar(provedor);
+    } catch (erro) {
+      /*
+        Mesma queda do funil de produtos, e pelo mesmo motivo: cair para outro
+        gateway no meio de uma cobrança de CARTÃO pode cobrar duas vezes,
+        porque não dá para saber se a primeira nasceu do outro lado. No Pix
+        não há esse risco — a cobrança só existe quando alguém paga o QR.
+      */
+      const podeCair =
+        erro instanceof ErroDeGatewayIndisponivel &&
+        meio === 'pix' &&
+        nomeDoGateway !== 'mercadopago';
+      if (!podeCair) throw erro;
+
+      console.warn(
+        `[cobranca] ${nomeDoGateway} indisponível na cobrança ${id} — ` +
+          'cobrando o Pix pelo Mercado Pago.'
+      );
+      resultado = await cobrar(provedorDe('mercadopago'));
+    }
 
     anotarPagamento(id, resultado.idExterno);
     registrarEvento(`assinatura_pagamento_${resultado.status}`, id);

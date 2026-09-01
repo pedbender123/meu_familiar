@@ -102,6 +102,31 @@ export async function entregarChaveDaPlataforma(dados: {
  * que faz o e-mail dizer "Helena" em vez de "olá". Quando não houver pedido
  * nenhum, um cumprimento sem nome é melhor do que um nome errado.
  */
+/**
+ * Nome e CPF de quem já comprou aqui, para pré-preencher o checkout do plano.
+ *
+ * A `cobranca` guarda só e-mail, e a Wiven exige pagador identificado — nome
+ * e documento. Quem está vendo uma oferta de assinatura já comprou antes, e o
+ * último pedido dela tem os dois; pedir de novo o que já foi digitado é
+ * atrito no lugar mais caro do funil.
+ *
+ * Devolve `null` em cada campo que não existir: o checkout pede o que faltar.
+ * Nunca chuta — documento errado faz o gateway recusar a cobrança inteira.
+ */
+export function pagadorDaConta(email: string): { nome: string | null; cpf: string | null } {
+  const linha = db
+    .prepare(
+      `SELECT nome, cpf FROM pedidos WHERE lower(email) = ?
+        ORDER BY criado_em DESC LIMIT 1`
+    )
+    .get(email.trim().toLowerCase()) as { nome: string | null; cpf: string | null } | undefined;
+
+  return {
+    nome: linha?.nome?.trim() || null,
+    cpf: linha?.cpf?.trim() || null,
+  };
+}
+
 export function nomeDaConta(email: string): string {
   const linha = db
     .prepare(

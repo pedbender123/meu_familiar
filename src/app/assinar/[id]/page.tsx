@@ -2,7 +2,9 @@ import { notFound, redirect } from 'next/navigation';
 import { chavePublica, modoAtual, pagamentoEhFake } from '@/nucleo/checkouts/mercadopago';
 import { buscarCobranca } from '@/nucleo/cobrancas';
 import { buscarPlano, direitosDoPlano } from '@/nucleo/planos';
-import { CheckoutMercadoPago } from '@/components/checkout/MercadoPago';
+import { Checkout } from '@/components/checkout/Checkout';
+import { gatewayConferido } from '@/nucleo/checkouts/gateway';
+import { pagadorDaConta } from '@/lib/acesso-plataforma';
 import { PagamentoFake } from '@/components/PagamentoFake';
 import { PoeiraNaLuz } from '@/components/PoeiraNaLuz';
 import { MarcoDoCheckout } from '@/components/MarcoDoCheckout';
@@ -38,6 +40,22 @@ export default async function Assinar({
   const direitos = direitosDoPlano(plano);
   const chave = chavePublica();
 
+  /*
+    Quem cobra, resolvido ANTES de pintar a tela — e sondando a Wiven, para
+    não abrir um checkout apontado para um gateway que não está respondendo.
+
+    Sem campanha: assinatura não vem de anúncio, vem de quem já é cliente.
+  */
+  const gatewayPix = await gatewayConferido('pix');
+  const gatewayCartao = await gatewayConferido('cartao');
+
+  /*
+    A Wiven exige nome e documento do pagador, e a `cobranca` só guarda
+    e-mail. O último pedido da pessoa tem os dois — ela já comprou aqui, é
+    por isso que está vendo uma oferta de assinatura.
+  */
+  const pagador = pagadorDaConta(cobranca.email);
+
   const itens = [
     direitos.leiturasPorMes > 0 &&
       `${direitos.leiturasPorMes} leitura${direitos.leiturasPorMes > 1 ? 's' : ''} do Oráculo por mês`,
@@ -68,7 +86,7 @@ export default async function Assinar({
         {pagamentoEhFake() || !chave ? (
           <PagamentoFake pedidoId={id} base="cobranca" />
         ) : (
-          <CheckoutMercadoPago
+          <Checkout
             base="cobranca"
             destino="/conta?assinatura=ok"
             pedidoId={id}
@@ -77,6 +95,10 @@ export default async function Assinar({
             nomeProduto={plano.nome}
             itens={itens}
             modo={modoAtual()}
+            nome={pagador.nome ?? cobranca.email.split('@')[0]}
+            cpf={pagador.cpf}
+            gatewayPix={gatewayPix}
+            gatewayCartao={gatewayCartao}
           />
         )}
       </main>

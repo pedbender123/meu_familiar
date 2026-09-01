@@ -100,7 +100,7 @@ export const PRECO_RISCADO_CENTAVOS: Partial<Record<ProdutoId, number>> = {
 };
 
 /** O riscado da assinatura, que não é `ProdutoId` — vive na tabela `planos`. */
-export const PRECO_RISCADO_DA_ASSINATURA_CENTAVOS = 3790;
+export const PRECO_RISCADO_DA_ASSINATURA_CENTAVOS = 3990;
 
 /** `null` quando não há âncora, ou quando ela não é maior que o preço real. */
 export function riscadoDe(id: ProdutoId): number | null {

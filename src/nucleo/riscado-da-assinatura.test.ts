@@ -33,13 +33,18 @@ describe('o riscado da assinatura', () => {
   });
 
   /**
-   * E o número de vitrine mora num arquivo só.
+   * O número de vitrine mora num arquivo só.
    *
-   * Quem já é cliente e vê "de 37,90" dentro do app lembra disso na hora de
+   * Quem já é cliente e vê "de 39,90" dentro do app lembra disso na hora de
    * renovar. A oferta de vendas é para quem ainda não comprou e está
    * comparando três coisas; lá dentro é outra conversa.
+   *
+   * A guarda é pelo NOME da constante, não pelo número: `3990` também é o
+   * preço de um plano antigo na migração 009, e caçar o literal acusaria
+   * aquele arquivo sem ter nada de errado. Guarda que dispara à toa é guarda
+   * que alguém desliga.
    */
-  test('o 3790 não vaza para nenhuma outra tela', () => {
+  test('o riscado da assinatura é definido num lugar só', () => {
     function arquivos(dir: string, achados: string[] = []): string[] {
       for (const nome of readdirSync(dir)) {
         const caminho = join(dir, nome);
@@ -49,19 +54,14 @@ describe('o riscado da assinatura', () => {
       return achados;
     }
 
-    /*
-      Uma casa só: `modelo-de-venda.ts`. A `Oferta.tsx` já teve a sua cópia, e
-      duas cópias de um preço é como elas divergem — uma tela mostrando 37,90
-      e outra 34,90, sem ninguém saber qual é a certa.
-    */
-    const culpados = arquivos('src').filter(
-      (a) => a !== 'src/lib/modelo-de-venda.ts' && /\b3790\b/.test(readFileSync(a, 'utf8'))
+    const definem = arquivos('src').filter((a) =>
+      /PRECO_RISCADO_DA_ASSINATURA_CENTAVOS\s*=/.test(readFileSync(a, 'utf8'))
     );
 
     assert.deepEqual(
-      culpados,
-      [],
-      `o preço de vitrine escapou para: ${culpados.join(', ')}`
+      definem,
+      ['src/lib/modelo-de-venda.ts'],
+      'duas cópias de um preço é como uma tela mostra 39,90 e outra 34,90'
     );
   });
 
