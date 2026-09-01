@@ -166,15 +166,47 @@ describe('a ordem de precedência na visita', () => {
   const fonte = codigoDe('src/app/api/visita/route.ts');
 
   /**
-   * O `?c=` é explícito — alguém montou aquele link à mão para um lugar
-   * específico. O UTM é automático. Quando os dois vêm juntos, o nosso ganha:
-   * senão a mesma campanha existiria duas vezes.
+   * ── A regra inverteu em 01/09, e o motivo está medido ──────────────────
+   *
+   * Era o contrário: o `?c=` primeiro, porque alguém montou aquele link à mão
+   * e portanto seria mais específico que a macro automática. A premissa é que
+   * os dois apontam para a mesma campanha.
+   *
+   * Não apontam. A agência reaproveita um `?c=` só em campanha nova atrás de
+   * campanha nova — o link já está montado e funciona — enquanto o
+   * `utm_campaign` muda a cada uma. Em produção isso pôs **três campanhas da
+   * Meta dentro de uma campanha nossa**, somadas numa linha só, que é a linha
+   * sobre a qual se decide escalar ou pausar.
+   *
+   * Quando a plataforma que cobra o anúncio afirma um ID, ela é a autoridade.
    */
-  test('o ?c= é consultado antes do UTM', () => {
-    const pos = fonte.indexOf('buscarCampanhaPorCodigo(toque.codigoCampanha)');
-    const posUtm = fonte.indexOf('campanhaDoUtm(corpo.utmCampanha');
-    assert.ok(pos > 0 && posUtm > 0, 'os dois caminhos precisam existir');
-    assert.ok(pos < posUtm, 'o código nosso tem que ser tentado primeiro');
+  test('o ID da Meta é consultado antes do ?c=', () => {
+    const posMeta = fonte.indexOf('idDaMeta(corpo.utmCampanha)');
+    const posCodigo = fonte.indexOf('buscarCampanhaPorCodigo(toque.codigoCampanha)');
+    assert.ok(posMeta > 0 && posCodigo > 0, 'os dois caminhos precisam existir');
+    assert.ok(posMeta < posCodigo, 'o ID da plataforma decide primeiro');
+  });
+
+  /**
+   * Só um ID de VERDADE tem esse poder. `utm_campaign=promo` é um apelido
+   * igual ao `?c=`, e entre dois apelidos o nosso é o mais específico — é ele
+   * que sabe distinguir bio de indicação de teste interno.
+   */
+  test('UTM sem ID da Meta continua perdendo para o ?c=', () => {
+    const trecho = fonte.slice(
+      fonte.indexOf('const campanha ='),
+      fonte.indexOf('const peca =')
+    );
+    assert.match(
+      trecho,
+      /idDaMeta\(corpo\.utmCampanha\)\s*\?\s*campanhaDoUtm/,
+      'a preferência do UTM é condicionada ao ID'
+    );
+    assert.ok(
+      trecho.indexOf('buscarCampanhaPorCodigo') <
+        trecho.lastIndexOf('campanhaDoUtm(corpo.utmCampanha'),
+      'sem ID, o ?c= é tentado antes da queda para o UTM'
+    );
   });
 
   /**

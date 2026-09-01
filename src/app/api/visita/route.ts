@@ -15,6 +15,7 @@ import {
   buscarCampanhaPorCodigo,
   buscarPeca,
   campanhaDoUtm,
+  idDaMeta,
   pecaDoUtm,
 } from '@/lib/campanhas';
 import { buscarPedidoPorCodigoCurto } from '@/lib/db';
@@ -62,6 +63,8 @@ export async function POST(req: NextRequest) {
     utmCampanha?: string;
     utmConteudo?: string;
     utmConjunto?: string;
+    /** `utm_medium`. Algumas agências mandam o conjunto de anúncios aqui. */
+    utmMeio?: string;
     s?: string;
     e?: string;
     referencia?: string;
@@ -151,28 +154,50 @@ export async function POST(req: NextRequest) {
   });
 
   /**
-   * A campanha desta chegada, por dois caminhos.
+   * A campanha desta chegada, por dois caminhos — e **o ID da Meta ganha**.
    *
-   * ── A ordem importa, e é esta ─────────────────────────────────────────
+   * ── A ordem era a inversa, e custou caro ──────────────────────────────
    *
-   * **O que veio no link sempre ganha, e o `?c=` vem primeiro** porque ele é
-   * explícito: alguém montou aquele link à mão, para um lugar específico —
-   * bio, indicação, teste interno. O UTM é o caminho automático, do tráfego
-   * pago, onde ninguém escolheu nada.
+   * O `?c=` vinha primeiro, com um raciocínio que parecia sólido: alguém
+   * montou aquele link à mão, para um lugar específico, então ele é mais
+   * específico que a macro automática.
    *
-   * Quando os dois vêm juntos (um link de campanha nossa que também carrega
-   * as macros da Meta), o nosso vence e o UTM não cria campanha nenhuma —
-   * senão a mesma campanha existiria duas vezes, cada metade com metade das
-   * vendas.
+   * A premissa é que os dois apontam para a MESMA campanha. Medido em
+   * produção, 01/09: não apontam. A agência reaproveita um link só — o mesmo
+   * `?c=a2` — em campanha nova atrás de campanha nova, porque o link já está
+   * montado e funciona. Enquanto isso o `utm_campaign` muda a cada uma.
+   *
+   * Resultado: **três campanhas da Meta caindo dentro de uma campanha nossa.**
+   * Nenhuma delas tinha custo, conversão ou criativo próprios no painel; as
+   * três apareciam somadas numa linha chamada "Campanha teste com murilo". E
+   * é sobre essa linha que se decide escalar ou pausar.
+   *
+   * O `?c=` é um apelido que uma pessoa escolheu e reusa. O `utm_campaign` é
+   * o que a plataforma que cobra o anúncio afirma. **Quando a plataforma
+   * afirma, ela é a autoridade** — e é por isso que só um ID de verdade
+   * (`idDaMeta`) tem esse poder: `utm_campaign=promo` continua perdendo para
+   * o `?c=`, porque aí os dois são apelidos e o nosso é o mais específico.
+   *
+   * O `?c=` segue mandando sozinho onde ele é a única coisa que existe: link
+   * de bio, indicação, teste interno — que é para o que ele foi feito.
    */
   const campanha =
+    (idDaMeta(corpo.utmCampanha) ? campanhaDoUtm(corpo.utmCampanha, origem) : undefined) ??
     (toque.codigoCampanha ? buscarCampanhaPorCodigo(toque.codigoCampanha) : undefined) ??
     campanhaDoUtm(corpo.utmCampanha, origem);
 
+  /*
+    Mesma regra um degrau abaixo: o `{{ad.id}}` identifica o criativo melhor
+    que um código de duas letras reusado. E o conjunto é procurado nos dois
+    campos onde ele aparece na prática — ver `pecaDoUtm`.
+  */
   const peca = !campanha
     ? undefined
-    : ((toque.codigoPeca ? buscarPeca(campanha.id, toque.codigoPeca) : undefined) ??
-      pecaDoUtm(campanha.id, corpo.utmConteudo, corpo.utmConjunto));
+    : ((idDaMeta(corpo.utmConteudo)
+        ? pecaDoUtm(campanha.id, corpo.utmConteudo, corpo.utmConjunto, corpo.utmMeio)
+        : undefined) ??
+      (toque.codigoPeca ? buscarPeca(campanha.id, toque.codigoPeca) : undefined) ??
+      pecaDoUtm(campanha.id, corpo.utmConteudo, corpo.utmConjunto, corpo.utmMeio));
   const indicador = toque.codigoIndicacao
     ? buscarPedidoPorCodigoCurto(toque.codigoIndicacao)
     : undefined;

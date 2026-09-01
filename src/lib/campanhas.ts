@@ -1200,6 +1200,41 @@ export const TETO_DE_CAMPANHAS_AUTOMATICAS = 50;
  * e sublinhado — o ID da Meta é só dígito, mas quem escreve UTM à mão usa
  * `promo-agosto`, e recusar isso jogaria fora tráfego bom.
  */
+/**
+ * O ID que a Meta gerou, extraído de qualquer formato em que ele venha.
+ *
+ * ── O que estava acontecendo, medido em produção ──────────────────────────
+ *
+ * Quem monta o anúncio decide o que vai no campo de UTM, e cada pessoa monta
+ * de um jeito. Em 01/09 o banco tinha, para **quatro** campanhas da Meta,
+ * **sete** identidades diferentes chegando:
+ *
+ *     120250071056090615
+ *     1-1-1 - Aberto - ABO - 24/08/2026|120250071056090615
+ *     120250203900740615
+ *     Bitcap 01//09|120250203900740615
+ *     ...
+ *
+ * São a mesma campanha com o nome colado na frente. Para nós viravam duas
+ * campanhas; para a UTMify, duas linhas — cada uma com metade das vendas e
+ * metade do investimento, e nenhuma das duas fechando a conta sozinha.
+ *
+ * ── Por que o ID, e não o texto inteiro ───────────────────────────────────
+ *
+ * Porque o ID é a única parte que a Meta garante. O nome é digitado, muda
+ * quando alguém renomeia a campanha no gerenciador, e some quando trocam o
+ * modelo de UTM. O ID nasce com a campanha e morre com ela.
+ *
+ * Quinze dígitos porque os IDs da Meta têm 17 e nenhum código humano tem
+ * tantos números seguidos por acaso — `promo-2026` e `blackfriday10` não
+ * viram ID nenhum e continuam sendo tratados pelo texto.
+ */
+export function idDaMeta(bruto: string | null | undefined): string | null {
+  if (typeof bruto !== 'string') return null;
+  const achado = bruto.match(/\d{15,}/);
+  return achado ? achado[0] : null;
+}
+
 export function chaveDeUtm(bruto: string | null | undefined): string | null {
   if (typeof bruto !== 'string') return null;
   const cru = bruto.trim();
@@ -1215,6 +1250,17 @@ export function chaveDeUtm(bruto: string | null | undefined): string | null {
     converte, porque seria a soma de várias.
   */
   if (cru.includes('{') || cru.includes('}')) return null;
+
+  /*
+    Havendo ID da Meta no meio do texto, ele É a chave.
+
+    Sem isto, `Bitcap 01//09|120250203900740615` e `120250203900740615` viram
+    duas campanhas diferentes — a mesma campanha partida em duas, cada metade
+    com metade das vendas. Era o estado do banco em 01/09: sete identidades
+    para quatro campanhas reais.
+  */
+  const daMeta = idDaMeta(cru);
+  if (daMeta) return daMeta;
 
   const limpo = cru.slice(0, 64).replace(/[^\w.\-]/g, '');
   // Um caractere não identifica nada.
@@ -1314,11 +1360,39 @@ export function campanhaDoUtm(
 export function pecaDoUtm(
   campanhaId: string,
   utmContent: string | null | undefined,
-  utmTerm?: string | null
+  /**
+   * Os campos que PODEM trazer o conjunto de anúncios, em ordem de preferência.
+   *
+   * ── Por que uma lista, e não um campo ───────────────────────────────────
+   *
+   * `LinkDoAnuncio` recomenda `utm_term={{adset.id}}`, e essa recomendação
+   * continua certa. Ela só não é uma garantia: quem monta o anúncio decide
+   * onde põe cada coisa, e em 01/09 a agência estava mandando o conjunto em
+   * `utm_medium` (`CJ 01|120250071056070615`) e o POSICIONAMENTO em
+   * `utm_term` (`Threads_Feed`).
+   *
+   * Lendo só `utm_term`, o painel de mídia agruparia os criativos por
+   * "Threads_Feed" e "Instagram_Stories" achando que são conjuntos — e o
+   * conjunto real, que é a unidade onde o orçamento é decidido, não
+   * apareceria em lugar nenhum.
+   *
+   * Insistir no nosso formato é o erro que este arquivo inteiro já pagou uma
+   * vez. O sistema aceita o que chega e procura o ID onde ele estiver.
+   */
+  ...candidatosAConjunto: (string | null | undefined)[]
 ): Peca | undefined {
   const chave = chaveDeUtm(utmContent);
   if (!chave) return undefined;
-  const conjunto = chaveDeUtm(utmTerm);
+
+  /*
+    Um ID da Meta vale mais que um texto: entre `Threads_Feed` e
+    `CJ 01|120250071056070615`, o segundo identifica um conjunto de verdade.
+    Só quando nenhum candidato traz ID é que o texto do primeiro serve.
+  */
+  const conjunto =
+    candidatosAConjunto.map(idDaMeta).find((v) => v) ??
+    candidatosAConjunto.map(chaveDeUtm).find((v) => v) ??
+    null;
 
   const existente = db
     .prepare('SELECT * FROM pecas WHERE campanha_id = ? AND utm_conteudo = ?')

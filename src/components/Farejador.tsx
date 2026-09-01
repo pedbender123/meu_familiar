@@ -53,6 +53,8 @@ export function Farejador() {
         // campanha foi bem" para "este vídeo foi bem", perdendo QUAL PÚBLICO
         // respondeu.
         utmConjunto: busca.get('utm_term') ?? undefined,
+        // Nem toda agência põe o conjunto no `utm_term`. Ver `pecaDoUtm`.
+        utmMeio: busca.get('utm_medium') ?? undefined,
         s: busca.get('s') ?? undefined,
         e: busca.get('e') ?? undefined,
         referencia: document.referrer || undefined,
