@@ -1,10 +1,14 @@
 # Prompt de retomada — cole isto depois de compactar
 
-Atualizado em 30/08/2026, à noite.
+Atualizado em 01/09/2026.
 
-**O que foi feito:** o ambiente de teste, o painel de saúde (fases 1–3) e o
-fluxo UTM (§4 inteiro do plano). **O que falta:** `products` na cobrança da
-Wiven, travado por falta da documentação deles — ver o fim deste arquivo.
+**Tudo que está descrito aqui está em produção.** O próximo trabalho é
+`docs/PLANO-REFORMA-ASSINANTES.md`: a assinatura funciona, mas vive num canto
+separado do resto — não aparece na Central, não tem campanha, e a UTMify só
+sabe do primeiro mês.
+
+`products` da Wiven foi **abandonado a pedido do dono** — a assinatura usa as
+rotas próprias (`/gateway/card/subscription`), que não precisam de catálogo.
 
 ---
 
@@ -65,7 +69,7 @@ ssh root@100.126.229.42 'cd /root/apps/bruxario \
 
 ## Comandos
 
-`npm test` (778 passando) · `npm run build` · `npx tsc --noEmit`
+`npm test` (865 passando) · `npm run build` · `npx tsc --noEmit`
 `npm run wiven-fumaca` — cobrança Pix real de R$ 5 contra a API da Wiven
 
 ---
@@ -75,8 +79,8 @@ ssh root@100.126.229.42 'cd /root/apps/bruxario \
 | | |
 | --- | --- |
 | `GATEWAY` | `wiven` (Mercado Pago é a queda automática) |
-| `WIVEN_SPLITS` | `<joão>:40,<pedro>:20` — o resto fica com a conta que cobra |
-| `WIVEN_PRODUCER_DO_DONO` | o producerId do Pedro (sai do lucro reportado) |
+| `WIVEN_SPLITS` | **vazio desde 01/09** — tudo cai na conta que cobra (Murilo). A linha antiga está comentada logo acima dela no `.env` |
+| `WIVEN_PRODUCER_DO_DONO` | preenchido, mas sem efeito enquanto não houver split |
 | `NEXT_PUBLIC_META_PIXEL_ID` | **vazio de propósito** — só a UTMify fala com a Meta |
 | `UTMIFY_API_TOKEN` | preenchido · `UTMIFY_TESTE=0` |
 | `desconto_visivel` | interruptor ausente = preço riscado escondido |
@@ -91,13 +95,17 @@ token no chat** — basta citar o nome da variável.
 | --- | --- |
 | Produto normal | `cmtgczcd20tad01o7u7qd8h9s` |
 | Produto assinatura | `cmt6oods718b501ogyvwtdrhu` |
-| Oferta Simples (9,80) | `Z8O1Z1Y` |
-| Oferta Completa (18,90) | `5TWJNHQ` |
-| Oferta Upgrade (4,90) | `XB1T1D1` |
-| Oferta Assinatura (29,90) | `L8RNDJR` |
+| Oferta Simples | `Z8O1Z1Y` |
+| Oferta Completa | `5TWJNHQ` |
+| Oferta Upgrade | `XB1T1D1` |
+| Oferta Assinatura | `L8RNDJR` |
 
-Coprodução 40/40/20 configurada nos produtos. **Ainda não usada em cobrança
-nenhuma** — hoje quem divide é `WIVEN_SPLITS`.
+**Nada disso está em uso.** A coprodução 40/40/20 segue configurada nos
+produtos e nunca cobrou nada; os preços das ofertas são os antigos. Ficam
+registrados caso o catálogo volte a fazer sentido.
+
+**Preços de verdade** (em `modelo-de-venda.ts`, e no banco para os planos):
+Simples R$ 18,90 · Completa R$ 24,90 · Assinatura R$ 29,90/mês.
 
 ---
 
@@ -109,6 +117,14 @@ nenhuma** — hoje quem divide é `WIVEN_SPLITS`.
 - **Migração aplicada não se edita** — corrige-se com uma nova. Aconteceu na
   031/032 e está documentado lá.
 - **`splits` e coprodução nunca ligados juntos** — descontam duas vezes.
+- **`splits` não existe nas rotas de assinatura da Wiven.** A documentação dos
+  dois endpoints não lista o campo. Quando o repasse voltar, a divisão da
+  assinatura precisa ser resolvida com eles.
+- **Renovação de assinatura é idempotente pela transação.** A Wiven reenvia o
+  webhook até receber 200, e sem isso cada reenvio dava um mês de graça.
+- **O riscado é decoração** (`PRECO_RISCADO_CENTAVOS`). Nunca entra em conta,
+  e se for exibido numa tela nova precisa ser um preço que a loja praticou —
+  preço de referência que nunca existiu é publicidade enganosa.
 - **Reenviar venda para a UTMify gera um `Purchase` novo na Meta.** Foi o que
   inflou o contador para 17. Corrigir no banco sem reenviar, ou aceitar.
 - **Não martelar a API da Wiven.** Excesso de chamadas disparou proteção
