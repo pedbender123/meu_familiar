@@ -35,6 +35,22 @@ export interface LinhaDeAssinante {
   renovacao_automatica: number;
   /** Quanto essa pessoa já pagou no total, somando todas as cobranças pagas. */
   pagoCentavos: number;
+  /**
+   * Plano pago que ninguém pagou — cortesia, convite, teste.
+   *
+   * ── Por que precisa existir ─────────────────────────────────────────────
+   *
+   * Em 20/08 dez pessoas ganharam o plano mensal de presente. Elas são
+   * usuárias de verdade, com acesso de verdade, e o painel as contava como
+   * assinantes: **MRR de R$ 328,90 com um único pagamento no mundo.**
+   *
+   * Um MRR que inclui quem nunca pagou é pior que MRR nenhum — é o número que
+   * decide se o negócio se paga, e ele estava dizendo dez vezes mais.
+   *
+   * Cortesia continua aparecendo na lista, porque essas pessoas existem e
+   * usam. Ela só não entra na conta do dinheiro.
+   */
+  cortesia: boolean;
   diasRestantes: number | null;
 }
 
@@ -116,6 +132,7 @@ export function assinantesAtivos(agora = new Date()): LinhaDeAssinante[] {
       fim,
       renovacao_automatica: l.renovacao_automatica as number,
       pagoCentavos: l.pago_centavos as number,
+      cortesia: preco > 0 && (l.pago_centavos as number) === 0,
       diasRestantes: fim
         ? Math.max(0, Math.ceil((new Date(fim).getTime() - agora.getTime()) / UM_DIA))
         : null,
@@ -157,7 +174,12 @@ export interface ResumoDeAssinantes {
 export function resumoDeAssinantes(agora = new Date()): ResumoDeAssinantes {
   const ativos = assinantesAtivos(agora);
 
-  const pagos = ativos.filter((a) => a.porMesCentavos > 0);
+  /*
+    Assinante pago é quem tem plano pago **e pagou**. Cortesia num plano pago
+    parecia receita recorrente e não é: o MRR chegou a R$ 328,90 com um único
+    pagamento existindo no mundo.
+  */
+  const pagos = ativos.filter((a) => a.porMesCentavos > 0 && !a.cortesia);
   const gratuitos = ativos.length - pagos.length;
   const mrrCentavos = pagos.reduce((s, a) => s + a.porMesCentavos, 0);
 
@@ -170,7 +192,7 @@ export function resumoDeAssinantes(agora = new Date()): ResumoDeAssinantes {
       mrrCentavos: 0,
     };
     atual.quantos++;
-    atual.mrrCentavos += a.porMesCentavos;
+    if (!a.cortesia) atual.mrrCentavos += a.porMesCentavos;
     mapa.set(a.plano_id, atual);
   }
 

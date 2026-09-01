@@ -42,8 +42,20 @@ function conta(): string {
   return id;
 }
 
-function assinar(planoId: string, opcoes: { inicio?: Date; fim?: Date | null; status?: string } = {}) {
+/**
+ * Cria uma assinatura. Por padrão **de quem pagou** — com uma cobrança paga
+ * junto, porque é isso que separa assinante de cortesia desde que o MRR
+ * parou de contar quem ganhou o plano de presente.
+ *
+ * `cortesia: true` faz a assinatura nascer sem pagamento nenhum, que é o
+ * caso das dez que foram dadas em 20/08.
+ */
+function assinar(
+  planoId: string,
+  opcoes: { inicio?: Date; fim?: Date | null; status?: string; cortesia?: boolean } = {}
+) {
   const agora = new Date();
+  const contaId = conta();
   const inicio = opcoes.inicio ?? agora;
   const fim =
     opcoes.fim === null
@@ -55,7 +67,7 @@ function assinar(planoId: string, opcoes: { inicio?: Date; fim?: Date | null; st
      VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)`
   ).run(
     randomUUID(),
-    conta(),
+    contaId,
     planoId,
     opcoes.status ?? 'ativa',
     inicio.toISOString(),
@@ -63,6 +75,19 @@ function assinar(planoId: string, opcoes: { inicio?: Date; fim?: Date | null; st
     agora.toISOString(),
     agora.toISOString()
   );
+
+  if (!opcoes.cortesia) {
+    const preco = (db.prepare('SELECT preco_centavos p FROM planos WHERE id = ?').get(planoId) as
+      | { p: number }
+      | undefined)?.p ?? 0;
+    if (preco > 0) {
+      db.prepare(
+        `INSERT INTO cobrancas (id, conta_id, email, plano_id, valor_centavos, status,
+           pago_em, criado_em, atualizado_em)
+         VALUES (?, ?, 'x@y.z', ?, ?, 'pago', ?, ?, ?)`
+      ).run(randomUUID(), contaId, planoId, preco, agora.toISOString(), agora.toISOString(), agora.toISOString());
+    }
+  }
 }
 
 beforeEach(() => {
@@ -203,5 +228,40 @@ describe('churn', () => {
     assert.equal(r.perdidosNoMes, 1);
     assert.equal(r.novosNoMes, 0);
     assert.equal(r.churnMes, 0.5, '1 perdido de 2 que existiam no começo');
+  });
+});
+
+/**
+ * ── MRR não conta quem não pagou ──────────────────────────────────────────
+ *
+ * Em 20/08 dez pessoas ganharam o plano mensal de presente. São usuárias de
+ * verdade, com acesso de verdade — e o painel as contava como assinantes:
+ * **R$ 328,90 de MRR com um único pagamento existindo no mundo.**
+ *
+ * Um MRR que inclui quem nunca pagou é pior que MRR nenhum. É o número que
+ * decide se o negócio se paga, e ele dizia dez vezes mais.
+ */
+describe('cortesia não é receita', () => {
+  test('plano pago sem pagamento nenhum é cortesia', () => {
+    assinar(MENSAL, { cortesia: true });
+    const [a] = assinantesAtivos();
+    assert.equal(a.pagoCentavos, 0);
+    assert.equal(a.cortesia, true, 'ninguém pagou por esta');
+    assert.equal(resumoDeAssinantes().mrrCentavos, 0, 'MRR não pode contar cortesia');
+  });
+
+  /** E quem está no plano gratuito nunca é cortesia: não há o que perdoar. */
+  test('plano de graça não vira cortesia', () => {
+    const linhas = assinantesAtivos();
+    for (const l of linhas) {
+      if (l.preco_centavos === 0) assert.equal(l.cortesia, false);
+    }
+  });
+
+  /** Cortesia continua na lista: essas pessoas existem e usam o produto. */
+  test('cortesia aparece, só não soma dinheiro', () => {
+    assinar(MENSAL, { cortesia: true });
+    assert.equal(assinantesAtivos().length, 1, 'sumiu da lista');
+    assert.equal(resumoDeAssinantes().mrrCentavos, 0);
   });
 });
