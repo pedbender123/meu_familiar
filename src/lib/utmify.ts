@@ -55,6 +55,15 @@ export interface PedidoParaUtmify {
   /**
    * Tudo que saiu da venda antes do lucro de quem lê o relatório: a taxa do
    * gateway mais a fatia do dono da plataforma. Ver `reportar-venda.ts`.
+   *
+   * **Não vai no corpo hoje.** O campo de dedução leva a taxa do gateway
+   * pura, porque com os splits desligados não há fatia de plataforma nenhuma
+   * e chamar repasse de taxa é o que fez uma venda de R$ 18,90 aparecer com
+   * 66% de custo de gateway.
+   *
+   * Continua calculado e entregue de propósito: no dia em que o split voltar,
+   * a pergunta "a fatia da plataforma é custo da campanha?" volta com ele, e
+   * a resposta já está pronta aqui.
    */
   retiradoCentavos?: number;
   status: StatusUtmify;
@@ -150,30 +159,40 @@ export async function reportarPedido(pedido: PedidoParaUtmify): Promise<boolean>
       utm_term: pedido.rastreio?.utm_term ?? null,
     },
     commission: {
-      totalPriceInCents: pedido.produto.precoCentavos,
       /**
-       * ── Valor cheio, sem dedução (decisão do dono, 01/09/2026) ───────────
+       * ── O que vai, e por que os três campos ─────────────────────────────
        *
-       * Antes ia a taxa do gateway aqui, e a comissão saía já descontada. A
-       * intenção era boa: quem lê o painel decide escalar ou pausar, e ver o
-       * bruto faz o CPA parecer melhor do que é.
+       *   totalPriceInCents      o que o cliente pagou       24,90
+       *   gatewayFeeInCents      o que o gateway cobrou       3,48
+       *   userCommissionInCents  o que sobrou                21,42
        *
-       * Mudou porque o repasse mudou. Com os splits desligados, a receita
-       * inteira cai numa conta só, e a conta de quanto sobra deixou de ser
-       * feita aqui — ela é feita entre as pessoas, fora do sistema. Mandar
-       * uma dedução parcial dava um número que não é o bruto nem o líquido de
-       * ninguém.
+       * A UTMify sabe receber a taxa, então declarar os três é o único jeito
+       * que fecha: o painel mostra o faturamento cheio E o lucro correto, sem
+       * ninguém precisar refazer conta.
        *
-       * **A conta que a agência lê passa a ser sobre o BRUTO.** Quem comparar
-       * com o extrato vai achar a diferença da taxa, e é isso mesmo: o painel
-       * deles mede o que a venda gerou, não o que sobrou.
+       * As duas alternativas são piores, cada uma de um jeito. Mandar o cheio
+       * dizendo taxa zero infla o lucro de toda campanha e faz o CPA parecer
+       * melhor do que é. Mandar já descontado esconde o faturamento e quem
+       * comparar com o extrato acha uma diferença que ninguém explica.
        *
-       * Para voltar: `gatewayFeeInCents` recebe `retiradoCentavos` e a
-       * comissão volta a ser a subtração. O campo continua sendo alimentado
-       * pelo `reportar-venda.ts`, então nada mais precisa mudar.
+       * ── Taxa é taxa do GATEWAY, e só ────────────────────────────────────
+       *
+       * Houve um tempo em que ia aqui `retiradoCentavos`: a taxa MAIS a fatia
+       * da plataforma, porque a UTMify tem um campo só de dedução e do ponto
+       * de vista de quem recebe as duas somem do bolso igual.
+       *
+       * Com os splits desligados as duas coisas são o mesmo número, e chamar
+       * repasse de taxa é o tipo de mentira pequena que vira um bug grande
+       * quando o split voltar — foi assim que uma venda de R$ 18,90 apareceu
+       * com 66% de taxa de gateway. Enquanto for zero, que seja zero por ser
+       * zero, não por coincidência.
        */
-      gatewayFeeInCents: 0,
-      userCommissionInCents: pedido.produto.precoCentavos,
+      totalPriceInCents: pedido.produto.precoCentavos,
+      gatewayFeeInCents: pedido.taxaCentavos ?? 0,
+      userCommissionInCents: Math.max(
+        0,
+        pedido.produto.precoCentavos - (pedido.taxaCentavos ?? 0)
+      ),
       currency: 'BRL' as const,
     },
     isTest: process.env.UTMIFY_TESTE === '1',

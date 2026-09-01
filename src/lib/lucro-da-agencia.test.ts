@@ -67,10 +67,33 @@ describe('o que a Utmify recebe é o lucro da agência', () => {
    * O que a agência lê passa a ser sobre o BRUTO. Quem comparar com o extrato
    * acha a diferença da taxa, e é isso mesmo.
    */
-  test('a Utmify recebe o valor cheio, sem dedução', () => {
+  /**
+   * A UTMify sabe receber a taxa, então os três campos vão declarados: preço
+   * cheio, taxa do gateway, e o que sobrou. É o único arranjo que fecha — o
+   * painel mostra o faturamento cheio E o lucro correto.
+   *
+   * As duas alternativas erram cada uma de um jeito: cheio com taxa zero
+   * infla o lucro de toda campanha e melhora o CPA de mentira; já descontado
+   * esconde o faturamento e cria uma diferença contra o extrato que ninguém
+   * explica.
+   */
+  test('vai o preço cheio COM a taxa declarada', () => {
     const fonte = codigoDe('src/lib/utmify.ts');
-    assert.match(fonte, /gatewayFeeInCents: 0/);
-    assert.match(fonte, /userCommissionInCents: pedido\.produto\.precoCentavos/);
+    assert.match(fonte, /totalPriceInCents: pedido\.produto\.precoCentavos/);
+    assert.match(fonte, /gatewayFeeInCents: pedido\.taxaCentavos \?\? 0/);
+    assert.match(fonte, /precoCentavos - \(pedido\.taxaCentavos \?\? 0\)/);
+  });
+
+  /**
+   * E a taxa reportada é a do GATEWAY, não "tudo que saiu". Com os splits
+   * desligados os dois números são iguais, e é justamente aí que a confusão
+   * se instala sem doer — até o split voltar e uma venda de R$ 18,90
+   * aparecer com 66% de custo de gateway, como já aconteceu.
+   */
+  test('taxa é taxa do gateway, não repasse', () => {
+    const fonte = codigoDe('src/lib/utmify.ts');
+    const bloco = fonte.slice(fonte.indexOf('commission: {'));
+    assert.doesNotMatch(bloco, /retiradoCentavos/, 'repasse não é taxa de gateway');
   });
 
   /**
