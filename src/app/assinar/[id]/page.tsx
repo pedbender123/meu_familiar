@@ -99,6 +99,15 @@ export default async function Assinar({
             cpf={pagador.cpf}
             gatewayPix={gatewayPix}
             gatewayCartao={gatewayCartao}
+            /*
+              Plano recorrente é só cartão, por ora. O Pix recorrente da Wiven
+              existe na documentação e nunca foi exercitado — e a falha dele
+              aparece trinta dias depois, com o cliente já sem acesso.
+
+              Plano de acesso único segue com os dois: ali o Pix é uma
+              cobrança comum, do mesmo tipo que já roda no funil.
+            */
+            somenteCartao={plano.recorrente === 1}
           />
         )}
       </main>

@@ -131,6 +131,24 @@ export async function POST(
      * dias mais o e-mail de renovação. É o que rodava antes disto existir, e
      * continua sendo a rede quando o Mercado Pago está cobrando.
      */
+    /**
+     * Plano recorrente não é cobrado no Pix por enquanto.
+     *
+     * Recusar é melhor que cair na cobrança avulsa. A queda daria 30 dias de
+     * acesso SEM criar recorrência nenhuma — a pessoa acharia que assinou, e
+     * a descoberta viria trinta dias depois, com o acesso fechando sozinho e
+     * nenhuma cobrança nova para explicar por quê.
+     *
+     * A tela já esconde o Pix nesses planos; isto é a trava para quem chegar
+     * por outro caminho.
+     */
+    if (plano.recorrente === 1 && meio === 'pix') {
+      return NextResponse.json(
+        { erro: 'Assinatura só no cartão por enquanto. Escolha cartão para continuar.' },
+        { status: 400 }
+      );
+    }
+
     const recorrente = plano.recorrente === 1 && nomeDoGateway === 'wiven' && !!wiven;
 
     let resultado;

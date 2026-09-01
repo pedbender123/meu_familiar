@@ -54,6 +54,7 @@ export function Checkout({
   gatewayPix,
   gatewayCartao,
   base = 'pedido',
+  somenteCartao = false,
   caminho = 'pagamento',
   destino,
 }: {
@@ -71,10 +72,22 @@ export function Checkout({
   gatewayPix: GatewayDoMeio;
   gatewayCartao: GatewayDoMeio;
   base?: 'pedido' | 'cobranca';
+  /**
+   * Esconde o Pix e abre direto no cartão.
+   *
+   * Existe para a assinatura recorrente. O Pix recorrente da Wiven existe na
+   * documentação e nunca foi exercitado aqui — e o modo de falha dele é caro:
+   * uma recorrência que não renova só aparece trinta dias depois, quando o
+   * cliente já perdeu o acesso e ninguém foi avisado.
+   *
+   * Cartão primeiro, Pix quando houver uma assinatura de verdade provando
+   * que funciona.
+   */
+  somenteCartao?: boolean;
   caminho?: 'pagamento' | 'melhorar';
   destino?: string;
 }) {
-  const [meio, setMeio] = useState<MeioEscolhido>('pix');
+  const [meio, setMeio] = useState<MeioEscolhido>(somenteCartao ? 'cartao' : 'pix');
   const gatewayDoMeio = meio === 'pix' ? gatewayPix : gatewayCartao;
 
   function escolher(novo: MeioEscolhido) {
@@ -87,26 +100,33 @@ export function Checkout({
 
   return (
     <div className="w-full max-w-md flex flex-col gap-6">
-      <div
-        role="tablist"
-        aria-label="Forma de pagamento"
-        className="grid grid-cols-2 gap-2 rounded-2xl border border-pergaminho/12 p-1.5"
-      >
-        <Aba
-          ativa={meio === 'pix'}
-          aoClicar={() => escolher('pix')}
-          icone={<QrCode size={16} strokeWidth={1.5} />}
-          rotulo="Pix"
-          detalhe="Na hora"
-        />
-        <Aba
-          ativa={meio === 'cartao'}
-          aoClicar={() => escolher('cartao')}
-          icone={<CreditCard size={16} strokeWidth={1.5} />}
-          rotulo="Cartão"
-          detalhe="À vista"
-        />
-      </div>
+      {/*
+        Com uma opção só, a barra de abas some inteira em vez de virar um
+        botão sozinho e desabilitado. Aba única que não leva a lugar nenhum é
+        uma escolha que não existe fingindo existir.
+      */}
+      {!somenteCartao && (
+        <div
+          role="tablist"
+          aria-label="Forma de pagamento"
+          className="grid grid-cols-2 gap-2 rounded-2xl border border-pergaminho/12 p-1.5"
+        >
+          <Aba
+            ativa={meio === 'pix'}
+            aoClicar={() => escolher('pix')}
+            icone={<QrCode size={16} strokeWidth={1.5} />}
+            rotulo="Pix"
+            detalhe="Na hora"
+          />
+          <Aba
+            ativa={meio === 'cartao'}
+            aoClicar={() => escolher('cartao')}
+            icone={<CreditCard size={16} strokeWidth={1.5} />}
+            rotulo="Cartão"
+            detalhe="À vista"
+          />
+        </div>
+      )}
 
       {/*
         A troca de aba desmonta um formulário e monta outro — o cartão do

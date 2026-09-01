@@ -24,7 +24,13 @@ describe('o checkout começa no Pix', () => {
    */
   test('o meio nasce em pix', () => {
     const fonte = codigoDe('src/components/checkout/Checkout.tsx');
-    assert.match(fonte, /useState<MeioEscolhido>\('pix'\)/);
+    /*
+      A assinatura recorrente passou a poder pedir só cartão, então o padrão
+      virou condicional. A regra do funil não mudou: sem `somenteCartao`, que
+      é o caso de toda compra de produto, o meio continua nascendo no Pix.
+    */
+    assert.match(fonte, /useState<MeioEscolhido>\(somenteCartao \? 'cartao' : 'pix'\)/);
+    assert.match(fonte, /somenteCartao = false/, 'o padrão tem que ser o funil normal');
   });
 
   test('o cartão continua a um clique, não escondido', () => {

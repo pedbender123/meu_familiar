@@ -101,3 +101,45 @@ describe('a rota de cobrança', () => {
     assert.ok(j === -1 || i < j, 'gravar tem que vir antes de responder');
   });
 });
+
+/**
+ * ── Só cartão, por enquanto ───────────────────────────────────────────────
+ *
+ * O Pix recorrente da Wiven existe na documentação e nunca foi exercitado
+ * aqui. O modo de falha dele é o pior tipo: uma recorrência que não renova só
+ * aparece trinta dias depois, quando o cliente já perdeu o acesso e ninguém
+ * foi avisado de nada.
+ */
+describe('assinatura é só no cartão', () => {
+  test('a tela esconde o Pix quando o plano é recorrente', () => {
+    const tela = codigoDe('src/app/assinar/[id]/page.tsx');
+    assert.match(tela, /somenteCartao=\{plano\.recorrente === 1\}/);
+  });
+
+  /**
+   * Recusar é melhor que cair na cobrança avulsa: a queda daria 30 dias de
+   * acesso SEM criar recorrência, a pessoa acharia que assinou, e a descoberta
+   * viria um mês depois com o acesso fechando sozinho.
+   */
+  test('a rota recusa Pix em plano recorrente, em vez de virar cobrança única', () => {
+    const rota = codigoDe('src/app/api/cobranca/[id]/pagamento/route.ts');
+    assert.match(rota, /plano\.recorrente === 1 && meio === 'pix'/);
+    assert.match(rota, /status: 400/);
+  });
+
+  test('o checkout abre direto no cartão nesse modo', () => {
+    const checkout = codigoDe('src/components/checkout/Checkout.tsx');
+    assert.match(checkout, /useState<MeioEscolhido>\(somenteCartao \? 'cartao' : 'pix'\)/);
+  });
+
+  /**
+   * E a trava não pode ter comido o caminho antigo: plano de acesso único
+   * (`recorrente = 0`) continua cobrável, nos dois meios, pela rota avulsa.
+   */
+  test('o caminho da cobrança única continua existindo', () => {
+    const rota = codigoDe('src/app/api/cobranca/[id]/pagamento/route.ts');
+    assert.match(rota, /resultado = await cobrar\(provedor\)/);
+    // A recusa é condicionada; não existe recusa solta de Pix.
+    assert.match(rota, /if \(plano\.recorrente === 1 && meio === 'pix'\)/);
+  });
+});
