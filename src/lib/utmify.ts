@@ -152,21 +152,28 @@ export async function reportarPedido(pedido: PedidoParaUtmify): Promise<boolean>
     commission: {
       totalPriceInCents: pedido.produto.precoCentavos,
       /**
-       * Tudo que foi retirado antes do lucro de quem lê — taxa do gateway
-       * mais a fatia da plataforma. A Utmify só tem um campo de dedução, e
-       * do ponto de vista de quem recebe as duas coisas são a mesma: dinheiro
-       * que saiu da venda antes de chegar nele.
+       * ── Valor cheio, sem dedução (decisão do dono, 01/09/2026) ───────────
+       *
+       * Antes ia a taxa do gateway aqui, e a comissão saía já descontada. A
+       * intenção era boa: quem lê o painel decide escalar ou pausar, e ver o
+       * bruto faz o CPA parecer melhor do que é.
+       *
+       * Mudou porque o repasse mudou. Com os splits desligados, a receita
+       * inteira cai numa conta só, e a conta de quanto sobra deixou de ser
+       * feita aqui — ela é feita entre as pessoas, fora do sistema. Mandar
+       * uma dedução parcial dava um número que não é o bruto nem o líquido de
+       * ninguém.
+       *
+       * **A conta que a agência lê passa a ser sobre o BRUTO.** Quem comparar
+       * com o extrato vai achar a diferença da taxa, e é isso mesmo: o painel
+       * deles mede o que a venda gerou, não o que sobrou.
+       *
+       * Para voltar: `gatewayFeeInCents` recebe `retiradoCentavos` e a
+       * comissão volta a ser a subtração. O campo continua sendo alimentado
+       * pelo `reportar-venda.ts`, então nada mais precisa mudar.
        */
-      gatewayFeeInCents: pedido.retiradoCentavos ?? pedido.taxaCentavos ?? 0,
-      /**
-       * O que sobra para quem vende, depois da taxa. A Utmify usa este número
-       * como receita no relatório — mandar o valor cheio infla o resultado de
-       * toda campanha e faz o CPA parecer melhor do que é.
-       */
-      userCommissionInCents: Math.max(
-        0,
-        pedido.produto.precoCentavos - (pedido.retiradoCentavos ?? pedido.taxaCentavos ?? 0)
-      ),
+      gatewayFeeInCents: 0,
+      userCommissionInCents: pedido.produto.precoCentavos,
       currency: 'BRL' as const,
     },
     isTest: process.env.UTMIFY_TESTE === '1',

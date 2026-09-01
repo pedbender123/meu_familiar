@@ -53,17 +53,36 @@ describe('o que a Utmify recebe é o lucro da agência', () => {
   });
 
   /**
-   * A Utmify tem um campo só de dedução. Do ponto de vista de quem recebe, a
-   * taxa do gateway e a fatia da plataforma são a mesma coisa: dinheiro que
-   * saiu da venda antes de chegar nele.
+   * ── Mudou em 01/09/2026: vai o valor CHEIO ──────────────────────────────
+   *
+   * Até aqui a dedução ia junto, e a comissão saía descontada. A intenção era
+   * boa — quem lê o painel decide escalar ou pausar, e ver o bruto faz o CPA
+   * parecer melhor do que é.
+   *
+   * Mudou porque o repasse mudou. Com os splits desligados, a receita inteira
+   * cai numa conta só e a divisão passou a ser feita entre as pessoas, fora
+   * do sistema. Uma dedução parcial dava um número que não era o bruto nem o
+   * líquido de ninguém.
+   *
+   * O que a agência lê passa a ser sobre o BRUTO. Quem comparar com o extrato
+   * acha a diferença da taxa, e é isso mesmo.
    */
-  test('a dedução reportada é tudo que saiu antes do lucro', () => {
+  test('a Utmify recebe o valor cheio, sem dedução', () => {
     const fonte = codigoDe('src/lib/utmify.ts');
-    assert.match(fonte, /gatewayFeeInCents: pedido\.retiradoCentavos \?\? pedido\.taxaCentavos \?\? 0/);
-    assert.match(
-      fonte,
-      /precoCentavos - \(pedido\.retiradoCentavos \?\? pedido\.taxaCentavos \?\? 0\)/
-    );
+    assert.match(fonte, /gatewayFeeInCents: 0/);
+    assert.match(fonte, /userCommissionInCents: pedido\.produto\.precoCentavos/);
+  });
+
+  /**
+   * E o caminho de volta continua alimentado: `reportar-venda.ts` ainda
+   * calcula `retiradoCentavos` e o entrega. Voltar a descontar é trocar dois
+   * valores em `utmify.ts`, sem mexer em mais nada — e o dia em que os splits
+   * voltarem, é isso que vai ser preciso.
+   */
+  test('o cálculo da dedução continua disponível para voltar', () => {
+    const fonte = codigoDe('src/lib/reportar-venda.ts');
+    assert.match(fonte, /retiradoCentavos/);
+    assert.match(fonte, /pedido\.split_do_dono_centavos \?\? 0/);
   });
 
   /**
