@@ -68,18 +68,19 @@ const PRECOS_DO_MODELO_ANTIGO: Partial<Record<ProdutoId, number>> = {
    *
    * Agora o cheio absorve o cupom:
    *
-   *     Revelação   12,25 − 20%  =   9,80
-   *     Completa    23,62 − 20%  =  18,90
+   *     Simples     23,62 − 20%  =  18,90
+   *     Completa    31,12 − 20%  =  24,90
    *
    * **`precoComDesconto` arredonda para CIMA** (`Math.ceil`), não para o mais
-   * próximo. Por isso a Completa é 2362 e não 2363: 2363 × 0,8 = 1890,4, que
-   * o `ceil` empurra para 1891 e faz o cliente pagar um centavo a mais do que
-   * o anunciado. Com 2362 dá 1889,6 → 1890, exato.
+   * próximo. Por isso a Simples é 2362 e não 2363: 2363 × 0,8 = 1890,4, que o
+   * `ceil` empurra para 1891 e faz o cliente pagar um centavo a mais do que o
+   * anunciado. Com 2362 dá 1889,6 → 1890, exato. Mesma conta na Completa:
+   * 3112 × 0,8 = 2489,6 → 2490; 3113 daria 2491.
    *
    * Mexer num destes números sem refazer a conta muda o que o cliente paga —
    * o teste ao lado trava os dois resultados, não os dois preços cheios.
    */
-  revelacao: 1225,
+  revelacao: 2362,
   /**
    * A Completa também passa por aqui agora.
    *
@@ -87,7 +88,7 @@ const PRECOS_DO_MODELO_ANTIGO: Partial<Record<ProdutoId, number>> = {
    * que virava 15,12 depois do cupom. Só o preço da Revelação tinha sido
    * pensado com o desconto; o da Completa vazava.
    */
-  completa: 2362,
+  completa: 3112,
 };
 
 export function precoVigenteCentavos(id: ProdutoId): number {

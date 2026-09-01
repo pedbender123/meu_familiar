@@ -40,12 +40,12 @@ describe('desligado — o modelo de produção', () => {
   /** O erro que custaria dinheiro: entregar de graça o que o anúncio cobra. */
   /**
    * O número aqui é o CHEIO, antes do cupom de lançamento. O que o cliente
-   * paga (R$ 9,80) é travado em `preco-com-cupom.test.ts` — os dois juntos
-   * são o contrato: cheio 12,25, cobrado 9,80.
+   * paga (R$ 18,90) é travado em `preco-com-cupom.test.ts` — os dois juntos
+   * são o contrato: cheio 23,62, cobrado 18,90.
    */
-  test('a Revelação tem preço cheio, não zero', () => {
-    assert.equal(precoVigenteCentavos('revelacao'), 1225);
-    assert.equal(produtoVigente('revelacao').precoCentavos, 1225);
+  test('a Simples tem preço cheio, não zero', () => {
+    assert.equal(precoVigenteCentavos('revelacao'), 2362);
+    assert.equal(produtoVigente('revelacao').precoCentavos, 2362);
   });
 
   /**
@@ -81,7 +81,7 @@ describe('desligado — o modelo de produção', () => {
   });
 
   test('a Completa também tem cheio, para o cupom caber', () => {
-    assert.equal(precoVigenteCentavos('completa'), 2362);
+    assert.equal(precoVigenteCentavos('completa'), 3112);
   });
 });
 
@@ -102,7 +102,7 @@ describe('virar a chave', () => {
     ligar(true);
     assert.equal(precoVigenteCentavos('revelacao'), 0);
     ligar(false);
-    assert.equal(precoVigenteCentavos('revelacao'), 1225);
+    assert.equal(precoVigenteCentavos('revelacao'), 2362);
   });
 });
 
@@ -155,7 +155,7 @@ describe('nenhuma rota decide preço pela tabela estática', () => {
     ligar(false);
     const preco = precoVigenteCentavos('revelacao');
     assert.ok(preco > 0, 'preço zero faz o funil entregar sem cobrar');
-    assert.equal(preco, 1225);
+    assert.equal(preco, 2362);
   });
 });
 
@@ -196,7 +196,7 @@ describe('nenhum caminho de cobrança escapa do interruptor', () => {
     ligar(false);
     assert.equal(
       precoDoPedido({ produto: 'revelacao', desconto_percentual: null }).finalCentavos,
-      1225
+      2362
     );
     ligar(true);
     assert.equal(

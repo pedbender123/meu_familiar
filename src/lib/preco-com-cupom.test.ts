@@ -26,36 +26,42 @@ beforeEach(() => {
 });
 
 describe('o valor que o cliente paga', () => {
-  test('Revelação sai a R$ 9,80 com o cupom aplicado', () => {
+  test('Simples sai a R$ 18,90 com o cupom aplicado', () => {
     const preco = precoComDesconto(produtoVigente('revelacao'), DESCONTO_DE_LANCAMENTO);
-    assert.equal(preco.finalCentavos, 980, 'é o preço anunciado; não pode sair menos');
+    assert.equal(preco.finalCentavos, 1890, 'é o preço anunciado; não pode sair diferente');
   });
 
-  test('Completa sai a R$ 18,90 com o cupom aplicado', () => {
+  test('Completa sai a R$ 24,90 com o cupom aplicado', () => {
     const preco = precoComDesconto(produtoVigente('completa'), DESCONTO_DE_LANCAMENTO);
-    assert.equal(preco.finalCentavos, 1890);
+    assert.equal(preco.finalCentavos, 2490);
   });
 
-  /** Sem cupom, o cheio é o cheio — e é ele que aparece riscado na tela. */
+  /** Sem cupom, o cheio é o cheio — e é ele que apareceria riscado na tela. */
   test('sem cupom, cobra o cheio', () => {
-    assert.equal(precoVigenteCentavos('revelacao'), 1225);
-    assert.equal(precoVigenteCentavos('completa'), 2362);
+    assert.equal(precoVigenteCentavos('revelacao'), 2362);
+    assert.equal(precoVigenteCentavos('completa'), 3112);
   });
 
   /**
    * `precoComDesconto` arredonda para CIMA. 2363 × 0,8 = 1890,4 vira 1891 —
    * um centavo a mais do que o anunciado. É a diferença entre um cheio
    * escolhido no olho e um calculado.
+   *
+   * O que este teste trava de verdade é o PREÇO FINAL. O cheio é consequência
+   * dele, e recalculá-lo é o passo que se esquece quando alguém sobe preço com
+   * pressa — foi assim que a venda anunciada a R$ 9,80 saiu por R$ 7,84 uma
+   * vez, por doze horas.
    */
   test('o arredondamento é para cima, e os cheios foram escolhidos por isso', () => {
-    assert.equal(Math.ceil(1225 * 0.8), 980);
     assert.equal(Math.ceil(2362 * 0.8), 1890);
+    assert.equal(Math.ceil(3112 * 0.8), 2490);
     assert.equal(Math.ceil(2363 * 0.8), 1891, 'o valor ingênuo erraria por um centavo');
+    assert.equal(Math.ceil(3113 * 0.8), 2491, 'idem na Completa');
   });
 
   /** Tirar o cupom é o caminho de subir preço sem assustar. */
   test('desligar o cupom sobe para o cheio, sem mexer em código', () => {
     const semCupom = precoComDesconto(produtoVigente('revelacao'), 0);
-    assert.equal(semCupom.finalCentavos, 1225);
+    assert.equal(semCupom.finalCentavos, 2362);
   });
 });

@@ -174,9 +174,22 @@ describe('churn', () => {
   });
 
   test('conta os perdidos do mês pelo fim do acesso', () => {
-    const inicioDoMes = new Date();
-    inicioDoMes.setDate(2);
-    inicioDoMes.setHours(0, 0, 0, 0);
+    /*
+      Um instante dentro do mês corrente e JÁ PASSADO.
+
+      Antes isto era "dia 2 às 00:00", e o teste falhava todo dia 1º: no
+      primeiro dia do mês o dia 2 ainda não chegou, o acesso não tinha
+      terminado, e o assinante não contava como perdido. Vermelho uma vez por
+      mês, sempre por um dia — o tipo de teste que ensina a ignorar vermelho.
+
+      O `max` cobre a virada: no primeiro minuto do mês, "um minuto atrás"
+      cairia no mês anterior.
+    */
+    const agora = new Date();
+    const primeiroDoMes = new Date(agora.getFullYear(), agora.getMonth(), 1, 0, 0, 0, 0);
+    const inicioDoMes = new Date(
+      Math.max(primeiroDoMes.getTime(), agora.getTime() - 60_000)
+    );
 
     // Um veio de antes e continua; um veio de antes e caiu neste mês.
     assinar(MENSAL, { inicio: new Date(Date.now() - 90 * 86_400_000) });
