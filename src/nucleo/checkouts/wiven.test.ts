@@ -682,3 +682,41 @@ describe('o split da venda', () => {
   });
 });
 
+
+/**
+ * ── A URL de callback duplicada ───────────────────────────────────────────
+ *
+ * `WIVEN_CALLBACK_URL` espera a ORIGEM, e o nome dela convida a colar a URL
+ * do callback inteira. Aconteceu ao montar o ambiente de teste: o resultado
+ * foi `/api/webhook/wiven/api/webhook/wiven`, a Wiven tentou seis vezes,
+ * levou 404 em todas, e a assinatura ficou paga do lado deles e sem
+ * confirmação do nosso.
+ *
+ * O sintoma é mudo: nenhum erro no nosso código, só um pagamento que nunca
+ * chega — descoberto quando alguém repara que o acesso não foi liberado.
+ */
+describe('a URL de callback', () => {
+  const original = process.env.WIVEN_CALLBACK_URL;
+  const depois = () => {
+    if (original === undefined) delete process.env.WIVEN_CALLBACK_URL;
+    else process.env.WIVEN_CALLBACK_URL = original;
+  };
+
+  test('aceita a origem', () => {
+    process.env.WIVEN_CALLBACK_URL = 'https://teste.bruxario.com.br';
+    assert.equal(urlDeCallback(), 'https://teste.bruxario.com.br/api/webhook/wiven');
+    depois();
+  });
+
+  test('e a URL completa, sem duplicar o caminho', () => {
+    process.env.WIVEN_CALLBACK_URL = 'https://teste.bruxario.com.br/api/webhook/wiven';
+    assert.equal(urlDeCallback(), 'https://teste.bruxario.com.br/api/webhook/wiven');
+    depois();
+  });
+
+  test('com barra no fim também', () => {
+    process.env.WIVEN_CALLBACK_URL = 'https://teste.bruxario.com.br/';
+    assert.equal(urlDeCallback(), 'https://teste.bruxario.com.br/api/webhook/wiven');
+    depois();
+  });
+});

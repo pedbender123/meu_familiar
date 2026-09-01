@@ -84,7 +84,24 @@ export const CAMINHO_DO_WEBHOOK = '/api/webhook/wiven';
  */
 export function urlDeCallback(): string {
   const explicito = process.env.WIVEN_CALLBACK_URL?.trim();
-  if (explicito) return `${explicito.replace(/\/$/, '')}${CAMINHO_DO_WEBHOOK}`;
+  if (explicito) {
+    const limpo = explicito.replace(/\/$/, '');
+    /*
+      ── Por que a variável perdoa a URL completa ──────────────────────────
+
+      Ela se chama `WIVEN_CALLBACK_URL` e espera só a ORIGEM. Quem lê o nome
+      cola a URL do callback — foi exatamente o que aconteceu ao montar o
+      ambiente de teste, e o resultado foi
+      `.../api/webhook/wiven/api/webhook/wiven`: a Wiven tentou seis vezes,
+      levou 404 em todas, e a assinatura ficou paga do lado deles e sem
+      confirmação do nosso.
+
+      O sintoma é caro e mudo. Não há erro em lugar nenhum do nosso código —
+      só um pagamento que nunca chega, descoberto quando alguém repara que o
+      acesso não foi liberado. Aceitar as duas formas custa uma linha.
+    */
+    return limpo.endsWith(CAMINHO_DO_WEBHOOK) ? limpo : `${limpo}${CAMINHO_DO_WEBHOOK}`;
+  }
 
   const base = (process.env.BASE_URL || 'https://bruxario.com.br').replace(/\/$/, '');
 
