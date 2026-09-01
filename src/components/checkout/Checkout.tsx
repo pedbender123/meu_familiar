@@ -154,6 +154,7 @@ export function Checkout({
           cpf={cpf}
           itens={itens}
           destino={destino}
+          base={base}
         />
       ) : meio === 'pix' && gatewayPix === 'cakto' ? (
         <CheckoutCaktoPix
@@ -162,6 +163,7 @@ export function Checkout({
           valorEmReais={valorEmReais}
           nome={nome}
           cpf={cpf}
+          base={base}
         />
       ) : (
         <CheckoutMercadoPago

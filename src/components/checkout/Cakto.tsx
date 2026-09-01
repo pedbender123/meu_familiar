@@ -53,11 +53,22 @@ export function CheckoutCaktoPix({
   valorEmReais,
   nome,
   cpf,
+  base = 'pedido',
 }: {
   pedidoId: string;
   valorEmReais: number;
   nome: string;
   cpf: string | null;
+  /**
+   * Mesma correção feita no checkout da Wiven, pelo mesmo motivo.
+   *
+   * Rota fixa em `/api/pedido/...` funciona enquanto só o funil de produtos
+   * usa este componente, e quebra com "pedido não encontrado" no dia em que
+   * alguém apontar a assinatura para cá. A Cakto não está roteada hoje —
+   * consertar agora custa uma linha; descobrir depois custa uma venda na tela
+   * de pagar.
+   */
+  base?: 'pedido' | 'cobranca';
 }) {
   const [telefone, setTelefone] = useState('');
   const [documento, setDocumento] = useState(cpf ?? '');
@@ -75,7 +86,7 @@ export function CheckoutCaktoPix({
     if (!pix) return;
     const timer = setInterval(async () => {
       try {
-        const r = await fetch(`/api/pedido/${pedidoId}`);
+        const r = await fetch(`/api/${base}/${pedidoId}`);
         if (!r.ok) return;
         const d = await r.json();
         if (d.status && d.status !== 'aguardando_pagamento') {
@@ -100,7 +111,7 @@ export function CheckoutCaktoPix({
 
     setEnviando(true);
     try {
-      const resposta = await fetch(`/api/pedido/${pedidoId}/pagamento`, {
+      const resposta = await fetch(`/api/${base}/${pedidoId}/pagamento`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

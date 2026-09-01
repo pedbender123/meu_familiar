@@ -73,6 +73,7 @@ export function CheckoutWiven({
   cpf,
   itens,
   destino,
+  base = 'pedido',
 }: {
   pedidoId: string;
   meio: 'pix' | 'cartao';
@@ -81,6 +82,24 @@ export function CheckoutWiven({
   cpf: string | null;
   itens?: string[];
   destino?: string;
+  /**
+   * Qual família de rota atende este checkout.
+   *
+   * ── O bug que isto conserta ─────────────────────────────────────────────
+   *
+   * As duas chamadas daqui apontavam para `/api/pedido/...` fixo. Enquanto só
+   * o funil de produtos usava a Wiven, ninguém notou — o `pedidoId` sempre era
+   * mesmo um pedido.
+   *
+   * Quando a assinatura passou a cobrar pela Wiven, o mesmo componente
+   * recebeu o id de uma COBRANÇA e foi bater na rota de pedido: **"pedido não
+   * encontrado"**, na tela de pagar, com o cartão já digitado.
+   *
+   * `CheckoutMercadoPago` já tinha este prop; este aqui nasceu sem, e a
+   * divergência entre dois checkouts é exatamente o que o comentário de
+   * `assinar/[id]/page.tsx` previa quando disse para não duplicar.
+   */
+  base?: 'pedido' | 'cobranca';
 }) {
   const [telefone, setTelefone] = useState('');
   const [documento, setDocumento] = useState(cpf ?? '');
@@ -108,7 +127,7 @@ export function CheckoutWiven({
     if (!pix) return;
     const timer = setInterval(async () => {
       try {
-        const r = await fetch(`/api/pedido/${pedidoId}`);
+        const r = await fetch(`/api/${base}/${pedidoId}`);
         if (!r.ok) return;
         const d = await r.json();
         if (d.status && d.status !== 'aguardando_pagamento') {
@@ -185,7 +204,7 @@ export function CheckoutWiven({
     marcar('pagamento_tentado');
 
     try {
-      const resposta = await fetch(`/api/pedido/${pedidoId}/pagamento`, {
+      const resposta = await fetch(`/api/${base}/${pedidoId}/pagamento`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
