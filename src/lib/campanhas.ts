@@ -386,6 +386,21 @@ export interface RelatorioDoPeriodo {
   taxaCentavos: number;
   liquidoCentavos: number;
   custoIaCentavos: number;
+  /* ── assinatura ─────────────────────────────────────────────────────────
+     Separado do resto de propósito.
+
+     Receita que se repete e receita que acontece uma vez são coisas
+     diferentes, e somá-las num balde só é como se comemora um mês
+     excepcional que não volta. A Central mostra as duas lado a lado; o que
+     não podia continuar era assinatura não aparecer em lugar nenhum. */
+  /** Primeiras cobranças pagas no período — assinantes que nasceram aqui. */
+  assinaturasNovas: number;
+  /** Meses seguintes cobrados no período. Receita da base, não da aquisição. */
+  renovacoes: number;
+  /** Bruto das duas somadas: o dinheiro de assinatura que entrou no período. */
+  receitaRecorrenteCentavos: number;
+  /** Taxa de gateway sobre essa receita, quando o gateway informou. */
+  taxaRecorrenteCentavos: number;
   /* ── detalhe ── */
   porOrigem: { origem: string; pessoas: number; vendas: number }[];
   porDispositivo: { dispositivo: string; pessoas: number }[];
@@ -601,6 +616,55 @@ export function relatorioDoPeriodo(
     0
   );
 
+  /**
+   * ── o dinheiro de assinatura ──────────────────────────────────────────
+   *
+   * Vem de `cobrancas`, que é outra tabela e outra pergunta. `relatorioDoPeriodo`
+   * lia só `pedidos`, e por isso a primeira assinatura paga de verdade não
+   * apareceu em tela nenhuma do painel.
+   *
+   * ── Por que `pago_em`, e não `criado_em` ────────────────────────────────
+   *
+   * Porque a pergunta aqui é "quanto entrou neste período". A cobrança pode
+   * ter nascido ontem e ser paga hoje, e a renovação de um contrato de seis
+   * meses atrás é dinheiro de hoje. Usar a data de criação jogaria a receita
+   * para a janela errada — justamente o erro que assinatura torna comum.
+   *
+   * ── Por que o filtro de campanha é direto ───────────────────────────────
+   *
+   * A cobrança guarda `campanha_id` desde a migração 038, herdado do pedido
+   * ou do cookie. O que é anterior a isso tem a coluna nula e simplesmente não
+   * aparece em campanha nenhuma — que é a resposta honesta. Distribuir receita
+   * sem atribuição entre campanhas seria creditar dinheiro a quem talvez não o
+   * tenha trazido, o mesmo erro que a atribuição real acabou de consertar do
+   * lado dos pedidos.
+   */
+  const assinaturas = db
+    .prepare(
+      `SELECT renovacao_de, valor_centavos, bruto_centavos, taxa_centavos
+         FROM cobrancas
+        WHERE status = 'pago' AND pago_em >= @de AND pago_em < @ate
+          ${campanhaId ? 'AND campanha_id = @campanha' : ''}`
+    )
+    .all(j) as {
+    renovacao_de: string | null;
+    valor_centavos: number;
+    bruto_centavos: number | null;
+    taxa_centavos: number | null;
+  }[];
+
+  let assinaturasNovas = 0;
+  let renovacoes = 0;
+  let receitaRecorrenteCentavos = 0;
+  let taxaRecorrenteCentavos = 0;
+  for (const c of assinaturas) {
+    if (c.renovacao_de) renovacoes += 1;
+    else assinaturasNovas += 1;
+    // O que o gateway disse ter cobrado; o valor de tabela só como recurso.
+    receitaRecorrenteCentavos += c.bruto_centavos ?? c.valor_centavos;
+    taxaRecorrenteCentavos += c.taxa_centavos ?? 0;
+  }
+
   /* ── a lista de pessoas ── */
   const pessoas: PessoaDoPeriodo[] = visitasLinhas
     .map((v) => {
@@ -725,6 +789,10 @@ export function relatorioDoPeriodo(
     taxaCentavos,
     liquidoCentavos,
     custoIaCentavos,
+    assinaturasNovas,
+    renovacoes,
+    receitaRecorrenteCentavos,
+    taxaRecorrenteCentavos,
     porOrigem,
     porDispositivo,
     porHora,

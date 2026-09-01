@@ -163,13 +163,25 @@ export async function colher(agora = Date.now()): Promise<Leitura> {
     )
     .all(desde) as { id: string }[];
 
+  /*
+    As duas tabelas, e não só `pedidos`.
+
+    Assinatura é venda paga que a UTMify precisa receber, e ela vive em
+    `cobrancas`. Enquanto esta consulta olhava só um lado, a tela de Saúde
+    diria "tudo relatado" com uma assinatura tendo falhado em silêncio — que
+    é exatamente o estado em que o sistema passou dias sem ninguém notar.
+  */
   const naoRelatadas = db
     .prepare(
       `SELECT id, utmify_erro FROM pedidos
         WHERE ${real} AND pago_em > ?
+          AND (utmify_erro IS NOT NULL OR utmify_em IS NULL)
+       UNION ALL
+       SELECT id, utmify_erro FROM cobrancas
+        WHERE status = 'pago' AND pago_em > ?
           AND (utmify_erro IS NOT NULL OR utmify_em IS NULL)`
     )
-    .all(desde) as { id: string; utmify_erro: string | null }[];
+    .all(desde, desde) as { id: string; utmify_erro: string | null }[];
 
   const ultimo = db
     .prepare(`SELECT MAX(pago_em) AS q FROM pedidos WHERE ${real} AND pago_em IS NOT NULL`)

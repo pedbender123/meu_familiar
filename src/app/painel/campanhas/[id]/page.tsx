@@ -110,12 +110,34 @@ export default async function RelatorioDaCampanha({
   const r = relatorioDoPeriodo(janela.de, janela.ate, gran.minutos, campanha.id);
 
   const investido = campanha.investido_centavos;
-  const lucro = r.liquidoCentavos - r.custoIaCentavos - investido;
+
+  /**
+   * ── Assinatura entra na conta da campanha ─────────────────────────────
+   *
+   * Ela só passou a poder entrar agora: `cobrancas` guarda `campanha_id`
+   * desde a migração 038, e antes disso somar receita de assinatura aqui
+   * seria creditar à campanha dinheiro que talvez não fosse dela.
+   *
+   * Entra porque a alternativa é pior. Com a assinatura de fora, a campanha
+   * que vende assinatura aparece com ROAS de uma fração do real — e a decisão
+   * que sai de um ROAS subestimado é pausar o que está funcionando.
+   *
+   * A separação continua na tela, na linha logo abaixo dos números: o total
+   * responde "valeu a pena", e o detalhe responde "de que tipo de receita".
+   * Um número só, sem o detalhe, esconderia que parte disso é receita que se
+   * repete e parte é receita que aconteceu uma vez.
+   */
+  const receitaTotal = r.brutoCentavos + r.receitaRecorrenteCentavos;
+  const liquidoTotal =
+    r.liquidoCentavos + (r.receitaRecorrenteCentavos - r.taxaRecorrenteCentavos);
+  const vendasTotais = r.vendas + r.assinaturasNovas + r.renovacoes;
+
+  const lucro = liquidoTotal - r.custoIaCentavos - investido;
   const custoPorPessoa = r.visitantes > 0 ? Math.round(investido / r.visitantes) : 0;
   const custoPorEmail = r.emailsCapturados > 0 ? Math.round(investido / r.emailsCapturados) : 0;
-  const custoPorVenda = r.vendas > 0 ? Math.round(investido / r.vendas) : 0;
-  const conversao = r.visitantes > 0 ? (r.vendas / r.visitantes) * 100 : 0;
-  const roas = investido > 0 ? r.brutoCentavos / investido : 0;
+  const custoPorVenda = vendasTotais > 0 ? Math.round(investido / vendasTotais) : 0;
+  const conversao = r.visitantes > 0 ? (vendasTotais / r.visitantes) * 100 : 0;
+  const roas = investido > 0 ? receitaTotal / investido : 0;
 
   const horas =
     (new Date(janela.ate).getTime() - new Date(janela.de).getTime()) / 3600_000;
@@ -208,7 +230,7 @@ export default async function RelatorioDaCampanha({
         <div className="w-full grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
           <Cartao rotulo="Investido" valor={brl(investido)}
             nota={campanha.alcance_estimado ? `alcance previsto ${campanha.alcance_estimado}` : undefined} />
-          <Cartao rotulo="Receita bruta" valor={brl(r.brutoCentavos)}
+          <Cartao rotulo="Receita bruta" valor={brl(receitaTotal)}
             nota={investido > 0 ? `ROAS ${roas.toFixed(2)}×` : undefined} cor={OURO} />
           <Cartao rotulo="Lucro" valor={brl(lucro)}
             nota="receita − taxa − IA − anúncio"
@@ -220,6 +242,33 @@ export default async function RelatorioDaCampanha({
           <Cartao rotulo="Custo por venda"
             valor={custoPorVenda > 0 ? brl(custoPorVenda) : '—'} />
         </div>
+
+        {/*
+          De que a receita é feita.
+
+          Sem esta linha, "Receita bruta" seria um número que mistura o que
+          acontece uma vez com o que se repete — e quem lê não teria como
+          saber qual das duas está sustentando o resultado. São decisões
+          diferentes: venda avulsa se escala comprando mais mídia; assinatura
+          se escala segurando quem já entrou.
+
+          Só aparece quando há assinatura. Aqui esconder é certo: numa
+          campanha que nunca vendeu plano, esta linha seria três zeros
+          ocupando o lugar do que importa.
+        */}
+        {(r.assinaturasNovas > 0 || r.renovacoes > 0) && (
+          <div className="w-full grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <Cartao rotulo="Vendas avulsas" valor={String(r.vendas)}
+              nota={brl(r.brutoCentavos)} />
+            <Cartao rotulo="Assinaturas novas" valor={String(r.assinaturasNovas)}
+              nota="primeira cobrança paga" cor={VIOLETA} />
+            <Cartao rotulo="Renovações" valor={String(r.renovacoes)}
+              nota="meses seguintes desta base" cor={VIOLETA} />
+            <Cartao rotulo="Receita de assinatura"
+              valor={brl(r.receitaRecorrenteCentavos)}
+              nota="dentro da receita bruta acima" cor={VIOLETA} />
+          </div>
+        )}
 
         {/* ── o que aconteceu ── */}
         <div className="w-full grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
@@ -272,7 +321,7 @@ export default async function RelatorioDaCampanha({
                 { rotulo: 'Escolheram um plano', pessoas: r.escolheramRevelacao + r.escolheramCompleta },
                 { rotulo: 'Abriram o checkout', pessoas: r.abriramCheckout },
                 { rotulo: 'Apertaram pagar', pessoas: r.tentaramPagar },
-                { rotulo: 'Pagaram', pessoas: r.vendas },
+                { rotulo: 'Pagaram', pessoas: vendasTotais },
               ]}
             />
           </Bloco>

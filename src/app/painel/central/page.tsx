@@ -205,6 +205,34 @@ export default async function Central({
             nota="antes do custo de IA" />
         </div>
 
+        {/*
+          ── assinatura, separada de propósito ──────────────────────────────
+
+          Receita que se repete e receita que acontece uma vez não somam na
+          mesma linha: misturá-las é como se comemora um mês excepcional que
+          não volta. Mas assinatura tinha um problema pior que estar
+          misturada — ela não aparecia em lugar nenhum. A Central conta
+          `pedidos`, e assinatura vive em `cobrancas`.
+
+          Fica visível mesmo em zero. Esconder quando não há nada é o que
+          faria a receita voltar a ser invisível justamente no mês em que
+          ninguém reparou que ela parou.
+        */}
+        <div className="w-full grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <Cartao rotulo="Assinaturas novas" valor={String(r.assinaturasNovas)}
+            nota="primeira cobrança paga no período" cor={VIOLETA} />
+          <Cartao rotulo="Renovações" valor={String(r.renovacoes)}
+            nota="meses seguintes — receita da base" cor={VIOLETA} />
+          <Cartao rotulo="Receita de assinatura" valor={brl(r.receitaRecorrenteCentavos)}
+            nota={r.taxaRecorrenteCentavos > 0
+              ? `taxa ${brl(r.taxaRecorrenteCentavos)}`
+              : 'bruto cobrado no período'}
+            cor={VIOLETA} />
+          <Cartao rotulo="Entrou no total"
+            valor={brl(r.brutoCentavos + r.receitaRecorrenteCentavos)}
+            nota="avulso + assinatura, sem normalizar" />
+        </div>
+
         {/* ── gráficos ── */}
         <div className="w-full grid grid-cols-1 lg:grid-cols-2 gap-3">
           <Bloco titulo="Movimento no período" nota={`Linha = visitantes. Barras = vendas. Agrupado ${gran.rotulo}.`} largo>

@@ -31,8 +31,16 @@ export default async function Campanhas() {
   const comResultado = campanhas.map((c) => {
     const j = janelaDaCampanha(c);
     const r = relatorioDoPeriodo(j.de, j.ate, 1440, c.id);
-    const lucro = r.liquidoCentavos - r.custoIaCentavos - c.investido_centavos;
-    return { campanha: c, r, lucro, noAr: !c.fim };
+    /*
+      Assinatura conta como venda desta campanha — mesma conta da tela de
+      detalhe, e pelo mesmo motivo: deixá-la de fora faria a campanha que
+      vende plano aparecer com uma fração do resultado que teve.
+    */
+    const vendas = r.vendas + r.assinaturasNovas + r.renovacoes;
+    const liquido =
+      r.liquidoCentavos + (r.receitaRecorrenteCentavos - r.taxaRecorrenteCentavos);
+    const lucro = liquido - r.custoIaCentavos - c.investido_centavos;
+    return { campanha: c, r, vendas, lucro, noAr: !c.fim };
   });
 
   return (
@@ -69,11 +77,12 @@ export default async function Campanhas() {
         )}
 
         <div className="w-full flex flex-col gap-3">
-          {comResultado.map(({ campanha: c, r, lucro, noAr }) => {
+          {comResultado.map(({ campanha: c, r, vendas, lucro, noAr }) => {
             const custoPorPessoa =
               r.visitantes > 0 ? Math.round(c.investido_centavos / r.visitantes) : 0;
             const custoPorVenda =
-              r.vendas > 0 ? Math.round(c.investido_centavos / r.vendas) : 0;
+              vendas > 0 ? Math.round(c.investido_centavos / vendas) : 0;
+            const assinaturas = r.assinaturasNovas + r.renovacoes;
             return (
               <Link key={c.id} href={`/painel/campanhas/${c.id}`}
                 className="rounded-xl border hover:border-vela/40 superficie px-5 py-4 flex flex-col gap-3 transition">
@@ -120,17 +129,24 @@ export default async function Campanhas() {
                   <Numero rotulo="investido" valor={brl(c.investido_centavos)} />
                   <Numero rotulo="pessoas" valor={String(r.visitantes)} />
                   <Numero rotulo="terminaram" valor={String(r.terminaram)} />
-                  <Numero rotulo="vendas" valor={String(r.vendas)} cor={OURO} />
+                  <Numero rotulo="vendas" valor={String(vendas)} cor={OURO} />
                   <Numero rotulo="por pessoa"
                     valor={custoPorPessoa > 0 ? brl(custoPorPessoa) : '—'} />
                   <Numero rotulo="lucro" valor={brl(lucro)}
                     cor={lucro > 0 ? VERDE : lucro < 0 ? VERMELHO : undefined} />
                 </div>
 
-                {r.vendas > 0 && custoPorVenda > 0 && (
+                {vendas > 0 && custoPorVenda > 0 && (
                   <p className="font-corpo text-[11px] text-pergaminho/40">
                     Custo por venda: {brl(custoPorVenda)} · e-mails capturados:{' '}
                     {r.emailsCapturados}
+                    {/*
+                      Quantas das vendas são assinatura. Sem isto, "12 vendas"
+                      numa campanha que vendeu 3 planos e 9 PDFs lê igual a uma
+                      que vendeu 12 PDFs — e as duas se escalam diferente.
+                    */}
+                    {assinaturas > 0 &&
+                      ` · ${assinaturas} de assinatura (${brl(r.receitaRecorrenteCentavos)})`}
                   </p>
                 )}
               </Link>

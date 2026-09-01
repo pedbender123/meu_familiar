@@ -11,7 +11,9 @@ import {
   buscarCobrancaPorPagamento,
   cobrancaDoContrato,
   confirmarPagamento,
+  anotarAcessoEnviado,
   ligarAssinaturaAoContrato,
+  registrarRenovacao,
   renovarAssinatura,
 } from '../nucleo/cobrancas';
 import { calcularExpiracao, produtoDe } from './produtos';
@@ -22,6 +24,7 @@ import { registrarCompra } from '../nucleo/eventos-meta';
 import { entregarChaveDaPlataforma, nomeDaConta } from './acesso-plataforma';
 import { buscarPedidoPorMelhoria, confirmarMelhoria } from '../nucleo/melhoria';
 import { reportarVenda } from './reportar-venda';
+import { reportarAssinatura } from './reportar-assinatura';
 
 export type DesfechoNotificacao =
   | 'nao_libera_acesso'
@@ -115,6 +118,40 @@ export async function processarNotificacaoDePagamento(
       console.log(
         `[webhook] assinatura ${cobranca.assinatura_externa_id} renovada até ${renovada.fim}`
       );
+
+      /**
+       * **O mês novo vira uma linha de receita, e chega à UTMify.**
+       *
+       * Antes disto a renovação empurrava a data de fim e sumia: nenhum
+       * valor, nenhuma data, nenhuma transação no banco. Um assinante de seis
+       * meses tinha uma única venda registrada — a de seis meses atrás — e a
+       * agência media o retorno da campanha sobre um sexto do que ela trouxe.
+       *
+       * A linha nasce herdando a atribuição da cobrança original: a campanha
+       * que trouxe a pessoa é a mesma que está pagando o sexto mês.
+       *
+       * `registrarRenovacao` devolve `null` quando esta transação já virou
+       * linha — reenvio do webhook não pode virar receita dobrada, do mesmo
+       * jeito que já não vira mês de graça.
+       */
+      const linha = registrarRenovacao(cobranca, {
+        transacaoExterna: resultado.idExterno,
+        assinaturaId: renovada.id,
+        metodo: resultado.metodo,
+        brutoCentavos: resultado.brutoCentavos,
+        taxaCentavos: resultado.taxaCentavos,
+        liquidoCentavos: resultado.liquidoCentavos,
+      });
+
+      if (linha) {
+        // Sem `await`: o gateway tem 8 segundos para receber a resposta.
+        void reportarAssinatura(linha, 'paid', {
+          metodo: resultado.metodo,
+          taxaCentavos: resultado.taxaCentavos,
+          aprovadoEm: new Date(linha.pago_em!),
+        });
+      }
+
       return { desfecho: 'assinatura_renovada' };
     }
   }
@@ -156,11 +193,17 @@ export async function processarNotificacaoDePagamento(
     }
 
     if (confirmada?.assinatura) {
-      await entregarChaveDaPlataforma({
+      /*
+        A entrega é aguardada aqui — diferente do funil de produto, onde a
+        geração roda solta. Aqui não há nada para gerar: é um e-mail, e saber
+        se ele saiu é metade da pergunta que a tela de assinantes responde.
+      */
+      const entregue = await entregarChaveDaPlataforma({
         email: cobranca.email,
         nome: nomeDaConta(cobranca.email),
         contaNova: false,
       });
+      if (entregue) anotarAcessoEnviado(cobranca.id);
 
       /**
        * **A venda de plano também é venda.**
@@ -186,6 +229,22 @@ export async function processarNotificacaoDePagamento(
           resultado.brutoCentavos !== null
             ? resultado.brutoCentavos / 100
             : cobranca.valor_centavos / 100,
+      });
+
+      /**
+       * **E para a UTMify, que é quem a agência lê.**
+       *
+       * Este ramo retorna antes de chegar ao `reportarVenda` do pedido, lá
+       * embaixo — então até aqui NENHUMA assinatura tinha sido reportada,
+       * nunca. A de 01/09, a primeira paga de verdade, não apareceu no painel
+       * deles por caminho nenhum.
+       *
+       * A cobrança relida do banco, e não a de cima: `confirmarPagamento`
+       * acabou de gravar `pago_em`, método e valores, e é isso que precisa ir.
+       */
+      void reportarAssinatura(confirmada?.cobranca ?? cobranca, 'paid', {
+        metodo: resultado.metodo,
+        taxaCentavos: resultado.taxaCentavos,
       });
     }
 

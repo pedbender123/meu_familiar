@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { sessaoAtual } from '@/lib/sessao-servidor';
 import { resumoDeAssinantes, assinantesAtivos } from '@/nucleo/assinantes';
+import { usoDasContas, resumoDeUso } from '@/nucleo/uso-do-assinante';
 import { PainelDeAssinantes } from '@/components/painel/Assinantes';
 
 export const metadata = { title: 'Assinantes', robots: { index: false, follow: false } };
@@ -18,10 +19,22 @@ export default async function Assinantes() {
   const sessao = await sessaoAtual();
   if (!sessao || sessao.tipo !== 'admin') redirect('/painel/entrar');
 
+  const lista = assinantesAtivos();
+
+  /**
+   * O que acontece depois da compra, buscado em lote.
+   *
+   * Sem isto a tela respondia só "quanto entra por mês" — e receita recorrente
+   * sem uso é uma projeção de dinheiro que já parou de vir e ainda não avisou.
+   */
+  const usos = usoDasContas(lista.map((a) => a.conta_id));
+
   return (
     <PainelDeAssinantes
       resumo={resumoDeAssinantes()}
-      lista={assinantesAtivos()}
+      lista={lista}
+      usos={Object.fromEntries(usos)}
+      uso={resumoDeUso([...usos.values()])}
     />
   );
 }

@@ -19,6 +19,7 @@ import {
 } from '@/nucleo/cobrancas';
 import { buscarPlano } from '@/nucleo/planos';
 import { registrarEvento } from '@/lib/db';
+import { reportarAssinatura } from '@/lib/reportar-assinatura';
 import { excedeuLimite, LIMITES } from '@/lib/rate-limit';
 import { entregarChaveDaPlataforma, nomeDaConta } from '@/lib/acesso-plataforma';
 
@@ -223,6 +224,22 @@ export async function POST(
 
     anotarPagamento(id, resultado.idExterno);
     registrarEvento(`assinatura_pagamento_${resultado.status}`, id);
+
+    /**
+     * A intenção de assinar, para a UTMify.
+     *
+     * A venda paga sozinha não basta: é o par `waiting_payment` + `paid` que
+     * dá o denominador da conversão no painel deles. Sem o primeiro, quem
+     * abriu o checkout de assinatura e desistiu não existe — e a campanha
+     * aparece convertendo 100% de um funil que ninguém vê.
+     *
+     * Aqui, e não em `abrirCobranca`, porque é neste ponto que o meio de
+     * pagamento é conhecido. Reportar antes obrigaria a chutar Pix numa
+     * assinatura que só aceita cartão.
+     *
+     * Sem `await`: esta rota está entre a pessoa e o pagamento dela.
+     */
+    void reportarAssinatura(buscarCobranca(id) ?? cobranca, 'waiting_payment', { metodo: meio });
 
     return NextResponse.json({
       status: resultado.status,

@@ -101,12 +101,26 @@ function plataformaDe(gateway: string | null | undefined): string {
  * anterior e usamos o mesmo. O nome só entra quando ela nunca recebeu um UTM
  * na vida, e aí não há identidade prévia para conflitar.
  */
-function rastreioDaCampanha(pedido: Pedido): ParametrosDeRastreio {
-  const campanha = pedido.campanha_id ? buscarCampanha(pedido.campanha_id) : undefined;
+/**
+ * Os três campos que bastam para saber de qual anúncio a venda veio.
+ *
+ * Não é `Pedido` porque assinatura não é pedido: `cobrancas` guarda os mesmos
+ * três desde a migração 038, e a tradução para a UTMify é idêntica. Repetir a
+ * função para a outra tabela seria garantir que uma das duas passe a mandar o
+ * `utm_campaign` errado sem ninguém notar.
+ */
+export interface VendaAtribuida {
+  campanha_id: string | null;
+  peca_id: string | null;
+  origem: string | null;
+}
+
+export function rastreioDaCampanha(venda: VendaAtribuida): ParametrosDeRastreio {
+  const campanha = venda.campanha_id ? buscarCampanha(venda.campanha_id) : undefined;
   if (!campanha) return {};
 
-  const peca = pedido.peca_id
-    ? listarPecas(campanha.id).find((p) => p.id === pedido.peca_id)
+  const peca = venda.peca_id
+    ? listarPecas(campanha.id).find((p) => p.id === venda.peca_id)
     : undefined;
 
   /**
@@ -145,7 +159,7 @@ function rastreioDaCampanha(pedido: Pedido): ParametrosDeRastreio {
   }
 
   return {
-    utm_source: pedido.origem ?? 'desconhecido',
+    utm_source: venda.origem ?? 'desconhecido',
     utm_medium: 'paid',
     utm_campaign: idDaCampanha ?? campanha.nome,
     /*

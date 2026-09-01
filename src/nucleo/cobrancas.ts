@@ -29,8 +29,42 @@ export interface Cobranca {
   assinatura_externa_id: string | null;
   proxima_cobranca_em: string | null;
   pago_em: string | null;
+  /* ── de onde veio quem assinou (migração 038) ── */
+  campanha_id: string | null;
+  peca_id: string | null;
+  origem: string | null;
+  atribuicao: string | null;
+  utm_json: string | null;
+  ip_comprador: string | null;
+  utmify_em: string | null;
+  utmify_erro: string | null;
+  /**
+   * A cobrança original, quando esta linha é a renovação de um mês seguinte.
+   *
+   * `null` na primeira cobrança e em toda venda avulsa. Existindo, ela diz
+   * duas coisas: que este dinheiro é receita recorrente, e de qual assinatura
+   * ele veio — que é de onde a atribuição foi herdada.
+   */
+  renovacao_de: string | null;
+  /** Quando a chave de acesso saiu para quem assinou (migração 039). */
+  acesso_enviado_em: string | null;
   criado_em: string;
   atualizado_em: string;
+}
+
+/**
+ * De onde veio a pessoa, do jeito que o pedido já guardava.
+ *
+ * Os nomes são os mesmos de `pedidos` porque o conceito é o mesmo e o
+ * relatório vai somar as duas tabelas — ver a migração 038.
+ */
+export interface RastreioDaCobranca {
+  origem?: string | null;
+  campanha_id?: string | null;
+  peca_id?: string | null;
+  atribuicao?: string | null;
+  utm_json?: string | null;
+  ip_comprador?: string | null;
 }
 
 /**
@@ -57,6 +91,15 @@ export function abrirCobranca(dados: {
    * "qualquer plano não-público".
    */
   origem?: 'vitrine' | 'oferta';
+  /**
+   * De onde a pessoa veio — lido dos cookies de atribuição, ou herdado do
+   * pedido quando a compra sai da tela de oferta.
+   *
+   * Opcional porque nem toda cobrança nasce de campanha: quem assina de
+   * dentro do app, meses depois, veio de lugar nenhum novo. Ausente é a
+   * resposta honesta, e é diferente de zero.
+   */
+  rastreio?: RastreioDaCobranca;
 }): { cobranca: Cobranca; plano: Plano } | null {
   /**
    * A trava de emergência, e só ela.
@@ -89,11 +132,29 @@ export function abrirCobranca(dados: {
   const agora = new Date().toISOString();
   const id = randomUUID();
 
+  const r = dados.rastreio ?? {};
   db.prepare(
     `INSERT INTO cobrancas
-       (id, conta_id, email, plano_id, valor_centavos, status, criado_em, atualizado_em)
-     VALUES (?, ?, ?, ?, ?, 'aguardando_pagamento', ?, ?)`
-  ).run(id, dados.contaId, dados.email.trim().toLowerCase(), plano.id, plano.preco_centavos, agora, agora);
+       (id, conta_id, email, plano_id, valor_centavos, status,
+        campanha_id, peca_id, origem, atribuicao, utm_json, ip_comprador,
+        criado_em, atualizado_em)
+     VALUES (@id, @conta, @email, @plano, @valor, 'aguardando_pagamento',
+             @campanha, @peca, @origem, @atribuicao, @utm, @ip,
+             @agora, @agora)`
+  ).run({
+    id,
+    conta: dados.contaId,
+    email: dados.email.trim().toLowerCase(),
+    plano: plano.id,
+    valor: plano.preco_centavos,
+    campanha: r.campanha_id ?? null,
+    peca: r.peca_id ?? null,
+    origem: r.origem ?? null,
+    atribuicao: r.atribuicao ?? null,
+    utm: r.utm_json ?? null,
+    ip: r.ip_comprador ?? null,
+    agora,
+  });
 
   /**
    * A intenção de pagar nasce AQUI, e é aqui que ela é contada.
@@ -220,6 +281,28 @@ export function confirmarPagamento(
   return transacao();
 }
 
+/**
+ * Carimba que a chave de acesso saiu.
+ *
+ * ── Por que isto não podia ficar só no log ────────────────────────────────
+ *
+ * O e-mail que não chega em assinatura não vira chamado de suporte: vira
+ * cancelamento no mês seguinte, sem explicação. Antes disto, conferir se a
+ * pessoa recebeu o acesso exigia abrir a caixa de entrada dela.
+ *
+ * Nunca lança: falhar ao anotar um diagnóstico não pode custar a entrega de
+ * quem acabou de pagar.
+ */
+export function anotarAcessoEnviado(id: string, quando = new Date()): void {
+  try {
+    db.prepare(
+      `UPDATE cobrancas SET acesso_enviado_em = ?, atualizado_em = ? WHERE id = ?`
+    ).run(quando.toISOString(), quando.toISOString(), id);
+  } catch (erro) {
+    console.error('[cobrancas] não consegui anotar a entrega do acesso:', erro);
+  }
+}
+
 export function cobrancasDaConta(contaId: string): Cobranca[] {
   return db
     .prepare('SELECT * FROM cobrancas WHERE conta_id = ? ORDER BY criado_em DESC')
@@ -325,6 +408,103 @@ export function renovarAssinatura(
   ).run(fim, transacaoExterna, agora.toISOString(), assinatura.id);
 
   return { id: assinatura.id, fim };
+}
+
+/**
+ * A renovação vira uma cobrança de verdade, herdando a atribuição da original.
+ *
+ * ── Por que uma linha nova, e não um contador ─────────────────────────────
+ *
+ * `renovarAssinatura` empurra a data de fim e pronto — o acesso continua, e o
+ * dinheiro do segundo mês não existe em lugar nenhum do banco. Um assinante de
+ * seis meses aparecia com uma única venda: a de seis meses atrás.
+ *
+ * Isso deixou de ser detalhe de relatório no dia em que assinatura virou o que
+ * a campanha vende. A agência calcula o retorno sobre o que ela vê, e o que
+ * ela via era um sexto do que a campanha tinha trazido.
+ *
+ * Receita aparece onde receita mora. Aqui.
+ *
+ * ── A atribuição é herdada, e isso é uma escolha ──────────────────────────
+ *
+ * A campanha que trouxe a pessoa é a mesma que está pagando o sexto mês — não
+ * houve anúncio novo, mas também não houve venda nova sem ela. É a leitura que
+ * mantém a receita recorrente ligada a quem a originou.
+ *
+ * A outra leitura — renovação é receita de base, não da campanha — é igualmente
+ * defensável, e muda o CPA que a agência vê. `renovacao_de` existindo permite
+ * as duas: quem quiser separar filtra por ela. O que não dava para fazer era
+ * decidir sem o dado.
+ *
+ * ── Idempotente pela transação ────────────────────────────────────────────
+ *
+ * A Wiven reenvia o webhook até receber 200. Uma transação paga um mês e não
+ * pode virar duas linhas de receita — a trava está aqui e no índice único da
+ * migração 038, porque idempotência que mora só na lógica some na próxima
+ * refatoração.
+ */
+export function registrarRenovacao(
+  original: Cobranca,
+  pagamento: {
+    transacaoExterna: string;
+    assinaturaId?: string | null;
+    metodo?: string | null;
+    brutoCentavos?: number | null;
+    taxaCentavos?: number | null;
+    liquidoCentavos?: number | null;
+    quando?: Date;
+  }
+): Cobranca | null {
+  if (!pagamento.transacaoExterna) return null;
+
+  const raiz = original.renovacao_de ?? original.id;
+
+  const jaExiste = db
+    .prepare(
+      `SELECT id FROM cobrancas WHERE renovacao_de = ? AND pagamento_id = ?`
+    )
+    .get(raiz, pagamento.transacaoExterna) as { id: string } | undefined;
+  if (jaExiste) return null;
+
+  const agora = (pagamento.quando ?? new Date()).toISOString();
+  const id = randomUUID();
+  const bruto = pagamento.brutoCentavos ?? original.valor_centavos;
+
+  db.prepare(
+    `INSERT INTO cobrancas
+       (id, conta_id, email, plano_id, valor_centavos, status,
+        pagamento_id, metodo, bruto_centavos, taxa_centavos, liquido_centavos,
+        assinatura_id, renovacao_de,
+        campanha_id, peca_id, origem, atribuicao, utm_json, ip_comprador,
+        pago_em, criado_em, atualizado_em)
+     VALUES (@id, @conta, @email, @plano, @valor, 'pago',
+             @pagamento, @metodo, @bruto, @taxa, @liquido,
+             @assinatura, @raiz,
+             @campanha, @peca, @origem, @atribuicao, @utm, @ip,
+             @agora, @agora, @agora)`
+  ).run({
+    id,
+    conta: original.conta_id,
+    email: original.email,
+    plano: original.plano_id,
+    valor: bruto,
+    pagamento: pagamento.transacaoExterna,
+    metodo: pagamento.metodo ?? original.metodo,
+    bruto,
+    taxa: pagamento.taxaCentavos ?? null,
+    liquido: pagamento.liquidoCentavos ?? null,
+    assinatura: pagamento.assinaturaId ?? original.assinatura_id,
+    raiz,
+    campanha: original.campanha_id,
+    peca: original.peca_id,
+    origem: original.origem,
+    atribuicao: original.atribuicao,
+    utm: original.utm_json,
+    ip: original.ip_comprador,
+    agora,
+  });
+
+  return buscarCobranca(id)!;
 }
 
 /**

@@ -76,11 +76,32 @@ export async function POST(
 
   const conta = garantirConta(pedido.email);
 
+  /**
+   * A atribuição vem DO PEDIDO, não dos cookies.
+   *
+   * Esta tela é a escada logo depois do ritual: a pessoa está aqui porque
+   * clicou num anúncio minutos atrás, e o pedido guarda essa origem desde o
+   * primeiro toque — inclusive o `utm_json` cru, que é o que a UTMify precisa
+   * para pôr a venda dentro da campanha certa.
+   *
+   * O cookie diria quase sempre a mesma coisa, mas "quase sempre" aqui é a
+   * diferença entre a assinatura ser creditada ao anúncio que a vendeu e ser
+   * creditada ao último link que a pessoa clicou. O pedido é a fonte mais
+   * próxima da venda que existe.
+   */
   const aberta = abrirCobranca({
     contaId: conta.id,
     email: pedido.email,
     planoId: corpo.plano,
     origem: 'oferta',
+    rastreio: {
+      origem: pedido.origem,
+      campanha_id: pedido.campanha_id,
+      peca_id: pedido.peca_id,
+      atribuicao: pedido.atribuicao,
+      utm_json: pedido.utm_json,
+      ip_comprador: pedido.ip_comprador,
+    },
   });
 
   if (!aberta) {

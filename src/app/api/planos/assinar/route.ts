@@ -3,6 +3,7 @@ import { sessaoAtual } from '@/lib/sessao-servidor';
 import { buscarConta, garantirConta } from '@/lib/autenticacao';
 import { abrirCobranca } from '@/nucleo/cobrancas';
 import { excedeuLimite } from '@/lib/rate-limit';
+import { atribuicaoDoPedido } from '@/lib/rastreio';
 
 /**
  * Abre a cobrança de um plano e devolve para onde ir pagar.
@@ -38,10 +39,20 @@ export async function POST(req: NextRequest) {
   // pro login seria perder uma venda por detalhe interno.
   const conta = buscarConta(sessao.email) ?? garantirConta(sessao.email);
 
+  /**
+   * De onde veio quem assinou, do mesmo cookie que o pedido já lia.
+   *
+   * `indicado_por` fica de fora porque `cobrancas` não tem essa coluna e
+   * indicação de cliente não é campanha — inventar o campo aqui só para não
+   * descartar um valor seria criar uma segunda verdade sobre indicação.
+   */
+  const { indicado_por: _indicacao, ...atribuicao } = atribuicaoDoPedido(req.cookies);
+
   const aberta = abrirCobranca({
     contaId: conta.id,
     email: sessao.email,
     planoId: corpo.plano,
+    rastreio: { ...atribuicao, ip_comprador: ip === 'local' ? null : ip.split(',')[0].trim() },
   });
 
   if (!aberta) {

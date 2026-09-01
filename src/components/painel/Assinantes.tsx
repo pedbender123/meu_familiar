@@ -1,4 +1,5 @@
 import type { ResumoDeAssinantes, LinhaDeAssinante } from '@/nucleo/assinantes';
+import type { UsoDoAssinante, ResumoDeUso } from '@/nucleo/uso-do-assinante';
 
 function reais(centavos: number): string {
   return (centavos / 100).toLocaleString('pt-BR', {
@@ -23,9 +24,13 @@ function dia(iso: string | null): string {
 export function PainelDeAssinantes({
   resumo,
   lista,
+  usos,
+  uso,
 }: {
   resumo: ResumoDeAssinantes;
   lista: LinhaDeAssinante[];
+  usos: Record<string, UsoDoAssinante>;
+  uso: ResumoDeUso;
 }) {
   return (
     <div className="flex flex-col gap-6 max-w-6xl">
@@ -53,6 +58,51 @@ export function PainelDeAssinantes({
             resumo.churnMes === null
               ? 'ninguém ativo no início do mês'
               : `${resumo.novosNoMes} novos · ${resumo.perdidosNoMes} perdidos`
+          }
+        />
+      </div>
+
+      {/*
+        ── o que acontece depois da compra ────────────────────────────────
+
+        MRR sozinho é uma projeção: ele diz o que entra se ninguém mexer em
+        nada, e todo mundo que cancela mexe. Estes três números são as
+        maneiras de a pessoa estar saindo antes de ela sair — e as três
+        acontecem semanas antes de o cancelamento aparecer no churn.
+
+        A margem fecha a outra metade: assinatura consome IA todo mês sem
+        venda nova pagando por ela. Um assinante que custa mais do que paga é
+        prejuízo com cara de crescimento.
+      */}
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+        <Cartao
+          rotulo="Nunca entraram"
+          valor={String(uso.nuncaEntraram)}
+          nota="pagaram e o acesso morreu na caixa de entrada"
+          alerta={uso.nuncaEntraram > 0}
+        />
+        <Cartao
+          rotulo="Entraram e não usaram"
+          valor={String(uso.entraramENaoUsaram)}
+          nota="pagam por algo que não abriram"
+          alerta={uso.entraramENaoUsaram > 0}
+        />
+        <Cartao
+          rotulo="Sumidos"
+          valor={String(uso.sumidos)}
+          nota="sem usar há mais de 14 dias"
+          alerta={uso.sumidos > 0}
+        />
+        <Cartao
+          rotulo="Custo de IA no mês"
+          valor={reais(uso.custoIaNoMesCentavos)}
+          nota={
+            resumo.mrrCentavos > 0
+              ? `${((uso.custoIaNoMesCentavos / resumo.mrrCentavos) * 100).toFixed(0)}% da receita · maior: ${reais(uso.maiorCustoNoMesCentavos)}`
+              : 'sem receita recorrente para comparar'
+          }
+          alerta={
+            resumo.mrrCentavos > 0 && uso.custoIaNoMesCentavos > resumo.mrrCentavos / 2
           }
         />
       </div>
@@ -117,12 +167,25 @@ export function PainelDeAssinantes({
                 <th className="py-2 pr-3 font-normal">Plano</th>
                 <th className="py-2 pr-3 font-normal">Desde</th>
                 <th className="py-2 pr-3 font-normal">Até</th>
+                <th className="py-2 pr-3 font-normal">Acesso</th>
+                <th className="py-2 pr-3 font-normal text-right">Uso</th>
+                <th className="py-2 pr-3 font-normal text-right">IA no mês</th>
                 <th className="py-2 pr-3 font-normal text-right">Por mês</th>
                 <th className="py-2 font-normal text-right">Já pagou</th>
               </tr>
             </thead>
             <tbody>
-              {lista.map((a) => (
+              {lista.map((a) => {
+                const u = usos[a.conta_id];
+                const usou = u ? u.consultas + u.leituras : 0;
+                /*
+                  Custo acima do que a pessoa paga por mês. É o caso que o
+                  MRR esconde: mais gente entrando piora o resultado, e o
+                  painel de receita mostra isso subindo.
+                */
+                const noPrejuizo =
+                  !!u && a.porMesCentavos > 0 && u.custoIaNoMesCentavos > a.porMesCentavos;
+                return (
                 <tr
                   key={a.id}
                   className="border-t"
@@ -130,6 +193,9 @@ export function PainelDeAssinantes({
                 >
                   <td className="py-2 pr-3 text-pergaminho/85 max-w-[22ch] truncate">
                     {a.email}
+                    {a.cortesia && (
+                      <span className="text-pergaminho/35 text-[11px]"> · cortesia</span>
+                    )}
                   </td>
                   <td className="py-2 pr-3 text-pergaminho/60">{a.plano_nome}</td>
                   <td className="py-2 pr-3 text-pergaminho/50 tabular-nums">
@@ -138,6 +204,34 @@ export function PainelDeAssinantes({
                   <td className="py-2 pr-3 text-pergaminho/50 tabular-nums">
                     {dia(a.fim)}
                   </td>
+                  {/*
+                    Três estados, e a diferença entre eles é o que se faz a
+                    respeito: chave que não saiu se reenvia; chave que saiu e
+                    ninguém abriu é um e-mail na caixa de spam; quem entrou
+                    tem a data do último acesso.
+                  */}
+                  <td className="py-2 pr-3 tabular-nums">
+                    {u?.ultimoAcessoEm ? (
+                      <span className="text-pergaminho/50">{dia(u.ultimoAcessoEm)}</span>
+                    ) : u?.acessoEnviadoEm ? (
+                      <span className="text-vela text-xs">não entrou</span>
+                    ) : (
+                      <span className="text-pergaminho/35 text-xs">chave não saiu</span>
+                    )}
+                  </td>
+                  <td className="py-2 pr-3 text-right tabular-nums">
+                    {usou > 0 ? (
+                      <span className="text-pergaminho/70">{usou}</span>
+                    ) : (
+                      <span className="text-pergaminho/30">—</span>
+                    )}
+                  </td>
+                  <td
+                    className="py-2 pr-3 text-right tabular-nums"
+                    style={{ color: noPrejuizo ? '#F87171' : undefined }}
+                  >
+                    {u && u.custoIaNoMesCentavos > 0 ? reais(u.custoIaNoMesCentavos) : '—'}
+                  </td>
                   <td className="py-2 pr-3 text-pergaminho/70 text-right tabular-nums">
                     {a.porMesCentavos > 0 ? reais(a.porMesCentavos) : '—'}
                   </td>
@@ -145,7 +239,8 @@ export function PainelDeAssinantes({
                     {a.pagoCentavos > 0 ? reais(a.pagoCentavos) : '—'}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
           {lista.length === 0 && <Vazio>Nenhuma assinatura ativa.</Vazio>}
@@ -160,17 +255,29 @@ function Cartao({
   valor,
   nota,
   destaque,
+  /**
+   * Vermelho só quando há o que fazer.
+   *
+   * Um cartão permanentemente alarmado vira papel de parede: quem vê a mesma
+   * cor todo dia para de ler, e no dia em que ela mudar ninguém repara.
+   */
+  alerta,
 }: {
   rotulo: string;
   valor: string;
   nota?: string;
   destaque?: boolean;
+  alerta?: boolean;
 }) {
   return (
     <div
       className="flex flex-col gap-1 p-4 rounded-xl border"
       style={{
-        borderColor: destaque ? 'rgba(217,164,65,0.4)' : 'var(--admin-borda)',
+        borderColor: alerta
+          ? 'rgba(248,113,113,0.4)'
+          : destaque
+            ? 'rgba(217,164,65,0.4)'
+            : 'var(--admin-borda)',
         background: destaque ? 'rgba(217,164,65,0.06)' : 'transparent',
       }}
     >
@@ -179,6 +286,7 @@ function Cartao({
       </span>
       <span
         className={`font-display ${destaque ? 'text-vela text-2xl' : 'text-pergaminho text-xl'} tabular-nums`}
+        style={alerta ? { color: '#F87171' } : undefined}
       >
         {valor}
       </span>

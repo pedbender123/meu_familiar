@@ -2,10 +2,10 @@
 
 Atualizado em 01/09/2026.
 
-**Tudo que está descrito aqui está em produção.** O próximo trabalho é
-`docs/PLANO-REFORMA-ASSINANTES.md`: a assinatura funciona, mas vive num canto
-separado do resto — não aparece na Central, não tem campanha, e a UTMify só
-sabe do primeiro mês.
+**Atenção: a reforma dos assinantes está NA ÁRVORE LOCAL e ainda não subiu.**
+Tudo o mais descrito aqui está em produção. `docs/PLANO-REFORMA-ASSINANTES.md`
+foi implementado inteiro (migrações 038 e 039) — falta rodar
+`scripts/subir.sh producao`, que pede confirmação escrita e é sua.
 
 `products` da Wiven foi **abandonado a pedido do dono** — a assinatura usa as
 rotas próprias (`/gateway/card/subscription`), que não precisam de catálogo.
@@ -14,10 +14,10 @@ rotas próprias (`/gateway/card/subscription`), que não precisam de catálogo.
 
 ## O que dizer
 
-> Leia `docs/RETOMAR.md`. O próximo trabalho é
-> `docs/PLANO-REFORMA-ASSINANTES.md`, na ordem da §4.
+> Leia `docs/RETOMAR.md`. A reforma dos assinantes está pronta e não subiu.
 >
-> Também aberto: a §8 de `PLANO-FLUXO-UTM.md` e a Fase 4 de
+> Aberto: o `.html` do funil para o marketing, a §7 de
+> `PLANO-REFORMA-ASSINANTES.md`, a §8 de `PLANO-FLUXO-UTM.md` e a Fase 4 de
 > `PLANO-PAINEL-DE-SAUDE.md`.
 
 ---
@@ -69,7 +69,7 @@ ssh root@100.126.229.42 'cd /root/apps/bruxario \
 
 ## Comandos
 
-`npm test` (865 passando) · `npm run build` · `npx tsc --noEmit`
+`npm test` (885 passando) · `npm run build` · `npx tsc --noEmit`
 `npm run wiven-fumaca` — cobrança Pix real de R$ 5 contra a API da Wiven
 
 ---
@@ -176,6 +176,36 @@ Simples R$ 18,90 · Completa R$ 24,90 · Assinatura R$ 29,90/mês.
 | **"pedido não encontrado"** ao assinar | checkout com rota fixa em `/api/pedido/` |
 | `clientIp` e CEP | a Wiven recusava a assinatura; o endpoint dela valida mais rígido |
 | Redirecionamento para **localhost** | `req.url` atrás do nginx; já tinha acontecido no login |
+
+---
+
+## A reforma dos assinantes — 01/09, ainda não em produção
+
+Migrações **038** (campanha, UTM, `renovacao_de` e o espelho da UTMify em
+`cobrancas`) e **039** (`acesso_enviado_em`). 885 testes.
+
+- **A renovação virou uma linha de cobrança.** Antes ela empurrava
+  `assinaturas.fim` e sumia: nenhum valor, nenhuma transação. Um assinante de
+  seis meses tinha uma única linha de dinheiro no banco.
+- **Nenhuma assinatura jamais foi reportada à UTMify.** O ramo da cobrança
+  retorna antes de chegar ao `reportarVenda` do pedido — não faltava só a
+  renovação, faltava a primeira também. Agora vão as duas, mais o
+  `waiting_payment`.
+- **A cobrança guarda de onde veio.** A tela de oferta herda a atribuição do
+  PEDIDO, `utm_json` incluído; a rota de dentro do app lê os cookies.
+- **Assinatura entra no ROAS da campanha**, com a separação visível na tela.
+- **A tela de assinantes responde entrou / usou / custou**, com vermelho em
+  quem custa mais de IA do que paga por mês.
+
+Regras novas que saíram daqui:
+
+- **`renovacao_de` aponta sempre para a cobrança RAIZ**, nunca para a
+  renovação anterior — senão separar recorrente de primeira venda exigiria
+  percorrer a cadeia.
+- **A renovação NÃO carrega `assinatura_externa_id`.** `cobrancaDoContrato`
+  pega a mais recente do contrato; preenchê-lo faria a renovação achar a si
+  mesma no mês seguinte.
+- **Receita de assinatura conta por `pago_em`**, não por `criado_em`.
 
 ---
 

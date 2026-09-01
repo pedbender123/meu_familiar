@@ -1,7 +1,11 @@
 # A reforma dos assinantes
 
 Escrito em 01/09/2026, no dia da primeira assinatura paga de verdade.
-**Nada aqui foi implementado.**
+**Implementado em 01/09/2026, no mesmo dia.** As cinco etapas da §4 estão
+prontas e testadas; o que sobrou está na §7.
+
+O que mudou no banco: migração **038** (campanha, UTM, `renovacao_de` e o
+espelho da UTMify em `cobrancas`) e **039** (`acesso_enviado_em`).
 
 ---
 
@@ -103,14 +107,47 @@ nada mostraria isso.
 
 ---
 
-## 4. A ordem
+## 4. A ordem — feita
 
-1. **Cartão de assinaturas na Central** — a receita para de estar invisível.
-2. **Atribuição na cobrança** — sem isso, nada do resto pode ser por campanha.
-3. **Renovação reportada à UTMify** — o painel deles para de subestimar.
-4. **Painel do assinante** — entrou, usou, custou.
-5. **Assinatura no relatório de campanha** — só depois de 2, e com a separação
-   entre única e recorrente visível na tela.
+1. ✅ **Cartão de assinaturas na Central.** Quatro cartões: assinaturas novas,
+   renovações, receita de assinatura e "entrou no total". `relatorioDoPeriodo`
+   passou a ler `cobrancas` pagas por `pago_em` — a data em que o dinheiro
+   entrou, não a em que a cobrança nasceu. Aparecem mesmo em zero: esconder
+   quando não há nada é o que faria a receita voltar a ser invisível no mês
+   em que ela parasse.
+2. ✅ **Atribuição na cobrança** (migração 038). `/api/oferta/[id]/comprar`
+   herda a atribuição **do pedido** — inclusive o `utm_json` cru; a rota de
+   dentro do app lê os cookies. Só vale para venda nova: o que é anterior tem
+   a coluna nula e não aparece em campanha nenhuma, que é a resposta honesta.
+3. ✅ **Renovação reportada à UTMify.** A renovação virou uma linha de
+   `cobrancas` (`renovacao_de` aponta para a raiz), com valor, taxa e
+   transação — e é reportada como venda própria. `waiting_payment` também vai,
+   do ponto em que o meio de pagamento é conhecido, senão não há denominador
+   de conversão.
+
+   Descoberta no caminho: **nenhuma assinatura jamais tinha sido reportada.**
+   O ramo da cobrança retorna antes de chegar ao `reportarVenda` do pedido —
+   não era só a renovação que faltava, era a primeira também.
+4. ✅ **Painel do assinante** (`nucleo/uso-do-assinante.ts`). Três estados de
+   acesso na tabela (chave não saiu / não entrou / data do último acesso),
+   uso, custo de IA no mês, e vermelho em quem custa mais do que paga. Em
+   cima, quatro cartões: nunca entraram, entraram e não usaram, sumidos há
+   mais de 14 dias, e o custo de IA como percentual do MRR.
+
+   Catorze dias porque o ciclo é de trinta: quem sumiu há duas semanas ainda
+   dá tempo de reconquistar antes da renovação. Um mês inteiro de silêncio já
+   é o cancelamento, só que ainda não digitado.
+5. ✅ **Assinatura no relatório de campanha.** ROAS, lucro, custo por venda e
+   conversão passaram a incluí-la — deixá-la de fora fazia a campanha que
+   vende plano aparecer com uma fração do resultado que teve, e a decisão que
+   sai de um ROAS subestimado é pausar o que está funcionando. A separação
+   fica na linha logo abaixo: avulsas, novas, renovações e quanto da receita
+   bruta é assinatura.
+
+**A decisão que ficou aberta de propósito:** renovação é venda da campanha ou
+receita de base? A tela hoje soma as duas, com o detalhe visível. `renovacao_de`
+existindo permite separar a qualquer momento — o que não dava para fazer era
+decidir sem o dado.
 
 ---
 
@@ -133,3 +170,19 @@ dizer se aquela pessoa está usando o que paga e quanto ela custa.
 
 E quando a agência, no painel dela, vir a renovação do sexto mês aparecer
 sozinha.
+
+---
+
+## 7. O que sobrou
+
+- **`gateway` na cobrança.** `plataformaDe` sai do pedido; em assinatura o
+  nome vai fixo (`Wiven`, ou `UTMIFY_PLATAFORMA`). Enquanto só a Wiven cobrar
+  recorrência, está correto — e passa a mentir no dia em que não for.
+- **Uso por assinante ao longo do tempo.** Hoje a tela responde "está usando?"
+  e "custa quanto?". Não responde "está usando MENOS que no mês passado", que
+  é o sinal mais cedo de todos.
+- **Aviso ativo.** Os três estados de saída aparecem em quem abre a tela.
+  Ninguém é avisado. É a mesma Fase 4 de `PLANO-PAINEL-DE-SAUDE.md`.
+- **As 8 cortesias de 20/08** continuam com acesso. Elas não somam receita
+  desde a correção do MRR, e agora aparecem marcadas na lista. Tirar o acesso
+  de gente real é decisão do dono, não do código.
