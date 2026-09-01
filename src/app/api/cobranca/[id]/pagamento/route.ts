@@ -5,10 +5,16 @@ import {
   type FormDataBrick,
 } from '@/nucleo/checkouts/mercadopago';
 import { provedorPara, provedorDe, gatewayDe, meioDe } from '@/nucleo/checkouts/gateway';
-import { ErroDeGatewayIndisponivel, type DadosCriacaoWiven } from '@/nucleo/checkouts/wiven';
+import {
+  ErroDeGatewayIndisponivel,
+  criarAssinaturaWiven,
+  periodicidadeDe,
+  type DadosCriacaoWiven,
+} from '@/nucleo/checkouts/wiven';
 import {
   buscarCobranca,
   anotarPagamento,
+  anotarAssinaturaExterna,
   confirmarPagamento,
 } from '@/nucleo/cobrancas';
 import { buscarPlano } from '@/nucleo/planos';
@@ -112,9 +118,48 @@ export async function POST(
   }
 
   try {
+    /**
+     * Recorrência de verdade, quando as duas condições valem.
+     *
+     * ── Por que só na Wiven, e só em plano recorrente ───────────────────────
+     *
+     * As rotas `/gateway/{pix,card}/subscription` são dela. Plano de acesso
+     * único (`recorrente = 0`) não tem o que renovar, e mandá-lo por ali
+     * criaria um contrato mensal para quem comprou uma coisa só.
+     *
+     * Quando não vale, cai na cobrança avulsa de sempre: uma parcela de 30
+     * dias mais o e-mail de renovação. É o que rodava antes disto existir, e
+     * continua sendo a rede quando o Mercado Pago está cobrando.
+     */
+    const recorrente = plano.recorrente === 1 && nomeDoGateway === 'wiven' && !!wiven;
+
     let resultado;
     try {
-      resultado = await cobrar(provedor);
+      if (recorrente) {
+        const criada = await criarAssinaturaWiven({
+          cobrancaId: cobranca.id,
+          emailDoCliente: cobranca.email,
+          plano: { id: plano.id, nome: plano.nome, precoCentavos: cobranca.valor_centavos },
+          periodicidade: periodicidadeDe(plano.duracao_dias),
+          wiven: wiven!,
+        });
+
+        /*
+          Gravado ANTES de responder à tela. Se o processo cair na linha
+          seguinte, o contrato já existe do lado deles e cobra todo mês —
+          perder o id aqui é perder a única forma de cancelar.
+        */
+        if (criada.assinatura) {
+          anotarAssinaturaExterna(cobranca.id, {
+            id: criada.assinatura.id,
+            proximaCobrancaEm: criada.assinatura.proximaCobrancaEm,
+          });
+          registrarEvento('assinatura_recorrente_criada', cobranca.id);
+        }
+        resultado = criada;
+      } else {
+        resultado = await cobrar(provedor);
+      }
     } catch (erro) {
       /*
         Mesma queda do funil de produtos, e pelo mesmo motivo: cair para outro
@@ -122,9 +167,18 @@ export async function POST(
         porque não dá para saber se a primeira nasceu do outro lado. No Pix
         não há esse risco — a cobrança só existe quando alguém paga o QR.
       */
+      /*
+        Assinatura recorrente NÃO cai para o Mercado Pago.
+
+        A queda existe para o Pix avulso, onde refazer a cobrança é inofensivo.
+        Aqui ela criaria um contrato mensal num gateway e possivelmente outro
+        no primeiro — e dois contratos ativos cobram a mesma pessoa duas vezes,
+        todo mês, até alguém reparar no extrato.
+      */
       const podeCair =
         erro instanceof ErroDeGatewayIndisponivel &&
         meio === 'pix' &&
+        !recorrente &&
         nomeDoGateway !== 'mercadopago';
       if (!podeCair) throw erro;
 

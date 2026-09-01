@@ -124,6 +124,25 @@ export function anotarPagamento(id: string, pagamentoId: string): void {
 }
 
 /**
+ * Guarda o contrato de recorrência criado no gateway.
+ *
+ * Gravado no INSTANTE em que a Wiven responde, antes de qualquer entrega:
+ * sem o id não há como cancelar, e uma assinatura recorrente que ninguém
+ * consegue parar cobra a pessoa todos os meses até alguém abrir um chamado no
+ * suporte do gateway.
+ */
+export function anotarAssinaturaExterna(
+  id: string,
+  externa: { id: string; proximaCobrancaEm: string | null }
+): void {
+  db.prepare(
+    `UPDATE cobrancas
+        SET assinatura_externa_id = ?, proxima_cobranca_em = ?, atualizado_em = ?
+      WHERE id = ?`
+  ).run(externa.id, externa.proximaCobrancaEm, new Date().toISOString(), id);
+}
+
+/**
  * Confirma a cobrança e cria a assinatura.
  *
  * **Idempotente**, e tem que ser: o webhook do Mercado Pago reenvia a mesma

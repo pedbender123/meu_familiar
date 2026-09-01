@@ -1019,3 +1019,197 @@ export function tokensDoWebhook(): string[] {
 export function tokenDoWebhook(): string {
   return tokensDoWebhook()[0] ?? '';
 }
+
+/* ── assinatura recorrente ────────────────────────────────────────────────*/
+
+export type PeriodicidadeWiven = 'DAYS' | 'WEEKS' | 'MONTHS' | 'YEARS';
+
+/**
+ * O que a Wiven devolve sobre a assinatura criada.
+ *
+ * **`status` nasce `INACTIVE`** no exemplo da documentação deles, mesmo com a
+ * transação em `OK` — porque no Pix ninguém pagou o QR ainda, e no cartão a
+ * captura ainda não confirmou. Ela vira `ACTIVE` depois, e quem conta isso é
+ * o webhook. Tratar `INACTIVE` como falha cancelaria assinatura que está só
+ * esperando o pagamento da primeira parcela.
+ */
+export interface AssinaturaExterna {
+  id: string;
+  status: string;
+  periodicidade: number;
+  periodicidadeTipo: PeriodicidadeWiven;
+  /** ISO. Quando a Wiven vai cobrar de novo, sozinha. */
+  proximaCobrancaEm: string | null;
+  iniciaEm: string | null;
+}
+
+interface RespostaAssinaturaWiven extends RespostaWiven {
+  subscription?: {
+    id?: string;
+    periodicityType?: PeriodicidadeWiven;
+    periodicity?: number;
+    nextChargeAt?: string;
+    startAt?: string;
+    status?: string;
+  };
+}
+
+export interface DadosDeAssinatura {
+  /** O id da nossa `cobranca`. Vira o `identifier`, como no pedido avulso. */
+  cobrancaId: string;
+  emailDoCliente: string;
+  plano: { id: string; nome: string; precoCentavos: number };
+  periodicidade: { tipo: PeriodicidadeWiven; quantidade: number };
+  wiven: DadosCriacaoWiven['wiven'];
+}
+
+/**
+ * Traduz a duração de um plano nosso para a periodicidade deles.
+ *
+ * 30 dias vira **1 MONTHS**, e não 30 DAYS, de propósito: `MONTHS` acompanha
+ * o calendário, então quem assina dia 31 de janeiro é cobrado em fevereiro no
+ * dia que existir. Com `DAYS`, a data da cobrança anda para trás todo mês e
+ * em um ano a pessoa é cobrada treze vezes — uma a mais do que contratou.
+ */
+export function periodicidadeDe(duracaoDias: number | null): {
+  tipo: PeriodicidadeWiven;
+  quantidade: number;
+} {
+  if (!duracaoDias || duracaoDias <= 0) return { tipo: 'MONTHS', quantidade: 1 };
+  if (duracaoDias % 365 === 0) return { tipo: 'YEARS', quantidade: duracaoDias / 365 };
+  if (duracaoDias % 30 === 0) return { tipo: 'MONTHS', quantidade: duracaoDias / 30 };
+  if (duracaoDias % 7 === 0) return { tipo: 'WEEKS', quantidade: duracaoDias / 7 };
+  return { tipo: 'DAYS', quantidade: duracaoDias };
+}
+
+/**
+ * Cria uma assinatura de verdade — a Wiven cobra sozinha nos meses seguintes.
+ *
+ * ── O que muda em relação à cobrança avulsa ───────────────────────────────
+ *
+ * Rotas próprias (`/gateway/pix/subscription` e `/gateway/card/subscription`),
+ * um objeto `product` obrigatório e um `subscription` com a periodicidade. O
+ * resto do corpo é o mesmo, e por isso o cliente, o cartão e o endereço saem
+ * das mesmas estruturas do checkout avulso.
+ *
+ * Antes disto, "assinatura" aqui era uma cobrança única de 30 dias com um
+ * e-mail pedindo para pagar de novo. Funcionava, e perdia todo mundo que não
+ * abrisse o e-mail.
+ *
+ * ── Sobre o split: ele NÃO existe aqui ────────────────────────────────────
+ *
+ * A documentação dos dois endpoints de assinatura **não lista `splits`** —
+ * ele aparece só nas cobranças avulsas. Mandar campo que o gateway não
+ * conhece é convite para `INVALID_INPUT` recusar a cobrança inteira, então
+ * ele não vai.
+ *
+ * Consequência: **a receita de assinatura cai inteira na conta que cobra.**
+ * Hoje isso é o combinado (01/09/2026: tudo na conta do Murilo), então não há
+ * nada a resolver. No dia em que voltar a haver repasse, a divisão da
+ * assinatura precisa ser resolvida com eles — por coprodução no produto, ou
+ * perguntando se `splits` vale nesta rota.
+ */
+export async function criarAssinaturaWiven(
+  dados: DadosDeAssinatura
+): Promise<ResultadoPagamento & { assinatura: AssinaturaExterna | null }> {
+  const extra = dados.wiven;
+  const identifier = identificadorDe(dados.cobrancaId);
+  const emReaisDoPlano = emReais(dados.plano.precoCentavos);
+
+  const corpo = {
+    identifier,
+    amount: emReaisDoPlano,
+    /*
+      `product` é obrigatório nas rotas de assinatura, e o `id` é "ID único do
+      produto na SUA aplicação" — ou seja, o nosso `plano.id`, não um código
+      do catálogo deles. Não é a migração para produtos da Wiven; é só como
+      esta rota identifica o que está sendo assinado.
+    */
+    product: {
+      id: dados.plano.id,
+      name: dados.plano.nome,
+      quantity: 1,
+      price: emReaisDoPlano,
+    },
+    subscription: {
+      periodicityType: dados.periodicidade.tipo,
+      periodicity: dados.periodicidade.quantidade,
+      // Cobra agora. Qualquer outro valor daria acesso antes do dinheiro.
+      firstChargeIn: 0,
+    },
+    client: {
+      name: extra.nome,
+      email: dados.emailDoCliente,
+      phone: extra.telefone,
+      document: extra.documento,
+      ...(extra.meio === 'cartao' ? { address: extra.endereco } : {}),
+    },
+    metadata: { provider: 'Bruxario', orderId: dados.cobrancaId },
+    callbackUrl: urlDeCallback(),
+    ...(extra.meio === 'cartao' ? { clientIp: extra.ip, card: extra.cartao } : {}),
+  };
+
+  let resposta: Response;
+  try {
+    resposta = await chamar(
+      extra.meio === 'pix' ? '/gateway/pix/subscription' : '/gateway/card/subscription',
+      { method: 'POST', body: JSON.stringify(corpo) }
+    );
+  } catch (erro) {
+    const tempoEsgotado =
+      erro instanceof Error && (erro.name === 'TimeoutError' || erro.name === 'AbortError');
+
+    if (!tempoEsgotado) {
+      marcarIndisponivel('wiven', `rede: ${String(erro).slice(0, 120)}`);
+      throw new ErroDeGatewayIndisponivel(`[wiven] rede indisponível: ${String(erro)}`);
+    }
+
+    /*
+      Tempo esgotado numa ASSINATURA é pior que numa cobrança avulsa: se ela
+      nasceu do outro lado, existe agora um contrato recorrente que o nosso
+      banco não conhece — e ele cobra todo mês. Nunca cai para outro gateway
+      aqui; a pessoa tenta de novo e o `identifier` único evita duplicata.
+    */
+    marcarIndisponivel('wiven', 'tempo esgotado');
+    throw new Error('[wiven] tempo esgotado — a assinatura pode ter sido criada');
+  }
+
+  if (!resposta.ok) {
+    const texto = await resposta.text();
+    if (ehIndisponibilidade(resposta.status)) {
+      marcarIndisponivel('wiven', `HTTP ${resposta.status}`);
+      throw new ErroDeGatewayIndisponivel(
+        `[wiven] indisponível (${resposta.status}): ${texto.slice(0, 200)}`
+      );
+    }
+    throw new Error(`[wiven] assinatura recusada (${resposta.status}): ${texto}`);
+  }
+
+  const bruta = (await resposta.json()) as RespostaAssinaturaWiven;
+
+  /*
+    O mesmo tradutor da cobrança avulsa, e pelo mesmo motivo: `status: "OK"`
+    na criação quer dizer "a cobrança nasceu", não "o dinheiro entrou". Só o
+    webhook libera acesso.
+  */
+  const resultado = traduzir(bruta, {
+    identifier,
+    meio: extra.meio,
+    brutoCentavos: dados.plano.precoCentavos,
+  });
+
+  const s = bruta.subscription;
+  return {
+    ...resultado,
+    assinatura: s?.id
+      ? {
+          id: s.id,
+          status: s.status ?? 'INACTIVE',
+          periodicidade: s.periodicity ?? dados.periodicidade.quantidade,
+          periodicidadeTipo: s.periodicityType ?? dados.periodicidade.tipo,
+          proximaCobrancaEm: s.nextChargeAt ?? null,
+          iniciaEm: s.startAt ?? null,
+        }
+      : null,
+  };
+}
