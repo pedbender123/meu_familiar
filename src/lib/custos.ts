@@ -58,6 +58,45 @@ export function centavosDeTexto(params: {
   return Math.round(dolares * DOLAR * 100);
 }
 
+/**
+ * O mesmo custo, em **milésimos de centavo**.
+ *
+ * ── O buraco que isto tapa, medido em produção ────────────────────────────
+ *
+ * Uma consulta ao Oráculo gasta ~650 tokens de entrada e ~580 de saída. Isso
+ * dá 0,17 centavo. `centavosDeTexto` arredonda, e 0,17 arredondado é **zero**.
+ *
+ * O efeito: as sete leituras que existiam no banco em 01/09 somavam R$ 0,00.
+ * Não é imprecisão — é a informação inteira desaparecendo. Cem consultas num
+ * mês custam 17 centavos de verdade e continuariam somando zero, porque cada
+ * parcela vira zero antes de entrar na soma.
+ *
+ * Do lado dos pedidos o arredondamento nunca incomodou: uma revelação inteira
+ * gasta tokens o bastante (mais a narração) para cair entre 1 e 54 centavos. É
+ * o uso miúdo e repetido da assinatura que o centavo não consegue representar
+ * — e é justamente ele que precisa ser medido, porque acontece todo mês sem
+ * venda nova pagando por ele.
+ *
+ * ── Por que milésimo, e não ponto flutuante ───────────────────────────────
+ *
+ * Somar `REAL` em SQLite acumula erro de representação, e dinheiro que soma
+ * errado num painel é pior que dinheiro não medido: o número existe, parece
+ * certo, e ninguém confere. Inteiro em unidade menor soma exato. Milésimo de
+ * centavo dá ~1700 por consulta, com folga para o modelo ficar dez vezes mais
+ * barato sem voltar a zerar.
+ */
+export function microcentavosDeTexto(params: {
+  modelo?: ModeloDeTexto;
+  tokensEntrada: number;
+  tokensSaida: number;
+}): number {
+  const p = PRECO_POR_MILHAO[params.modelo ?? 'gemini-3.5-flash-lite'];
+  const dolares =
+    (params.tokensEntrada / 1_000_000) * p.entrada +
+    (params.tokensSaida / 1_000_000) * p.saida;
+  return Math.round(dolares * DOLAR * 100 * 1000);
+}
+
 export function centavosDeNarracao(caracteres: number): number {
   const minutos = caracteres / CARACTERES_POR_SEGUNDO / 60;
   return Math.round(minutos * PRECO_TTS_POR_MINUTO * DOLAR * 100);

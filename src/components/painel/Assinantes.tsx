@@ -167,7 +167,12 @@ export function PainelDeAssinantes({
                 <th className="py-2 pr-3 font-normal">Plano</th>
                 <th className="py-2 pr-3 font-normal">Desde</th>
                 <th className="py-2 pr-3 font-normal">Até</th>
-                <th className="py-2 pr-3 font-normal">Acesso</th>
+                <th
+                  className="py-2 pr-3 font-normal"
+                  title="Data = último acesso. 'não entrou' = a chave saiu e ninguém abriu. 'sem registro' = cobrança anterior a 01/09, quando o carimbo passou a existir."
+                >
+                  Acesso
+                </th>
                 <th className="py-2 pr-3 font-normal text-right">Uso</th>
                 <th className="py-2 pr-3 font-normal text-right">IA no mês</th>
                 <th className="py-2 pr-3 font-normal text-right">Por mês</th>
@@ -216,7 +221,14 @@ export function PainelDeAssinantes({
                     ) : u?.acessoEnviadoEm ? (
                       <span className="text-vela text-xs">não entrou</span>
                     ) : (
-                      <span className="text-pergaminho/35 text-xs">chave não saiu</span>
+                      /*
+                        "Sem registro", e não "não saiu": o carimbo só existe
+                        desde 01/09, e toda cobrança anterior a ele está aqui
+                        sem que isso queira dizer que a chave falhou. Afirmar
+                        falha onde há ausência de dado é o jeito mais fácil de
+                        um painel mentir com números verdadeiros.
+                      */
+                      <span className="text-pergaminho/35 text-xs">sem registro</span>
                     )}
                   </td>
                   <td className="py-2 pr-3 text-right tabular-nums">

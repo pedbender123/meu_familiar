@@ -1,11 +1,13 @@
 # A reforma dos assinantes
 
 Escrito em 01/09/2026, no dia da primeira assinatura paga de verdade.
-**Implementado em 01/09/2026, no mesmo dia.** As cinco etapas da §4 estão
-prontas e testadas; o que sobrou está na §7.
+**Implementado e em produção em 01/09/2026, no mesmo dia.** As cinco etapas da
+§4 estão prontas e testadas; o que sobrou está na §7.
 
 O que mudou no banco: migração **038** (campanha, UTM, `renovacao_de` e o
-espelho da UTMify em `cobrancas`) e **039** (`acesso_enviado_em`).
+espelho da UTMify em `cobrancas`), **039** (`acesso_enviado_em`) e **040**
+(custo de IA em milésimos de centavo — sem ela, o item 4 mediria zero para
+sempre).
 
 ---
 
@@ -133,6 +135,13 @@ nada mostraria isso.
    uso, custo de IA no mês, e vermelho em quem custa mais do que paga. Em
    cima, quatro cartões: nunca entraram, entraram e não usaram, sumidos há
    mais de 14 dias, e o custo de IA como percentual do MRR.
+
+   **O que quase passou:** o custo por assinante nasceu estruturalmente zero.
+   Uma consulta ao Oráculo custa 0,17 centavo, `custo_centavos` é inteiro, e
+   0,17 arredondado é zero — as sete leituras que existiam em produção somavam
+   R$ 0,00. Não era imprecisão: era a informação inteira desaparecendo antes
+   de entrar na soma. Migração 040 guarda em milésimos e refaz a conta do
+   histórico a partir dos tokens, que sempre estiveram gravados.
 
    Catorze dias porque o ciclo é de trinta: quem sumiu há duas semanas ainda
    dá tempo de reconquistar antes da renovação. Um mês inteiro de silêncio já

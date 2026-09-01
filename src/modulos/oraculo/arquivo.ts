@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import db from '../../lib/db';
 import type { ResultadoDoEspetaculo } from './espetaculos';
+import { microcentavosDeTexto, type ModeloDeTexto } from '../../lib/custos';
 
 /**
  * O arquivo: onde as leituras ficam e de onde a mensagem lembra.
@@ -16,6 +17,8 @@ export interface LeituraArquivada {
   dia_de_ouro: number;
   modelo: string | null;
   custo_centavos: number | null;
+  /** O mesmo custo em milésimos de centavo — ver a migração 040. */
+  custo_microcentavos: number | null;
   criado_em: string;
 }
 
@@ -37,9 +40,10 @@ export function arquivar(dados: {
   db.prepare(
     `INSERT INTO leituras
        (id, conta_id, tipo, pergunta, semente, espetaculos_json, resposta_json,
-        dia_de_ouro, modelo, custo_centavos, tokens_entrada, tokens_saida, criado_em)
+        dia_de_ouro, modelo, custo_centavos, custo_microcentavos,
+        tokens_entrada, tokens_saida, criado_em)
      VALUES (@id, @conta_id, @tipo, @pergunta, @semente, @espetaculos, @resposta,
-        @dia_de_ouro, @modelo, @custo, @entrada, @saida, @agora)`
+        @dia_de_ouro, @modelo, @custo, @micro, @entrada, @saida, @agora)`
   ).run({
     id,
     conta_id: dados.contaId,
@@ -51,6 +55,18 @@ export function arquivar(dados: {
     dia_de_ouro: dados.diaDeOuro ? 1 : 0,
     modelo: dados.modelo,
     custo: dados.custoCentavos,
+    /*
+      A conta é refeita aqui a partir dos tokens, em vez de converter
+      `custoCentavos`. Converter multiplicaria um zero arredondado por mil e
+      continuaria zero — que é exatamente o problema que a coluna existe para
+      resolver. Uma consulta custa 0,17 centavo; só a unidade menor a
+      representa.
+    */
+    micro: microcentavosDeTexto({
+      modelo: dados.modelo as ModeloDeTexto,
+      tokensEntrada: dados.tokensEntrada,
+      tokensSaida: dados.tokensSaida,
+    }),
     entrada: dados.tokensEntrada,
     saida: dados.tokensSaida,
     agora: new Date().toISOString(),

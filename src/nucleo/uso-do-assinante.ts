@@ -39,7 +39,14 @@ export interface UsoDoAssinante {
   leituras: number;
   /** A última vez que a pessoa pediu qualquer coisa à IA. */
   ultimoUsoEm: string | null;
-  /** O que essa pessoa custou de modelo, desde sempre. */
+  /**
+   * O que essa pessoa custou de modelo, desde sempre, em centavos.
+   *
+   * A soma é feita em MILÉSIMOS de centavo e só arredondada no fim. Somar as
+   * parcelas já arredondadas dava zero sempre: uma consulta ao Oráculo custa
+   * 0,17 centavo, e cem delas continuavam somando zero porque cada uma virava
+   * zero antes de entrar na conta. Ver a migração 040.
+   */
   custoIaCentavos: number;
   /** E no mês corrente — o número que se compara com a mensalidade. */
   custoIaNoMesCentavos: number;
@@ -98,11 +105,18 @@ export function usoDasContas(
     if (linha) linha.acessoEnviadoEm = e.enviado;
   }
 
+  /*
+    `custo_microcentavos` com queda para `custo_centavos * 1000`: o primeiro é
+    a medida de verdade, o segundo cobre qualquer linha que a migração 040 não
+    tenha alcançado. A soma acontece na unidade menor e só arredonda no fim —
+    arredondar antes é o que fazia cem consultas somarem zero.
+  */
   const uso = db
     .prepare(
       `SELECT conta_id, tipo, COUNT(*) n, MAX(criado_em) ultima,
-              COALESCE(SUM(custo_centavos), 0) custo,
-              COALESCE(SUM(CASE WHEN criado_em >= ? THEN custo_centavos ELSE 0 END), 0) custo_mes
+              COALESCE(SUM(COALESCE(custo_microcentavos, custo_centavos * 1000)), 0) custo,
+              COALESCE(SUM(CASE WHEN criado_em >= ?
+                THEN COALESCE(custo_microcentavos, custo_centavos * 1000) ELSE 0 END), 0) custo_mes
          FROM leituras
         WHERE conta_id IN (${lacunas})
         GROUP BY conta_id, tipo`
@@ -126,6 +140,15 @@ export function usoDasContas(
     if (u.ultima && (!linha.ultimoUsoEm || u.ultima > linha.ultimoUsoEm)) {
       linha.ultimoUsoEm = u.ultima;
     }
+  }
+
+  /*
+    Aqui, e só aqui, o milésimo vira centavo. Toda a soma acima aconteceu na
+    unidade menor.
+  */
+  for (const linha of mapa.values()) {
+    linha.custoIaCentavos = Math.round(linha.custoIaCentavos / 1000);
+    linha.custoIaNoMesCentavos = Math.round(linha.custoIaNoMesCentavos / 1000);
   }
 
   return mapa;

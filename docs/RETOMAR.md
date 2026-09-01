@@ -2,10 +2,10 @@
 
 Atualizado em 01/09/2026.
 
-**Atenção: a reforma dos assinantes está NA ÁRVORE LOCAL e ainda não subiu.**
-Tudo o mais descrito aqui está em produção. `docs/PLANO-REFORMA-ASSINANTES.md`
-foi implementado inteiro (migrações 038 e 039) — falta rodar
-`scripts/subir.sh producao`, que pede confirmação escrita e é sua.
+**Tudo que está descrito aqui está em produção.**
+`docs/PLANO-REFORMA-ASSINANTES.md` foi implementado inteiro — migrações 038,
+039 e 040. O que sobrou está na §7 dele, mais o `.html` do funil para o
+marketing.
 
 `products` da Wiven foi **abandonado a pedido do dono** — a assinatura usa as
 rotas próprias (`/gateway/card/subscription`), que não precisam de catálogo.
@@ -69,7 +69,7 @@ ssh root@100.126.229.42 'cd /root/apps/bruxario \
 
 ## Comandos
 
-`npm test` (885 passando) · `npm run build` · `npx tsc --noEmit`
+`npm test` (892 passando) · `npm run build` · `npx tsc --noEmit`
 `npm run wiven-fumaca` — cobrança Pix real de R$ 5 contra a API da Wiven
 
 ---
@@ -179,10 +179,11 @@ Simples R$ 18,90 · Completa R$ 24,90 · Assinatura R$ 29,90/mês.
 
 ---
 
-## A reforma dos assinantes — 01/09, ainda não em produção
+## A reforma dos assinantes — 01/09, em produção
 
 Migrações **038** (campanha, UTM, `renovacao_de` e o espelho da UTMify em
-`cobrancas`) e **039** (`acesso_enviado_em`). 885 testes.
+`cobrancas`), **039** (`acesso_enviado_em`) e **040** (custo de IA em
+milésimos de centavo). 892 testes.
 
 - **A renovação virou uma linha de cobrança.** Antes ela empurrava
   `assinaturas.fim` e sumia: nenhum valor, nenhuma transação. Um assinante de
@@ -206,6 +207,11 @@ Regras novas que saíram daqui:
   pega a mais recente do contrato; preenchê-lo faria a renovação achar a si
   mesma no mês seguinte.
 - **Receita de assinatura conta por `pago_em`**, não por `criado_em`.
+- **Custo de consulta ao Oráculo mora em `custo_microcentavos`.** Uma consulta
+  custa 0,17 centavo, e `custo_centavos` arredondava cada uma para zero antes
+  da soma — as sete leituras de produção somavam R$ 0,00. Somar na unidade
+  menor e arredondar só no fim. `custo_centavos` continua existindo e continua
+  sendo zero para leitura: é a verdade arredondada, não um bug a consertar.
 
 ---
 

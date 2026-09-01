@@ -35,20 +35,22 @@ function cobrar(id: string, contaId: string, acessoEnviadoEm: string | null) {
   ).run(id, contaId, acessoEnviadoEm);
 }
 
+/** `custo` em MILÉSIMOS de centavo — a unidade real de uma consulta. */
+let sequencia = 0;
 function usar(contaId: string, tipo: string, quando: string, custo: number) {
   db.prepare(
     `INSERT INTO leituras (id, conta_id, tipo, pergunta, semente, resposta_json,
-       custo_centavos, criado_em)
-     VALUES (?, ?, ?, 'p', 's', '{}', ?, ?)`
-  ).run(`l-${contaId}-${quando}-${tipo}`, contaId, tipo, custo, quando);
+       custo_centavos, custo_microcentavos, criado_em)
+     VALUES (?, ?, ?, 'p', 's', '{}', 0, ?, ?)`
+  ).run(`l-${++sequencia}`, contaId, tipo, custo, quando);
 }
 
 describe('o uso de cada assinante', () => {
   test('conta consultas, leituras e custo separando o mês corrente', () => {
     conta('c1', '2026-09-14T10:00:00.000Z');
-    usar('c1', 'mensagem', '2026-08-20T10:00:00.000Z', 30);
-    usar('c1', 'mensagem', '2026-09-10T10:00:00.000Z', 40);
-    usar('c1', 'leitura', '2026-09-12T10:00:00.000Z', 200);
+    usar('c1', 'mensagem', '2026-08-20T10:00:00.000Z', 30_000);
+    usar('c1', 'mensagem', '2026-09-10T10:00:00.000Z', 40_000);
+    usar('c1', 'leitura', '2026-09-12T10:00:00.000Z', 200_000);
 
     const u = usoDasContas(['c1'], AGORA).get('c1')!;
     assert.equal(u.consultas, 2);
@@ -104,6 +106,39 @@ describe('o uso de cada assinante', () => {
   test('lista vazia não vira consulta', () => {
     assert.equal(usoDasContas([], AGORA).size, 0);
   });
+
+  /**
+   * O bug que a migração 040 conserta, no lugar onde ele doía.
+   *
+   * Uma consulta ao Oráculo custa 0,17 centavo. Enquanto o custo era gravado
+   * em centavos inteiros, cada uma virava zero ANTES de entrar na soma — e as
+   * sete leituras que existiam em produção somavam R$ 0,00. Cem consultas num
+   * mês continuariam somando zero.
+   */
+  test('cem consultas de fração de centavo não somam zero', () => {
+    conta('c1', '2026-09-14T00:00:00.000Z');
+    for (let i = 0; i < 100; i++) {
+      // 166 milésimos = 0,166 centavo, o custo medido de uma consulta real.
+      usar('c1', 'mensagem', '2026-09-05T10:00:00.000Z', 166);
+    }
+    const u = usoDasContas(['c1'], AGORA).get('c1')!;
+    assert.equal(u.consultas, 100);
+    assert.equal(u.custoIaCentavos, 17, '100 × 0,166 = 16,6 centavos');
+  });
+
+  /**
+   * As linhas anteriores à migração 040 não têm a coluna nova. Elas valem o
+   * que a coluna antiga diz — zero, na maioria — e não podem sumir da conta.
+   */
+  test('linha antiga cai para o custo em centavos', () => {
+    conta('c1', null);
+    db.prepare(
+      `INSERT INTO leituras (id, conta_id, tipo, pergunta, semente, resposta_json,
+         custo_centavos, custo_microcentavos, criado_em)
+       VALUES ('velha', 'c1', 'leitura', 'p', 's', '{}', 54, NULL, '2026-09-05T00:00:00.000Z')`
+    ).run();
+    assert.equal(usoDasContas(['c1'], AGORA).get('c1')!.custoIaCentavos, 54);
+  });
 });
 
 describe('os sinais de que alguém está saindo', () => {
@@ -111,9 +146,9 @@ describe('os sinais de que alguém está saindo', () => {
     conta('nunca', null);
     conta('semUso', '2026-09-14T00:00:00.000Z');
     conta('sumido', '2026-09-14T00:00:00.000Z');
-    usar('sumido', 'mensagem', '2026-08-20T00:00:00.000Z', 10);
+    usar('sumido', 'mensagem', '2026-08-20T00:00:00.000Z', 10_000);
     conta('ativo', '2026-09-14T00:00:00.000Z');
-    usar('ativo', 'mensagem', '2026-09-14T00:00:00.000Z', 50);
+    usar('ativo', 'mensagem', '2026-09-14T00:00:00.000Z', 50_000);
     return [...usoDasContas(['nunca', 'semUso', 'sumido', 'ativo'], AGORA).values()];
   }
 
