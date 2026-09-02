@@ -47,10 +47,39 @@ import { buscarPedido } from '../src/lib/db';
  *   npx tsx scripts/religar-utmify.ts              # mostra o plano
  *   npx tsx scripts/religar-utmify.ts --aplicar    # corrige o banco
  *   npx tsx scripts/religar-utmify.ts --aplicar --enviar   # e reporta à UTMify
+ *
+ *   --so-assinaturas   manda só assinatura, nenhum pedido
+ *   --com-testes       inclui as compras de teste do próprio dono (não faça)
  */
 
 const APLICAR = process.argv.includes('--aplicar');
 const ENVIAR = process.argv.includes('--enviar');
+const SO_ASSINATURAS = process.argv.includes('--so-assinaturas');
+const COM_TESTES = process.argv.includes('--com-testes');
+
+/**
+ * Os e-mails que não são clientes.
+ *
+ * ── Por que isto precisou existir ─────────────────────────────────────────
+ *
+ * Das 30 vendas pagas que nunca chegaram à UTMify, **14 eram testes do
+ * próprio dono** — ele comprando do próprio site para conferir o funil. Elas
+ * estão pagas de verdade no banco, e por isso o script as encontrava junto
+ * com as reais.
+ *
+ * Mandá-las seria pior que não mandar nada: além de inflar o relatório da
+ * agência com receita que não existe, cada uma vira um `Purchase` na Meta
+ * pela integração deles — o mesmo caminho que inflou o contador para 17 em
+ * agosto. A campanha passaria a otimizar por compras que ninguém fez.
+ *
+ * O padrão é excluir. `--com-testes` força a inclusão, para quando alguém
+ * quiser conferir o caminho inteiro num ambiente de teste.
+ */
+const EMAILS_QUE_NAO_SAO_CLIENTES = /pedro\.p\.bender|teste-prod|@exemplo\.com/i;
+
+function ehTeste(email: string | null | undefined): boolean {
+  return !COM_TESTES && EMAILS_QUE_NAO_SAO_CLIENTES.test(email ?? '');
+}
 
 function titulo(t: string) {
   console.log(`\n${'─'.repeat(72)}\n${t}\n${'─'.repeat(72)}`);
@@ -223,16 +252,28 @@ async function reportarAtrasadas() {
     )
     .all() as { id: string }[];
 
-  const pedidos = db
-    .prepare(
-      `SELECT id FROM pedidos
-        WHERE exemplo = 0 AND pago_em IS NOT NULL
-          AND (utmify_em IS NULL OR utmify_erro IS NOT NULL)
-        ORDER BY pago_em`
-    )
-    .all() as { id: string }[];
+  const todosOsPedidos = SO_ASSINATURAS
+    ? []
+    : (db
+        .prepare(
+          `SELECT id, email FROM pedidos
+            WHERE exemplo = 0 AND pago_em IS NOT NULL
+              AND (utmify_em IS NULL OR utmify_erro IS NOT NULL)
+            ORDER BY pago_em`
+        )
+        .all() as { id: string; email: string | null }[]);
+
+  const descartados = todosOsPedidos.filter((p) => ehTeste(p.email));
+  const pedidos = todosOsPedidos.filter((p) => !ehTeste(p.email));
 
   console.log(`  ${cobrancas.length} assinaturas · ${pedidos.length} pedidos`);
+  if (descartados.length > 0) {
+    console.log(
+      `  ${descartados.length} pedidos de teste do próprio dono ficam de fora ` +
+        '(--com-testes inclui)'
+    );
+  }
+  if (SO_ASSINATURAS) console.log('  --so-assinaturas: nenhum pedido será enviado');
 
   if (!ENVIAR) {
     for (const c of cobrancas) {
@@ -272,7 +313,8 @@ async function reportarAtrasadas() {
 async function principal() {
   console.log(
     APLICAR
-      ? `MODO REAL${ENVIAR ? ' + ENVIO À UTMIFY' : ' (sem enviar nada)'}`
+      ? `MODO REAL${ENVIAR ? ' + ENVIO À UTMIFY' : ' (sem enviar nada)'}` +
+          (COM_TESTES ? ' · INCLUINDO TESTES DO DONO' : '')
       : 'SIMULAÇÃO — nada é alterado. Use --aplicar para valer.'
   );
   reatribuirPedidos();
