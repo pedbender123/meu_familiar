@@ -25,11 +25,28 @@ import { apagarCampanha } from '../src/lib/campanhas';
  * filtro — não o banco.
  *
  * Uso:
- *   npx tsx scripts/limpar-campanhas.ts             # mostra o que sairia
+ *   npx tsx scripts/limpar-campanhas.ts                       # mostra o que sairia
  *   npx tsx scripts/limpar-campanhas.ts --aplicar
+ *   npx tsx scripts/limpar-campanhas.ts --so-da-meta --aplicar # poupa as suas
  */
 
 const APLICAR = process.argv.includes('--aplicar');
+
+/**
+ * Apagar só as que nasceram sozinhas do `utm_campaign`.
+ *
+ * ── Por que este recorte existe ───────────────────────────────────────────
+ *
+ * As campanhas cadastradas à mão são recorte INTERNO do funil: alguém montou
+ * aquele link para um lugar específico e usa a linha para ler o próprio site.
+ * Elas não são lixo mesmo sem venda nenhuma — uma campanha que não vendeu é
+ * uma informação, e apagá-la é apagar a resposta.
+ *
+ * As que nascem do `utm_campaign` são outra coisa: aparecem sozinhas, com
+ * nome de número, e quando o link do anúncio já traz `?c=` elas só duplicam
+ * o que já está ali.
+ */
+const SO_DA_META = process.argv.includes('--so-da-meta');
 
 interface Linha {
   id: string;
@@ -56,7 +73,7 @@ console.log('');
 
 for (const c of campanhas) {
   const vendas = c.pagos + c.assinaturas;
-  const fica = vendas > 0;
+  const fica = vendas > 0 || (SO_DA_META && !c.utm_campanha);
   console.log(
     `${fica ? 'FICA  ' : 'APAGA '} ${String(c.nome).slice(0, 40).padEnd(40)} ` +
       `| pedidos: ${String(c.pedidos).padStart(3)} | vendas: ${vendas} ` +
@@ -66,7 +83,9 @@ for (const c of campanhas) {
   if (!fica && APLICAR) apagarCampanha(c.id);
 }
 
-const apagadas = campanhas.filter((c) => c.pagos + c.assinaturas === 0);
+const apagadas = campanhas.filter(
+  (c) => c.pagos + c.assinaturas === 0 && !(SO_DA_META && !c.utm_campanha)
+);
 console.log(
   `\n${apagadas.length} de ${campanhas.length} campanhas ${APLICAR ? 'apagadas' : 'sairiam'}.`
 );
