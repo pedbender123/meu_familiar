@@ -652,6 +652,15 @@ export interface Pedido {
   /** JSON com os UTMs da chegada. Ver a migração 026. */
   utm_json: string | null;
   /**
+   * Quando a UTMify aceitou esta venda, e o erro da última tentativa.
+   *
+   * Existem no banco desde a migração 034 e faltavam neste tipo — o que faz o
+   * TypeScript recusar exatamente o código que quer CONFERIR se o relato deu
+   * certo. Ver `anotarEnvio` em `reportar-venda.ts`.
+   */
+  utmify_em: string | null;
+  utmify_erro: string | null;
+  /**
    * Quanto desta venda foi repassado a outras contas (split da Wiven).
    *
    * Gravado na cobrança, não deduzido no webhook: o webhook só sabe o que

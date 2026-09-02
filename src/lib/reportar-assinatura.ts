@@ -32,18 +32,23 @@ import {
  * id da assinatura, a UTMify agruparia os seis meses num pedido só e
  * sobrescreveria o valor.
  *
- * ── Nunca lança ───────────────────────────────────────────────────────────
+ * ── Nunca lança, mas DIZ se deu certo ─────────────────────────────────────
  *
  * Roda dentro do webhook que ENTREGA o acesso. Rastreio quebrado é relatório
  * com buraco; rastreio que lança é uma pessoa que pagou e não entrou.
+ *
+ * Devolver `false` em vez de `void` é o que separa "engoli o erro" de
+ * "escondi o erro". Enquanto ela não devolvia nada, o script de reenvio
+ * imprimia ✓ para uma venda que a UTMify tinha recusado com 400 — e a única
+ * pista era uma linha de log no meio de outras.
  */
 export async function reportarAssinatura(
   cobranca: Cobranca,
   status: StatusUtmify,
   extras: { metodo?: string | null; taxaCentavos?: number | null; aprovadoEm?: Date } = {}
-): Promise<void> {
+): Promise<boolean> {
   try {
-    if (!cobranca.email) return;
+    if (!cobranca.email) return false;
 
     const plano = buscarPlano(cobranca.plano_id);
 
@@ -77,7 +82,7 @@ export async function reportarAssinatura(
         hoje isso quer dizer Wiven. `cobrancas` não guarda qual gateway cobrou
         — quando guardar, este campo passa a sair de lá.
       */
-      plataforma: process.env.UTMIFY_PLATAFORMA ?? 'Wiven',
+      plataforma: process.env.UTMIFY_PLATAFORMA?.trim() || 'Wiven',
       orderId: cobranca.id,
       status,
       metodo: metodoParaUtmify(extras.metodo ?? cobranca.metodo),
@@ -98,9 +103,11 @@ export async function reportarAssinatura(
     });
 
     anotarEnvio(cobranca.id, aceito ? null : `${status} recusado ou sem resposta`);
+    return aceito;
   } catch (erro) {
     console.error('[utmify] reportar assinatura falhou:', erro);
     anotarEnvio(cobranca.id, String(erro).slice(0, 200));
+    return false;
   }
 }
 

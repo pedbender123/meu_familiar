@@ -296,17 +296,39 @@ async function reportarAtrasadas() {
     tipo de rajada que dispara proteção — foi o que derrubou o checkout da
     Wiven por 26 horas em 24/08. Um relatório atrasado suporta esperar.
   */
+  let aceitos = 0;
+  let recusados = 0;
+
   for (const c of cobrancas) {
     const x = buscarCobranca(c.id)!;
-    await reportarAssinatura(x, 'paid');
-    console.log(`  ✓ assinatura ${x.id.slice(0, 8)} · ${x.email}`);
+    /*
+      O resultado é lido, não presumido. Antes disto o script imprimia ✓ para
+      uma venda que a UTMify tinha recusado com 400 — a marca de certo era só
+      "a função voltou sem lançar", que é uma coisa completamente diferente.
+    */
+    const ok = await reportarAssinatura(x, 'paid');
+    console.log(`  ${ok ? '✓' : '✗'} assinatura ${x.id.slice(0, 8)} · ${x.email}`);
+    ok ? aceitos++ : recusados++;
     await new Promise((r) => setTimeout(r, 1500));
   }
   for (const p of pedidos) {
     const x = buscarPedido(p.id)!;
     await reportarVenda(x, 'paid');
-    console.log(`  ✓ pedido ${x.id.slice(0, 8)} · ${x.email}`);
+    /*
+      `reportarVenda` grava o desfecho no próprio pedido e não devolve nada.
+      Reler é mais honesto que presumir, e é a mesma fonte que a tela de
+      Saúde consulta.
+    */
+    const depois = buscarPedido(p.id)!;
+    const ok = !!depois.utmify_em && !depois.utmify_erro;
+    console.log(`  ${ok ? '✓' : '✗'} pedido ${x.id.slice(0, 8)} · ${x.email}`);
+    ok ? aceitos++ : recusados++;
     await new Promise((r) => setTimeout(r, 1500));
+  }
+
+  console.log(`\n  ${aceitos} aceitas · ${recusados} recusadas pela UTMify`);
+  if (recusados > 0) {
+    console.log('  As recusadas continuam marcadas como não reportadas, e podem ser reenviadas.');
   }
 }
 

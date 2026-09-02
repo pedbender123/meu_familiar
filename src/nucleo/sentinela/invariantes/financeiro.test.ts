@@ -18,6 +18,8 @@ function pedido(sobrescreve: Partial<Pedido> = {}): Pedido {
     signo_lua: null,
     produto: 'completa',
     utm_json: null,
+    utmify_em: null,
+    utmify_erro: null,
     gateway: null,
     telefone: null,
     ip_comprador: null,

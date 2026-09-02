@@ -70,7 +70,8 @@ function plataformaDe(gateway: string | null | undefined): string {
   if (gateway === 'wiven') return 'Wiven';
   if (gateway === 'cakto') return 'Cakto';
   if (gateway === 'mercadopago') return 'MercadoPago';
-  return process.env.UTMIFY_PLATAFORMA ?? 'MercadoPago';
+  // `||` porque `UTMIFY_PLATAFORMA=` existe vazia em produção — ver utmify.ts.
+  return process.env.UTMIFY_PLATAFORMA?.trim() || 'MercadoPago';
 }
 
 /**

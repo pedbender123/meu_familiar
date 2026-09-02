@@ -73,8 +73,32 @@ describe('o painel da Utmify não pode mentir sobre quem cobrou', () => {
 
   test('a constante antiga não decide mais nada sozinha', () => {
     const fonte = codigoDe('src/lib/utmify.ts');
-    assert.match(fonte, /pedido\.plataforma \?\?/);
+    assert.match(fonte, /platform: pedido\.plataforma \|\|/);
     assert.doesNotMatch(fonte, /platform: process\.env\.UTMIFY_PLATAFORMA \?\? 'Cakto'/);
+  });
+
+  /**
+   * **`||`, nunca `??`, no nome da plataforma.**
+   *
+   * `UTMIFY_PLATAFORMA=` existe no `.env` de produção com valor VAZIO. O `??`
+   * só cobre `undefined`, então `'' ?? 'MercadoPago'` é `''` — e a UTMify
+   * recusa o corpo inteiro com `platform is a required field`, 400, venda
+   * fora de qualquer relatório.
+   *
+   * Foi assim que a primeira assinatura reenviada voltou recusada, em 01/09.
+   */
+  test('variável de ambiente vazia não vira nome de plataforma', () => {
+    for (const arquivo of [
+      'src/lib/utmify.ts',
+      'src/lib/reportar-venda.ts',
+      'src/lib/reportar-assinatura.ts',
+    ]) {
+      assert.doesNotMatch(
+        codigoDe(arquivo),
+        /UTMIFY_PLATAFORMA \?\?/,
+        `${arquivo}: string vazia passaria pelo ?? e a UTMify recusa o pedido`
+      );
+    }
   });
 });
 

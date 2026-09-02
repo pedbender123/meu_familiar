@@ -125,7 +125,17 @@ export async function reportarPedido(pedido: PedidoParaUtmify): Promise<boolean>
      * Utmify como se fosse da Cakto, que nunca cobrou um centavo. Um painel
      * que existe para conferir não pode mentir sobre a origem do dinheiro.
      */
-    platform: pedido.plataforma ?? process.env.UTMIFY_PLATAFORMA ?? 'MercadoPago',
+    /*
+      `||`, e não `??`.
+
+      `UTMIFY_PLATAFORMA=` existe no `.env` de produção com valor VAZIO, e
+      `'' ?? 'MercadoPago'` é `''` — o `??` só cobre `undefined`. A UTMify
+      recusa o corpo inteiro com `platform is a required field`, e a venda
+      não entra em relatório nenhum.
+
+      Foi assim que a primeira assinatura reportada voltou 400.
+    */
+    platform: pedido.plataforma || process.env.UTMIFY_PLATAFORMA?.trim() || 'MercadoPago',
     paymentMethod: pedido.metodo,
     status: pedido.status,
     createdAt: emUtc(pedido.criadoEm),
