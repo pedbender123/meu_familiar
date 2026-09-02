@@ -301,8 +301,38 @@ export function atualizarCampanha(id: string, campos: Partial<Campanha>): void {
   ).run({ ...campos, id, atualizado_em: new Date().toISOString() });
 }
 
+/**
+ * Apaga a campanha **e tudo que apontava para ela**.
+ *
+ * ── O que a versão anterior deixava para trás ─────────────────────────────
+ *
+ * Um `DELETE` na linha da campanha, e só. As peças continuavam na tabela sem
+ * dono, e os pedidos continuavam com um `campanha_id` que não existe mais —
+ * então eles sumiam de todo relatório de campanha (não há campanha para
+ * filtrar) e também não apareciam como tráfego direto (o campo não é nulo).
+ * Ficavam num terceiro estado que nenhuma tela sabe mostrar.
+ *
+ * Por isso o painel nunca ficava limpo de verdade: apagar tirava a linha da
+ * lista e deixava o rastro no banco.
+ *
+ * ── Os pedidos não são apagados ───────────────────────────────────────────
+ *
+ * Eles perdem a campanha e viram tráfego sem atribuição, que é a verdade: a
+ * campanha deixou de existir, então ninguém sabe mais de onde vieram. A venda
+ * continua contada na Central, onde ela sempre esteve.
+ *
+ * Tudo numa transação: campanha apagada com pedido ainda apontando para ela é
+ * exatamente o estado que isto existe para não deixar acontecer.
+ */
 export function apagarCampanha(id: string): void {
-  db.prepare('DELETE FROM campanhas WHERE id = ?').run(id);
+  db.transaction(() => {
+    db.prepare('UPDATE pedidos SET campanha_id = NULL, peca_id = NULL WHERE campanha_id = ?').run(id);
+    db.prepare('UPDATE cobrancas SET campanha_id = NULL, peca_id = NULL WHERE campanha_id = ?').run(id);
+    db.prepare('UPDATE visitas SET campanha_id = NULL WHERE campanha_id = ?').run(id);
+    db.prepare('UPDATE toques SET campanha_id = NULL, peca_id = NULL WHERE campanha_id = ?').run(id);
+    db.prepare('DELETE FROM pecas WHERE campanha_id = ?').run(id);
+    db.prepare('DELETE FROM campanhas WHERE id = ?').run(id);
+  })();
 }
 
 /* ── o relatório ─────────────────────────────────────────────────────────── */
