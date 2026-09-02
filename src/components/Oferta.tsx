@@ -186,12 +186,15 @@ export function Oferta({
         finalCentavos: a.finalCentavos,
         descontoPercentual: a.descontoPercentual,
         gratis: a.gratis,
+        // A escada da oferta não tem bump: os ebooks são marcados no checkout.
+        bumpsCentavos: 0,
       },
       completa: {
         cheioCentavos: b.cheioCentavos,
         finalCentavos: b.finalCentavos,
         descontoPercentual: b.descontoPercentual,
         gratis: b.gratis,
+        bumpsCentavos: 0,
       },
     });
     setCupom({ codigo: a.codigo, gratis: a.gratis });
@@ -262,6 +265,7 @@ export function Oferta({
         finalCentavos: PRECO_DO_PLANO_CENTAVOS,
         descontoPercentual: 0,
         gratis: false,
+        bumpsCentavos: 0,
       },
       riscadoCentavos: riscados?.assinatura ?? null,
       itens: [

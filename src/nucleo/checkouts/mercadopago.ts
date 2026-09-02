@@ -128,9 +128,11 @@ export function montarCorpo(
   produto: Cobravel,
   pedidoId: string,
   emailDoPedido: string,
-  descontoPercentual: number
+  descontoPercentual: number,
+  /** Ver `DadosCriacao.bumpsCentavos`: entra depois do desconto. */
+  bumpsCentavos = 0
 ) {
-  const preco = precoComDesconto(produto, descontoPercentual);
+  const preco = precoComDesconto(produto, descontoPercentual, bumpsCentavos);
   const base = {
     transaction_amount: preco.finalCentavos / 100,
     description: produto.descricao,
@@ -188,6 +190,18 @@ export interface DadosCriacao {
    * o TypeScript reclamar. Campo que decide preço não pode ter valor padrão.
    */
   descontoPercentual: number;
+  /**
+   * Os ebooks marcados no checkout, já somados e validados contra o catálogo.
+   *
+   * Obrigatório pelo mesmo motivo do desconto, e o modo de falha aqui é o
+   * espelho dele: esquecer o campo faz a tela somar R$ 9,90 e o cartão ser
+   * debitado sem eles — a pessoa recebe o livro e não paga por ele.
+   *
+   * Já vem somado, nunca como lista de ids: quem transforma id em preço é
+   * `somaDosBumps`, no servidor, contra o catálogo. Um gateway não tem por
+   * que saber o que é um ebook.
+   */
+  bumpsCentavos: number;
 }
 
 /** O suficiente pra reconciliação achar o pedido — detalhe financeiro completo vem de `consultarPagamento`. */
@@ -225,10 +239,18 @@ class ProvedorMercadoPago implements ProvedorPagamento {
   }
 
   async criarPagamento(dados: DadosCriacao): Promise<ResultadoPagamento> {
-    const { form, produto, pedidoId, emailDoPedido, descontoPercentual } = dados;
+    const { form, produto, pedidoId, emailDoPedido, descontoPercentual, bumpsCentavos } =
+      dados;
 
     const resposta = await this.pagamentos.create({
-      body: montarCorpo(form, produto, pedidoId, emailDoPedido, descontoPercentual),
+      body: montarCorpo(
+        form,
+        produto,
+        pedidoId,
+        emailDoPedido,
+        descontoPercentual,
+        bumpsCentavos
+      ),
       // Exigido pelo MP. Chave nova por tentativa: se a pessoa erra o cartão e
       // tenta de novo, é uma cobrança nova de verdade — reaproveitar a chave
       // faria o MP devolver o resultado antigo, com a recusa anterior.

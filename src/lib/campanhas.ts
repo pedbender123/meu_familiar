@@ -582,7 +582,7 @@ export function relatorioDoPeriodo(
   const pedidos = db
     .prepare(
       `SELECT id, visitante, nome, email, familiar, status, produto,
-              desconto_percentual, respostas_json, bruto_centavos, taxa_centavos,
+              desconto_percentual, bumps_centavos, respostas_json, bruto_centavos, taxa_centavos,
               liquido_centavos, custo_ia_centavos, origem, criado_em,
               metodo_tentado, metodo_pagamento, motivo_recusa,
               -- pago_em responde "comprou?"; status responde "recebeu?".
@@ -606,6 +606,7 @@ export function relatorioDoPeriodo(
     status: string;
     produto: string;
     desconto_percentual: number | null;
+    bumps_centavos: number | null;
     pagamento_id: string | null;
     respostas_json: string;
     bruto_centavos: number | null;
@@ -984,7 +985,7 @@ export function desempenhoPorPeca(campanhaId: string): DesempenhoDaPeca[] {
   // aqui faria o painel divergir do que foi de fato cobrado.
   const pagos = db
     .prepare(
-      `SELECT peca_id, produto, desconto_percentual
+      `SELECT peca_id, produto, desconto_percentual, bumps_centavos
          FROM pedidos
         WHERE campanha_id = ? AND exemplo = 0
           AND status IN ('pago','gerando','entregue')`
@@ -993,6 +994,7 @@ export function desempenhoPorPeca(campanhaId: string): DesempenhoDaPeca[] {
     peca_id: string | null;
     produto: string;
     desconto_percentual: number | null;
+    bumps_centavos: number | null;
   }[];
 
   const receita = new Map<string, number>();
@@ -1171,13 +1173,17 @@ export function funilDaPeca(campanhaId: string, pecaId: string | null): FunilDaP
 
   const pagos = db
     .prepare(
-      `SELECT produto, desconto_percentual
+      `SELECT produto, desconto_percentual, bumps_centavos
          FROM pedidos
         WHERE campanha_id = @campanha AND exemplo = 0
           AND status IN ('pago','gerando','entregue')
           AND ${pecaId ? 'peca_id = @peca' : 'peca_id IS NULL'}`
     )
-    .all(params) as { produto: string; desconto_percentual: number | null }[];
+    .all(params) as {
+    produto: string;
+    desconto_percentual: number | null;
+    bumps_centavos: number | null;
+  }[];
 
   const receitaCentavos = pagos.reduce((s, p) => s + precoDoPedido(p).finalCentavos, 0);
 

@@ -33,13 +33,14 @@ export default async function Pedidos() {
   // painel sem número nenhum.
   const pagos = db
     .prepare(
-      `SELECT produto, desconto_percentual, bruto_centavos, taxa_centavos,
+      `SELECT produto, desconto_percentual, bumps_centavos, bruto_centavos, taxa_centavos,
               liquido_centavos, custo_ia_centavos
          FROM pedidos WHERE status = 'entregue' AND exemplo = 0`
     )
     .all() as {
     produto: string;
     desconto_percentual: number | null;
+    bumps_centavos: number | null;
     bruto_centavos: number | null;
     taxa_centavos: number | null;
     liquido_centavos: number | null;
@@ -63,7 +64,7 @@ export default async function Pedidos() {
   const recentes = db
     .prepare(
       `SELECT id, nome, email, familiar, produto, status, criado_em, metodo_pagamento,
-              bruto_centavos, desconto_percentual
+              bruto_centavos, desconto_percentual, bumps_centavos
          FROM pedidos ORDER BY criado_em DESC LIMIT 40`
     )
     .all() as {
@@ -77,6 +78,7 @@ export default async function Pedidos() {
     metodo_pagamento: string | null;
     bruto_centavos: number | null;
     desconto_percentual: number | null;
+    bumps_centavos: number | null;
   }[];
 
   // Quem comprou mais de uma vez. É a pergunta que o suporte faz primeiro

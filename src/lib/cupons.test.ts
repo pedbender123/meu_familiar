@@ -120,7 +120,7 @@ describe('receita de verdade', () => {
     assert.equal(
       receitaDoPedido({
         produto: 'revelacao',
-        desconto_percentual: null,
+        desconto_percentual: null, bumps_centavos: null,
         bruto_centavos: null,
         pagamento_id: null,
       }),
@@ -132,7 +132,7 @@ describe('receita de verdade', () => {
     assert.equal(
       receitaDoPedido({
         produto: 'revelacao',
-        desconto_percentual: 20,
+        desconto_percentual: 20, bumps_centavos: null,
         bruto_centavos: 784,
         pagamento_id: 'mp-1',
       }),
@@ -153,7 +153,7 @@ describe('receita de verdade', () => {
     assert.equal(
       receitaDoPedido({
         produto: 'revelacao',
-        desconto_percentual: null,
+        desconto_percentual: null, bumps_centavos: null,
         bruto_centavos: null,
         pagamento_id: 'mp-antigo',
       }),
@@ -165,7 +165,7 @@ describe('receita de verdade', () => {
     assert.equal(
       receitaDoPedido({
         produto: 'revelacao',
-        desconto_percentual: 100,
+        desconto_percentual: 100, bumps_centavos: null,
         bruto_centavos: null,
         pagamento_id: 'mp-2',
       }),
@@ -177,7 +177,7 @@ describe('receita de verdade', () => {
     assert.equal(
       receitaDoPedido({
         produto: 'revelacao',
-        desconto_percentual: null,
+        desconto_percentual: null, bumps_centavos: null,
         bruto_centavos: 0,
         pagamento_id: 'mp-3',
       }),

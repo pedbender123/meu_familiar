@@ -78,6 +78,8 @@ export async function POST(
       pedidoId: id,
       emailDoPedido: pedido.email,
       descontoPercentual: 0,
+      // A melhoria é um upgrade da leitura; os ebooks são do checkout inicial.
+      bumpsCentavos: 0,
     });
 
     anotarPagamentoDaMelhoria(id, resultado.idExterno);

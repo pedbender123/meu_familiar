@@ -119,7 +119,7 @@ export function contatos(filtro?: {
   const pedidos = db
     .prepare(
       `SELECT id, lower(email) email, nome, visitante, familiar, status, produto,
-              desconto_percentual, bruto_centavos, origem, criado_em,
+              desconto_percentual, bumps_centavos, bruto_centavos, origem, criado_em,
               pagamento_id, metodo_tentado
          FROM pedidos WHERE exemplo = 0
          ${janela ? 'AND criado_em >= @de AND criado_em < @ate' : ''}
@@ -134,6 +134,7 @@ export function contatos(filtro?: {
     status: string;
     produto: string;
     desconto_percentual: number | null;
+    bumps_centavos: number | null;
     bruto_centavos: number | null;
     origem: string | null;
     criado_em: string;

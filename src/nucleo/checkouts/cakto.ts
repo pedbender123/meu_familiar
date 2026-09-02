@@ -392,7 +392,11 @@ export class ProvedorCakto implements ProvedorPagamento {
      * `precoComDesconto` continua sendo o que a vitrine mostra e o que
      * `conferirPreco` espera ver cobrado.
      */
-    const preco = precoComDesconto(dados.produto, dados.descontoPercentual);
+    const preco = precoComDesconto(
+      dados.produto,
+      dados.descontoPercentual,
+      dados.bumpsCentavos
+    );
     const offerId = await garantirOferta(dados.produto, dados.produto.precoCentavos);
 
     /**

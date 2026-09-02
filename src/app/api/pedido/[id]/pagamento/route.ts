@@ -14,6 +14,7 @@ import { calcularExpiracao, produtoDe } from '@/lib/produtos';
 import { produtoVigenteDe } from '@/lib/modelo-de-venda';
 import { aposPagamento } from '@/lib/processar';
 import { excedeuLimite, LIMITES } from '@/lib/rate-limit';
+import { bumpsValidos, somaDosBumps } from '@/nucleo/biblioteca/catalogo';
 
 /**
  * Recebe o `formData` do Payment Brick e cria o pagamento no Mercado Pago.
@@ -74,8 +75,24 @@ export async function POST(
   let cakto: DadosCaktoDoFront | undefined;
   let wiven: DadosCriacaoWiven['wiven'] | undefined;
   let utm: Record<string, string> | undefined;
+  let bumps: string[] = [];
   try {
     const corpo = await req.json();
+    /**
+     * Os ebooks marcados no checkout.
+     *
+     * ── O que chega, e o que é aceito ───────────────────────────────────
+     *
+     * Chegam IDS, nunca preços. O navegador diz o que a pessoa marcou; quanto
+     * isso custa é decidido aqui, contra o catálogo. É a mesma regra do preço
+     * do produto, e pelo mesmo motivo: valor que passa pelo navegador é valor
+     * editável.
+     *
+     * `bumpsValidos` também descarta livro sem PDF em disco. Sem isso, um id
+     * de um livro ainda não entregue viraria cobrança por um arquivo que não
+     * existe — a pessoa pagaria e a entrega devolveria 404.
+     */
+    bumps = bumpsValidos(corpo?.bumps);
     /**
      * Três fronts, um endpoint.
      *
@@ -159,6 +176,20 @@ export async function POST(
      */
     ...(utm && Object.keys(utm).length ? { utm_json: JSON.stringify(utm) } : {}),
     ip_comprador: ip === 'local' ? null : ip.split(',')[0].trim(),
+    /**
+     * Os ebooks ficam gravados ANTES da cobrança, junto da tentativa.
+     *
+     * Pela mesma razão que a tentativa é gravada antes: quem entrega os
+     * livros é o webhook, horas depois, sem navegador por perto. Se a escolha
+     * só existisse na memória desta requisição, um pagamento confirmado
+     * chegaria sem saber por quais livros a pessoa pagou.
+     *
+     * `bumps_centavos` guarda o que foi COBRADO, não o preço de hoje: o preço
+     * de um livro pode mudar, e a venda antiga continua valendo o que ela
+     * valeu.
+     */
+    bumps_json: bumps.length ? JSON.stringify(bumps) : null,
+    bumps_centavos: somaDosBumps(bumps),
   });
   registrarEvento('pagamento_tentado', id);
 
@@ -220,6 +251,12 @@ export async function POST(
       // Lido do PEDIDO, nunca do corpo da requisição: é o cupom que já foi
       // validado contra o banco quando o pedido nasceu.
       descontoPercentual: dados.desconto_percentual ?? 0,
+      /*
+        Somado aqui, no servidor, a partir dos ids validados — nunca vindo do
+        corpo da requisição. Entra depois do desconto: o cupom foi dado para a
+        oferta da campanha, não para o livro de R$ 9,90.
+      */
+      bumpsCentavos: somaDosBumps(bumps),
     });
   }
 

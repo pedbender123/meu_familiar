@@ -652,7 +652,11 @@ export class ProvedorWiven implements ProvedorPagamento {
      * gravado no pedido. Nunca vem do navegador — `amount` editável pelo
      * cliente seria preço editável pelo cliente.
      */
-    const preco = precoComDesconto(dados.produto, dados.descontoPercentual);
+    const preco = precoComDesconto(
+      dados.produto,
+      dados.descontoPercentual,
+      dados.bumpsCentavos
+    );
     const identifier = identificadorDe(dados.pedidoId);
     const splits = splitsDe(preco.finalCentavos);
 

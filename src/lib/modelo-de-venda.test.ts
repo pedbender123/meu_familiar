@@ -195,12 +195,12 @@ describe('nenhum caminho de cobrança escapa do interruptor', () => {
   test('precoDoPedido segue o interruptor', () => {
     ligar(false);
     assert.equal(
-      precoDoPedido({ produto: 'revelacao', desconto_percentual: null }).finalCentavos,
+      precoDoPedido({ produto: 'revelacao', desconto_percentual: null, bumps_centavos: null }).finalCentavos,
       1890
     );
     ligar(true);
     assert.equal(
-      precoDoPedido({ produto: 'revelacao', desconto_percentual: null }).finalCentavos,
+      precoDoPedido({ produto: 'revelacao', desconto_percentual: null, bumps_centavos: null }).finalCentavos,
       0
     );
   });
@@ -209,7 +209,7 @@ describe('nenhum caminho de cobrança escapa do interruptor', () => {
   test('desligado, a Revelação não é grátis em lugar nenhum', () => {
     ligar(false);
     assert.equal(
-      precoDoPedido({ produto: 'revelacao', desconto_percentual: null }).gratis,
+      precoDoPedido({ produto: 'revelacao', desconto_percentual: null, bumps_centavos: null }).gratis,
       false
     );
   });

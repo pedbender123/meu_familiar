@@ -326,7 +326,7 @@ export function comparacaoDeFunis(desde: string | null): {
 
   const pedidos = db
     .prepare(
-      `SELECT p.funil AS funil, p.status, p.produto, p.desconto_percentual,
+      `SELECT p.funil AS funil, p.status, p.produto, p.desconto_percentual, p.bumps_centavos,
               p.visitante
          FROM pedidos p
         WHERE p.exemplo = 0 AND p.funil IS NOT NULL ${filtro}`
@@ -336,6 +336,7 @@ export function comparacaoDeFunis(desde: string | null): {
     status: string;
     produto: string;
     desconto_percentual: number | null;
+    bumps_centavos: number | null;
     visitante: string | null;
   }[];
 

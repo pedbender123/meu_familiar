@@ -102,7 +102,7 @@ export function consolidado(de?: string, ate?: string): Consolidado {
 
   const pagos = db
     .prepare(
-      `SELECT produto, desconto_percentual, bruto_centavos, taxa_centavos,
+      `SELECT produto, desconto_percentual, bumps_centavos, bruto_centavos, taxa_centavos,
               liquido_centavos, custo_ia_centavos, pago_em, criado_em,
               -- Sem esta coluna, \`receitaDoPedido\` não distingue "entregue sem
               -- cobranca de cobrado sem valor gravado, e devolve zero
@@ -115,6 +115,7 @@ export function consolidado(de?: string, ate?: string): Consolidado {
     .all(janela ? { de, ate } : {}) as {
     produto: string;
     desconto_percentual: number | null;
+    bumps_centavos: number | null;
     bruto_centavos: number | null;
     taxa_centavos: number | null;
     liquido_centavos: number | null;

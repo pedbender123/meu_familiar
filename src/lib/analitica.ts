@@ -127,11 +127,15 @@ export function resumo(janela: Janela): Resumo {
 
   const vendas = db
     .prepare(
-      `SELECT produto, desconto_percentual FROM pedidos
+      `SELECT produto, desconto_percentual, bumps_centavos FROM pedidos
         WHERE exemplo = 0 AND status = 'entregue'
         ${corte ? 'AND criado_em >= @corte' : ''}`
     )
-    .all({ corte }) as { produto: string; desconto_percentual: number | null }[];
+    .all({ corte }) as {
+    produto: string;
+    desconto_percentual: number | null;
+    bumps_centavos: number | null;
+  }[];
 
   const receitaCentavos = vendas.reduce(
     (s, p) => s + precoDoPedido(p).finalCentavos,
@@ -189,7 +193,7 @@ export function porDia(dias: number, agora = new Date()): PontoDoDia[] {
 
   const entregues = db
     .prepare(
-      `SELECT ${DIA_LOCAL} dia, produto, desconto_percentual
+      `SELECT ${DIA_LOCAL} dia, produto, desconto_percentual, bumps_centavos
          FROM pedidos
         WHERE exemplo = 0 AND status = 'entregue' AND criado_em >= ?`
     )
@@ -197,6 +201,7 @@ export function porDia(dias: number, agora = new Date()): PontoDoDia[] {
     dia: string;
     produto: string;
     desconto_percentual: number | null;
+    bumps_centavos: number | null;
   }[];
 
   const mapaVisitas = new Map(visitas.map((v) => [v.dia, v.n]));
@@ -257,7 +262,8 @@ export function porOrigem(janela: Janela): LinhaDeOrigem[] {
 
   const pedidos = db
     .prepare(
-      `SELECT coalesce(origem, 'direto') origem, status, produto, desconto_percentual
+      `SELECT coalesce(origem, 'direto') origem, status, produto, desconto_percentual,
+              bumps_centavos
          FROM pedidos WHERE exemplo = 0 ${filtro}`
     )
     .all({ corte }) as {
@@ -265,6 +271,7 @@ export function porOrigem(janela: Janela): LinhaDeOrigem[] {
     status: string;
     produto: string;
     desconto_percentual: number | null;
+    bumps_centavos: number | null;
   }[];
 
   const mapa = new Map<string, LinhaDeOrigem>();

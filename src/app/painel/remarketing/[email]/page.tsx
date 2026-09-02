@@ -35,7 +35,7 @@ export default async function FichaDaPessoa({
 
   const pedidos = db
     .prepare(
-      `SELECT id, nome, familiar, produto, status, desconto_percentual, cupom,
+      `SELECT id, nome, familiar, produto, status, desconto_percentual, bumps_centavos, cupom,
               bruto_centavos, taxa_centavos, metodo_tentado, metodo_pagamento,
               motivo_recusa, tentativas_pagamento, respostas_json, origem,
               criado_em, pago_em
@@ -48,6 +48,7 @@ export default async function FichaDaPessoa({
     produto: string;
     status: string;
     desconto_percentual: number | null;
+    bumps_centavos: number | null;
     cupom: string | null;
     bruto_centavos: number | null;
     taxa_centavos: number | null;

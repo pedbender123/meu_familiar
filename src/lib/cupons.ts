@@ -105,6 +105,15 @@ export interface PrecoComDesconto {
   descontoPercentual: number;
   /** `true` quando nada será cobrado e o checkout deve ser pulado. */
   gratis: boolean;
+  /**
+   * Quanto dos `finalCentavos` são ebooks marcados no checkout.
+   *
+   * Zero em quase todo pedido. Separado do preço do produto porque as duas
+   * receitas se leem diferente — uma é a oferta que a campanha anuncia, a
+   * outra é o que ela conseguiu somar depois do sim — e porque só o produto
+   * recebe desconto de cupom.
+   */
+  bumpsCentavos: number;
 }
 
 /**
@@ -121,19 +130,47 @@ export function precoComDesconto(
    * `diasDeLinkPublico` que não significam nada numa conta de desconto.
    */
   produto: { precoCentavos: number },
-  descontoPercentual = 0
+  descontoPercentual = 0,
+  /**
+   * Os ebooks marcados no checkout, já somados por `somaDosBumps`.
+   *
+   * ── Por que entra DEPOIS do desconto ────────────────────────────────────
+   *
+   * O cupom foi dado para a oferta que a campanha anuncia. Deixá-lo incidir
+   * sobre o bump daria um desconto que ninguém prometeu, num item cujo preço
+   * é a coisa toda: R$ 9,90 com 20% vira R$ 7,92, e a margem de um PDF de
+   * impulso não tem essa folga.
+   *
+   * ── Por que não entra no `cheioCentavos` ────────────────────────────────
+   *
+   * Porque o cheio é o riscado, e riscar o bump afirmaria que ele já custou
+   * mais — o que seria propaganda enganosa pelo mesmo motivo que
+   * `PRECO_RISCADO_CENTAVOS` existe separado em `modelo-de-venda.ts`.
+   */
+  bumpsCentavos = 0
 ): PrecoComDesconto {
   const pct = Math.max(0, Math.min(100, Math.round(descontoPercentual)));
   const cheio = produto.precoCentavos;
   // Arredonda para cima: 20% de R$ 9,80 dá R$ 7,84 e não R$ 7,83. Centavo a
   // menos no nosso bolso é irrelevante; centavo a mais é cobrança indevida.
-  const final = Math.ceil(cheio * (1 - pct / 100));
+  const doProduto = Math.ceil(cheio * (1 - pct / 100));
+  const extras = Math.max(0, Math.round(bumpsCentavos));
+
+  /*
+    O piso vale sobre o TOTAL, não sobre o produto.
+
+    Um cupom de 100% na Revelação com um ebook marcado não é uma venda grátis:
+    são R$ 9,90 a cobrar. Aplicar o piso só ao produto faria o checkout ser
+    pulado e o livro entregue sem cobrança nenhuma.
+  */
+  const total = doProduto + extras;
 
   return {
     cheioCentavos: cheio,
-    finalCentavos: final < PISO_COBRAVEL_CENTAVOS ? 0 : final,
+    finalCentavos: total < PISO_COBRAVEL_CENTAVOS ? 0 : total,
     descontoPercentual: pct,
-    gratis: final < PISO_COBRAVEL_CENTAVOS,
+    gratis: total < PISO_COBRAVEL_CENTAVOS,
+    bumpsCentavos: extras,
   };
 }
 
@@ -141,6 +178,25 @@ export function precoComDesconto(
 export function precoDoPedido(pedido: {
   produto: string;
   desconto_percentual: number | null;
+  /**
+   * O que os ebooks marcados no checkout somaram, **como foi cobrado**.
+   *
+   * ── Por que é obrigatório, e não `?` ────────────────────────────────────
+   *
+   * Este campo decide receita, e quase toda consulta que chama esta função
+   * seleciona colunas à mão. Opcional, ele seria esquecido num `SELECT` e o
+   * relatório passaria a mostrar menos dinheiro do que entrou — sem erro,
+   * sem aviso, sem ninguém notar.
+   *
+   * É a mesma lição de `DadosCriacao.descontoPercentual`, que nasceu opcional
+   * e produziu um Pix cobrando o preço cheio num pedido com 20% de desconto.
+   * Campo que mexe em dinheiro não tem valor padrão: `null` é uma resposta
+   * (não houve bump), e o compilador obriga quem consulta a dá-la.
+   *
+   * Vale o valor GRAVADO, não o do catálogo hoje: o preço de um livro pode
+   * mudar, e uma venda antiga continua valendo o que foi cobrado dela.
+   */
+  bumps_centavos: number | null;
 }): PrecoComDesconto {
   /**
    * O preço VIGENTE, não o da tabela estática.
@@ -152,7 +208,8 @@ export function precoDoPedido(pedido: {
    */
   return precoComDesconto(
     { precoCentavos: precoVigenteCentavos(pedido.produto as ProdutoId) },
-    pedido.desconto_percentual ?? 0
+    pedido.desconto_percentual ?? 0,
+    pedido.bumps_centavos ?? 0
   );
 }
 
@@ -243,6 +300,8 @@ export function alternarCupom(codigo: string, ativo: boolean): void {
 export function receitaDoPedido(pedido: {
   produto: string;
   desconto_percentual: number | null;
+  /** Ver `precoDoPedido`: obrigatório porque decide dinheiro. */
+  bumps_centavos: number | null;
   bruto_centavos?: number | null;
   pagamento_id?: string | null;
 }): number {

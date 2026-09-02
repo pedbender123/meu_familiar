@@ -652,6 +652,15 @@ export interface Pedido {
   /** JSON com os UTMs da chegada. Ver a migração 026. */
   utm_json: string | null;
   /**
+   * Os ebooks marcados no checkout, como lista JSON de ids. Ver a migração 041.
+   *
+   * `bumps_centavos` é o que eles somaram NA COBRANÇA — guardado, e não
+   * recalculado do catálogo, porque preço de livro muda e venda antiga
+   * continua valendo o que foi cobrado dela.
+   */
+  bumps_json: string | null;
+  bumps_centavos: number | null;
+  /**
    * Quando a UTMify aceitou esta venda, e o erro da última tentativa.
    *
    * Existem no banco desde a migração 034 e faltavam neste tipo — o que faz o

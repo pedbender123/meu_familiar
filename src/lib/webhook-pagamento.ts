@@ -25,6 +25,7 @@ import { entregarChaveDaPlataforma, nomeDaConta } from './acesso-plataforma';
 import { buscarPedidoPorMelhoria, confirmarMelhoria } from '../nucleo/melhoria';
 import { reportarVenda } from './reportar-venda';
 import { reportarAssinatura } from './reportar-assinatura';
+import { entregarBumpsDoPedido } from '../nucleo/biblioteca/entrega';
 
 export type DesfechoNotificacao =
   | 'nao_libera_acesso'
@@ -311,6 +312,20 @@ export async function processarNotificacaoDePagamento(
     metodo_pagamento: resultado.metodo,
   });
   registrarEvento('pagamento_confirmado', pedido.id);
+
+  /**
+   * Os ebooks marcados no checkout são liberados aqui, com o resto.
+   *
+   * Antes de `aposPagamento`, e de propósito: a geração da leitura é o passo
+   * caro e demorado do fluxo, e ela roda solta, sem `await`. Se um dia ela
+   * falhar no meio, quem pagou por um livro continua com o livro — porque o
+   * direito já foi gravado neste ponto, que é uma escrita local e instantânea.
+   *
+   * É idempotente pelo índice único de `desbloqueios`: o gateway reenvia esta
+   * notificação, e reenvio não pode dar dois direitos nem contar a receita
+   * duas vezes.
+   */
+  entregarBumpsDoPedido(pedido.id);
 
   // Vigilância em linha: confere, no instante em que o pagamento é gravado,
   // se o valor bate com produto e cupom (docs/reestruturacao.md §5). Falha
