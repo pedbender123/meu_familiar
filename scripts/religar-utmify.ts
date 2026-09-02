@@ -2,7 +2,6 @@ import { carregarEnv } from '../src/lib/carregar-env';
 carregarEnv();
 
 import db from '../src/lib/db';
-import { campanhaDoUtm, pecaDoUtm, idDaMeta } from '../src/lib/campanhas';
 import { buscarCobranca } from '../src/nucleo/cobrancas';
 import { reportarAssinatura } from '../src/lib/reportar-assinatura';
 import { reportarVenda } from '../src/lib/reportar-venda';
@@ -11,24 +10,24 @@ import { buscarPedido } from '../src/lib/db';
 /**
  * Religa o histórico ao rastreio — o conserto do que já aconteceu.
  *
- * ── O que foi medido em produção, 01/09 ───────────────────────────────────
+ * ── O que ele conserta ────────────────────────────────────────────────────
  *
- * 1. **Quatro campanhas da Meta chegando como sete identidades.** Três delas
- *    vinham em dois formatos ao mesmo tempo (`ID` e `Nome|ID`), então cada
- *    uma existia duas vezes na UTMify, com metade das vendas em cada.
+ * 1. **A assinatura paga sem atribuição nenhuma.** A cobrança nasceu antes de
+ *    `cobrancas` ter as colunas de campanha (migração 038), então ela não
+ *    aparecia como venda em campanha nenhuma.
  *
- * 2. **Três campanhas da Meta caindo dentro de UMA campanha nossa.** O link
- *    do anúncio carrega `?c=a2`, o `?c=` vencia o UTM, e a agência reusa o
- *    mesmo `?c=` em campanha nova atrás de campanha nova. As três apareciam
- *    somadas numa linha só.
+ * 2. **Vendas pagas que nunca chegaram à UTMify.**
  *
- * 3. **A assinatura paga sem atribuição nenhuma.** A cobrança nasceu antes de
- *    `cobrancas` ter as colunas de campanha (migração 038).
+ * ── O que ele NÃO faz, e não deve voltar a fazer ──────────────────────────
  *
- * 4. **Vendas pagas que nunca chegaram à UTMify.**
+ * Uma versão anterior reatribuía os pedidos às campanhas do gerenciador de
+ * anúncios, criando uma campanha nossa para cada `utm_campaign` da Meta.
+ * Isso está errado por confundir duas coisas com o mesmo nome: **campanha no
+ * painel é recorte interno do funil**, montado por quem faz o link, e não um
+ * espelho do gerenciador. O efeito foi encher a tela de linhas com nome de
+ * número e quebrar a leitura que o dono usa.
  *
- * O código novo conserta os quatro daqui para a frente. Este script conserta
- * o que já está no banco.
+ * O que a UTMify recebe não depende disso: vai o `utm_json` cru do pedido.
  *
  * ── Isto NÃO inventa histórico ────────────────────────────────────────────
  *
@@ -45,7 +44,7 @@ import { buscarPedido } from '../src/lib/db';
  *
  * Uso:
  *   npx tsx scripts/religar-utmify.ts              # mostra o plano
- *   npx tsx scripts/religar-utmify.ts --aplicar    # corrige o banco
+ *   npx tsx scripts/religar-utmify.ts --aplicar    # corrige a atribuição
  *   npx tsx scripts/religar-utmify.ts --aplicar --enviar   # e reporta à UTMify
  *
  *   --so-assinaturas   manda só assinatura, nenhum pedido
@@ -85,89 +84,10 @@ function titulo(t: string) {
   console.log(`\n${'─'.repeat(72)}\n${t}\n${'─'.repeat(72)}`);
 }
 
-/* ── 1. os pedidos voltam para a campanha que o UTM deles diz ─────────────*/
-
-interface LinhaDePedido {
-  id: string;
-  campanha_id: string | null;
-  peca_id: string | null;
-  utm_json: string;
-  origem: string | null;
-  pago_em: string | null;
-}
-
-function reatribuirPedidos() {
-  titulo('1. Pedidos na campanha errada');
-
-  const pedidos = db
-    .prepare(
-      `SELECT id, campanha_id, peca_id, utm_json, origem, pago_em FROM pedidos
-        WHERE exemplo = 0 AND utm_json IS NOT NULL AND length(utm_json) > 2
-        ORDER BY criado_em`
-    )
-    .all() as LinhaDePedido[];
-
-  const mudancas: { id: string; de: string | null; para: string; pago: boolean }[] = [];
-
-  for (const p of pedidos) {
-    let utm: Record<string, string>;
-    try {
-      utm = JSON.parse(p.utm_json);
-    } catch {
-      continue;
-    }
-
-    // Só mexe onde a Meta afirma um ID. Sem ID, o `?c=` continua mandando.
-    if (!idDaMeta(utm.utm_campaign)) continue;
-
-    const campanha = campanhaDoUtm(utm.utm_campaign, p.origem);
-    if (!campanha || campanha.id === p.campanha_id) continue;
-
-    const peca = pecaDoUtm(campanha.id, utm.utm_content, utm.utm_term, utm.utm_medium);
-
-    mudancas.push({
-      id: p.id.slice(0, 8),
-      de: p.campanha_id?.slice(0, 8) ?? null,
-      para: `${campanha.nome} (${campanha.id.slice(0, 8)})`,
-      pago: !!p.pago_em,
-    });
-
-    if (APLICAR) {
-      db.prepare(`UPDATE pedidos SET campanha_id = ?, peca_id = ? WHERE id = ?`).run(
-        campanha.id,
-        peca?.id ?? null,
-        p.id
-      );
-    }
-  }
-
-  console.log(`${mudancas.length} pedidos mudam de campanha (${mudancas.filter((m) => m.pago).length} pagos)`);
-  for (const m of mudancas) {
-    console.log(`  ${m.id} ${m.pago ? '💰' : '  '} ${m.de ?? '(sem)'} → ${m.para}`);
-  }
-
-  /*
-    O aviso que importa mais que a correção.
-
-    O investimento é digitado à mão na campanha. Quando a receita muda de
-    campanha e o investimento não, o ROAS das duas fica errado — a que perdeu
-    a venda parece cara, a que ganhou parece de graça. Nenhum script pode
-    adivinhar como o orçamento foi dividido entre campanhas que até agora
-    eram uma só.
-  */
-  if (mudancas.length > 0) {
-    console.log(
-      '\n  ATENÇÃO: o investimento continua na campanha antiga. Redistribua à\n' +
-        '  mão no painel, senão o ROAS das duas fica errado — a que perdeu a\n' +
-        '  venda parece cara e a que ganhou parece de graça.'
-    );
-  }
-}
-
-/* ── 2. a assinatura herda a atribuição do pedido que a originou ──────────*/
+/* ── 1. a assinatura herda a atribuição do pedido que a originou ──────────*/
 
 function atribuirCobrancas() {
-  titulo('2. Cobranças pagas sem atribuição');
+  titulo('1. Cobranças pagas sem atribuição');
 
   const cobrancas = db
     .prepare(
@@ -239,10 +159,10 @@ function atribuirCobrancas() {
   if (cobrancas.length === 0) console.log('  nenhuma — todas já têm campanha');
 }
 
-/* ── 3. o que está pago e nunca chegou à UTMify ───────────────────────────*/
+/* ── 2. o que está pago e nunca chegou à UTMify ───────────────────────────*/
 
 async function reportarAtrasadas() {
-  titulo('3. Vendas pagas não reportadas à UTMify');
+  titulo('2. Vendas pagas não reportadas à UTMify');
 
   const cobrancas = db
     .prepare(
@@ -339,7 +259,6 @@ async function principal() {
           (COM_TESTES ? ' · INCLUINDO TESTES DO DONO' : '')
       : 'SIMULAÇÃO — nada é alterado. Use --aplicar para valer.'
   );
-  reatribuirPedidos();
   atribuirCobrancas();
   await reportarAtrasadas();
   console.log('');

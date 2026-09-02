@@ -15,7 +15,6 @@ import {
   buscarCampanhaPorCodigo,
   buscarPeca,
   campanhaDoUtm,
-  idDaMeta,
   pecaDoUtm,
 } from '@/lib/campanhas';
 import { buscarPedidoPorCodigoCurto } from '@/lib/db';
@@ -154,50 +153,46 @@ export async function POST(req: NextRequest) {
   });
 
   /**
-   * A campanha desta chegada, por dois caminhos — e **o ID da Meta ganha**.
+   * A campanha desta chegada, por dois caminhos.
    *
-   * ── A ordem era a inversa, e custou caro ──────────────────────────────
+   * ── O `?c=` ganha, e isto foi revertido uma vez ───────────────────────
    *
-   * O `?c=` vinha primeiro, com um raciocínio que parecia sólido: alguém
-   * montou aquele link à mão, para um lugar específico, então ele é mais
-   * específico que a macro automática.
+   * Em 01/09 esta ordem chegou a ser invertida: o ID da Meta passaria a
+   * vencer o `?c=`, porque medindo o banco dava para ver três campanhas do
+   * gerenciador caindo dentro de uma campanha nossa.
    *
-   * A premissa é que os dois apontam para a MESMA campanha. Medido em
-   * produção, 01/09: não apontam. A agência reaproveita um link só — o mesmo
-   * `?c=a2` — em campanha nova atrás de campanha nova, porque o link já está
-   * montado e funciona. Enquanto isso o `utm_campaign` muda a cada uma.
+   * A medição estava certa e a conclusão estava errada, por confundir duas
+   * coisas com o mesmo nome. **Campanha aqui não é campanha de mídia.** É um
+   * recorte interno do funil — serve para filtrar o que aconteceu no site
+   * dentro de uma janela, e quem decide o recorte é quem monta o link. O
+   * painel não gerencia marketing, e não é ele que fala com a UTMify: quem
+   * fala é `reportarVenda`, mandando o `utm_json` cru, que nunca passa por
+   * aqui.
    *
-   * Resultado: **três campanhas da Meta caindo dentro de uma campanha nossa.**
-   * Nenhuma delas tinha custo, conversão ou criativo próprios no painel; as
-   * três apareciam somadas numa linha chamada "Campanha teste com murilo". E
-   * é sobre essa linha que se decide escalar ou pausar.
+   * Deixar o ID da Meta mandar encheu o painel de linhas com nome de número,
+   * uma por campanha do gerenciador, quebrando exatamente o recorte que o
+   * dono usa para ler o próprio funil.
    *
-   * O `?c=` é um apelido que uma pessoa escolheu e reusa. O `utm_campaign` é
-   * o que a plataforma que cobra o anúncio afirma. **Quando a plataforma
-   * afirma, ela é a autoridade** — e é por isso que só um ID de verdade
-   * (`idDaMeta`) tem esse poder: `utm_campaign=promo` continua perdendo para
-   * o `?c=`, porque aí os dois são apelidos e o nosso é o mais específico.
-   *
-   * O `?c=` segue mandando sozinho onde ele é a única coisa que existe: link
-   * de bio, indicação, teste interno — que é para o que ele foi feito.
+   * Então: **o `?c=` é explícito e ganha.** Alguém montou aquele link à mão,
+   * para um lugar específico — bio, indicação, teste, um combinado com um
+   * sócio. O UTM continua criando campanha quando é a única coisa que
+   * existe, que é o caso do tráfego que chega sem link nosso.
    */
   const campanha =
-    (idDaMeta(corpo.utmCampanha) ? campanhaDoUtm(corpo.utmCampanha, origem) : undefined) ??
     (toque.codigoCampanha ? buscarCampanhaPorCodigo(toque.codigoCampanha) : undefined) ??
     campanhaDoUtm(corpo.utmCampanha, origem);
 
   /*
-    Mesma regra um degrau abaixo: o `{{ad.id}}` identifica o criativo melhor
-    que um código de duas letras reusado. E o conjunto é procurado nos dois
-    campos onde ele aparece na prática — ver `pecaDoUtm`.
+    O `utm_medium` entra junto na busca do conjunto: nem toda agência põe o
+    `{{adset.id}}` no `utm_term`, e ler só um campo agrupava os criativos por
+    posicionamento achando que era conjunto. Isto é recorte interno, como o
+    resto — não muda nada do que a UTMify recebe.
   */
   const peca = !campanha
     ? undefined
-    : ((idDaMeta(corpo.utmConteudo)
-        ? pecaDoUtm(campanha.id, corpo.utmConteudo, corpo.utmConjunto, corpo.utmMeio)
-        : undefined) ??
-      (toque.codigoPeca ? buscarPeca(campanha.id, toque.codigoPeca) : undefined) ??
+    : ((toque.codigoPeca ? buscarPeca(campanha.id, toque.codigoPeca) : undefined) ??
       pecaDoUtm(campanha.id, corpo.utmConteudo, corpo.utmConjunto, corpo.utmMeio));
+
   const indicador = toque.codigoIndicacao
     ? buscarPedidoPorCodigoCurto(toque.codigoIndicacao)
     : undefined;

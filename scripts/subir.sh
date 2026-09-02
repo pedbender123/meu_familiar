@@ -46,7 +46,7 @@ echo "→ build e restart"
 ssh "$VPS" "set -e
   cd $DIR
   mkdir -p /root/backups-deploy
-  cp var/data/bruxario.db /root/backups-deploy/$(basename $DIR)-\$(date +%Y%m%d-%H%M%S).db
+  node scripts/backup-banco.js /root/backups-deploy/$(basename $DIR)-\$(date +%Y%m%d-%H%M%S).db
   npm ci --no-audit --no-fund --prefer-offline >/dev/null
   npm run build
   pm2 restart $PROC --update-env

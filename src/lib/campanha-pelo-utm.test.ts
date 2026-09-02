@@ -166,46 +166,31 @@ describe('a ordem de precedência na visita', () => {
   const fonte = codigoDe('src/app/api/visita/route.ts');
 
   /**
-   * ── A regra inverteu em 01/09, e o motivo está medido ──────────────────
+   * ── Isto já foi invertido, e voltou ────────────────────────────────────
    *
-   * Era o contrário: o `?c=` primeiro, porque alguém montou aquele link à mão
-   * e portanto seria mais específico que a macro automática. A premissa é que
-   * os dois apontam para a mesma campanha.
+   * Em 01/09 o ID da Meta passou a vencer, porque três campanhas do
+   * gerenciador estavam caindo dentro de uma campanha nossa. A medição
+   * estava certa; a conclusão, não.
    *
-   * Não apontam. A agência reaproveita um `?c=` só em campanha nova atrás de
-   * campanha nova — o link já está montado e funciona — enquanto o
-   * `utm_campaign` muda a cada uma. Em produção isso pôs **três campanhas da
-   * Meta dentro de uma campanha nossa**, somadas numa linha só, que é a linha
-   * sobre a qual se decide escalar ou pausar.
-   *
-   * Quando a plataforma que cobra o anúncio afirma um ID, ela é a autoridade.
+   * **Campanha aqui não é campanha de mídia.** É recorte interno do funil, e
+   * quem escolhe o recorte é quem monta o link. Deixar o gerenciador mandar
+   * encheu o painel de linhas com nome de número e quebrou a leitura do
+   * próprio funil. O que a UTMify recebe não passa por aqui — vai o
+   * `utm_json` cru, direto de `reportarVenda`.
    */
-  test('o ID da Meta é consultado antes do ?c=', () => {
-    const posMeta = fonte.indexOf('idDaMeta(corpo.utmCampanha)');
-    const posCodigo = fonte.indexOf('buscarCampanhaPorCodigo(toque.codigoCampanha)');
-    assert.ok(posMeta > 0 && posCodigo > 0, 'os dois caminhos precisam existir');
-    assert.ok(posMeta < posCodigo, 'o ID da plataforma decide primeiro');
+  test('o ?c= é consultado antes do UTM', () => {
+    const pos = fonte.indexOf('buscarCampanhaPorCodigo(toque.codigoCampanha)');
+    const posUtm = fonte.indexOf('campanhaDoUtm(corpo.utmCampanha');
+    assert.ok(pos > 0 && posUtm > 0, 'os dois caminhos precisam existir');
+    assert.ok(pos < posUtm, 'o código nosso tem que ser tentado primeiro');
   });
 
-  /**
-   * Só um ID de VERDADE tem esse poder. `utm_campaign=promo` é um apelido
-   * igual ao `?c=`, e entre dois apelidos o nosso é o mais específico — é ele
-   * que sabe distinguir bio de indicação de teste interno.
-   */
-  test('UTM sem ID da Meta continua perdendo para o ?c=', () => {
-    const trecho = fonte.slice(
-      fonte.indexOf('const campanha ='),
-      fonte.indexOf('const peca =')
-    );
-    assert.match(
-      trecho,
-      /idDaMeta\(corpo\.utmCampanha\)\s*\?\s*campanhaDoUtm/,
-      'a preferência do UTM é condicionada ao ID'
-    );
-    assert.ok(
-      trecho.indexOf('buscarCampanhaPorCodigo') <
-        trecho.lastIndexOf('campanhaDoUtm(corpo.utmCampanha'),
-      'sem ID, o ?c= é tentado antes da queda para o UTM'
+  /** O painel não pode voltar a ser preenchido pelo gerenciador de anúncios. */
+  test('o ID da Meta não decide a campanha do painel', () => {
+    assert.doesNotMatch(
+      fonte,
+      /idDaMeta\(corpo\.utmCampanha\)\s*\?/,
+      'campanha no painel é recorte interno, não espelho do gerenciador'
     );
   });
 
