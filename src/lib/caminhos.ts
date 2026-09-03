@@ -53,6 +53,9 @@ export const CONTEUDO = path.join(RAIZ, 'conteudo');
  * esquecer significa vender um PDF que não existe do outro lado.
  */
 export const BIBLIOTECA = path.join(RAIZ, 'biblioteca');
+/** O Markdown de cada livro — o produto. Ver `nucleo/biblioteca/formato.ts`. */
+export const BIBLIOTECA_TEXTO = path.join(BIBLIOTECA, 'texto');
+/** O PDF de origem, quando houve um. Pesquisa, não entrega. */
 export const BIBLIOTECA_PDFS = path.join(BIBLIOTECA, 'pdfs');
 export const BIBLIOTECA_CAPAS = path.join(BIBLIOTECA, 'capas');
 export const ENV = path.join(RAIZ, '.env');

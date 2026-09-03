@@ -1,30 +1,33 @@
 'use client';
 
-import Image from 'next/image';
-import { Check, Plus } from 'lucide-react';
+import { Check, BookOpen } from 'lucide-react';
 
 /**
- * Os ebooks oferecidos junto, no momento em que a pessoa já decidiu comprar.
+ * Os ebooks marcados junto da compra.
  *
- * ── Por que aqui, e não na página de vendas ───────────────────────────────
+ * ── Por que isto converte, e o cuidado que exige ──────────────────────────
  *
- * A decisão de gastar R$ 9,90 a mais é muito mais barata que a decisão de
- * comprar do zero: o cartão já está na mão, o medo já passou, o "eu mereço"
- * já foi resolvido. Oferecer o mesmo livro na vitrine competiria com o
- * produto principal; oferecer aqui **soma** a ele.
+ * Quem está aqui já decidiu comprar e está com o cartão na mão. A decisão de
+ * somar R$ 9,90 é muito mais barata que a decisão de comprar do zero — é por
+ * isso que o bump existe, e é por isso que ele fica ANTES do botão de pagar e
+ * não numa página nova.
  *
- * ── Marcar não pode parecer comprar de novo ───────────────────────────────
+ * O cuidado é o inverso da mesma força: um bloco grande demais rouba a
+ * atenção da compra que já estava fechada. Por isso as linhas são compactas,
+ * sem imagem grande e sem argumento de venda — título, promessa de uma linha,
+ * preço. Quem quer, marca; quem não quer, nem lê.
  *
- * Cada caixa muda o total na hora, e o total fica visível o tempo todo. O que
- * derruba a confiança num order bump é a pessoa marcar, não ver nada mudar, e
- * descobrir o valor real só na fatura — então o número que ela vê aqui é
- * exatamente o que o servidor vai cobrar.
+ * ── Marcado é escolha, nunca padrão ───────────────────────────────────────
  *
- * ── Preço vem do servidor ─────────────────────────────────────────────────
+ * Nenhuma caixa vem marcada. Bump pré-marcado é venda que a pessoa descobre
+ * na fatura, e o que ela faz depois é pedir estorno e desconfiar do resto —
+ * inclusive do produto que ela queria.
  *
- * Este componente recebe preço para DESENHAR. Quem soma o que será cobrado é
- * `somaDosBumps`, no servidor, a partir dos ids — valor que passa pelo
- * navegador é valor editável.
+ * ── O preço aqui é só a tela ──────────────────────────────────────────────
+ *
+ * O total exibido soma no navegador para a pessoa ver, mas **o valor cobrado
+ * é recalculado no servidor** a partir dos ids, contra o catálogo. Ver
+ * `somaDosBumps`. O que viaja daqui é a marcação, nunca o dinheiro.
  */
 
 export interface EbookDoCheckout {
@@ -32,8 +35,6 @@ export interface EbookDoCheckout {
   titulo: string;
   promessa: string;
   precoCentavos: number;
-  /** `null` quando a capa ainda não chegou: o livro vende sem imagem. */
-  capa: string | null;
 }
 
 function reais(centavos: number): string {
@@ -50,131 +51,80 @@ export function OrderBumps({
 }: {
   ebooks: EbookDoCheckout[];
   marcados: string[];
+  /** Recebe o id alternado — quem guarda a lista é o checkout. */
   aoMarcar: (id: string) => void;
 }) {
   if (ebooks.length === 0) return null;
 
-  const somaCentavos = ebooks
-    .filter((e) => marcados.includes(e.id))
-    .reduce((s, e) => s + e.precoCentavos, 0);
-
   return (
-    <section
-      aria-label="Adicione ao seu pedido"
-      className="w-full flex flex-col gap-2"
-    >
-      <div className="flex items-baseline justify-between gap-3 px-1">
-        <h2 className="font-corpo text-[0.7rem] tracking-[0.18em] uppercase text-vela/80">
-          Some ao seu pedido
+    <section className="flex flex-col gap-2">
+      <div className="flex items-center gap-2 px-1">
+        <BookOpen size={13} strokeWidth={1.5} className="text-vela/70" />
+        <h2 className="font-corpo text-[0.68rem] tracking-[0.16em] uppercase text-pergaminho/45">
+          Leve junto
         </h2>
-        <span className="font-corpo text-[11px] text-pergaminho/35">opcional</span>
       </div>
 
-      <ul className="flex flex-col gap-2 list-none p-0 m-0">
+      <div className="flex flex-col gap-1.5">
         {ebooks.map((e) => {
           const marcado = marcados.includes(e.id);
           return (
-            <li key={e.id}>
+            <button
+              key={e.id}
+              type="button"
+              role="checkbox"
+              aria-checked={marcado}
+              onClick={() => aoMarcar(e.id)}
+              className="group flex items-start gap-3 text-left rounded-xl border px-3.5 py-3 transition"
+              style={{
+                borderColor: marcado
+                  ? 'rgba(217,164,65,0.55)'
+                  : 'color-mix(in srgb, var(--pergaminho) 14%, transparent)',
+                background: marcado ? 'rgba(217,164,65,0.07)' : 'transparent',
+              }}
+            >
               {/*
-                O bloco inteiro é o botão, não só a caixinha.
-
-                Alvo de toque de 20 pixels no celular é onde o order bump
-                morre: a pessoa tenta marcar, erra, e desiste em vez de tentar
-                de novo. Aqui qualquer lugar do cartão marca.
+                A caixa desenhada à mão, e não um `<input type=checkbox>`: o
+                nativo herda o azul do sistema operacional e destoa de tudo —
+                num checkout, um elemento que parece de outro site é exatamente
+                o que faz alguém desconfiar na hora de digitar o cartão.
               */}
-              <button
-                type="button"
-                onClick={() => aoMarcar(e.id)}
-                aria-pressed={marcado}
-                className="w-full flex items-center gap-3 text-left rounded-2xl border p-2.5 transition"
+              <span
+                aria-hidden="true"
+                className="mt-0.5 shrink-0 w-[18px] h-[18px] rounded-[6px] border flex items-center justify-center transition"
                 style={{
                   borderColor: marcado
-                    ? 'rgba(217,164,65,0.55)'
-                    : 'color-mix(in srgb, var(--pergaminho) 15%, transparent)',
-                  background: marcado
-                    ? 'rgba(217,164,65,0.08)'
-                    : 'transparent',
+                    ? 'var(--vela)'
+                    : 'color-mix(in srgb, var(--pergaminho) 30%, transparent)',
+                  background: marcado ? 'var(--vela)' : 'transparent',
                 }}
               >
-                <span
-                  aria-hidden="true"
-                  className="shrink-0 w-5 h-5 rounded-md border flex items-center justify-center transition"
-                  style={{
-                    borderColor: marcado
-                      ? 'var(--vela)'
-                      : 'color-mix(in srgb, var(--pergaminho) 30%, transparent)',
-                    background: marcado ? 'var(--vela)' : 'transparent',
-                  }}
-                >
-                  {marcado ? (
-                    <Check size={13} strokeWidth={3} className="text-tinta" />
-                  ) : (
-                    <Plus
-                      size={12}
-                      strokeWidth={2}
-                      className="text-pergaminho/40"
-                    />
-                  )}
-                </span>
+                {marcado && <Check size={12} strokeWidth={3} className="text-tinta" />}
+              </span>
 
-                {/*
-                  A capa é enfeite: sem ela o livro ainda vende, só aparece sem
-                  imagem. Ver `biblioteca/LEIA-ME.md`.
-                */}
-                {e.capa && (
-                  <span className="shrink-0 relative w-10 h-14 rounded-md overflow-hidden border border-pergaminho/10">
-                    <Image
-                      src={e.capa}
-                      alt=""
-                      fill
-                      sizes="40px"
-                      className="object-cover"
-                    />
-                  </span>
-                )}
-
-                <span className="flex-1 min-w-0 flex flex-col gap-0.5">
-                  <span className="font-corpo text-[13px] leading-tight text-pergaminho block">
-                    {e.titulo}
-                  </span>
-                  <span className="font-corpo font-light text-[11.5px] leading-snug text-pergaminho/45 block">
-                    {e.promessa}
-                  </span>
+              <span className="flex-1 min-w-0 flex flex-col gap-0.5">
+                <span className="font-corpo text-[0.82rem] leading-snug text-pergaminho/90">
+                  {e.titulo}
                 </span>
-
-                <span
-                  className="shrink-0 font-corpo text-sm tabular-nums"
-                  style={{ color: marcado ? 'var(--vela)' : undefined }}
-                >
-                  + {reais(e.precoCentavos)}
+                <span className="font-corpo font-light text-[0.72rem] leading-snug text-pergaminho/45">
+                  {e.promessa}
                 </span>
-              </button>
-            </li>
+              </span>
+
+              <span
+                className="font-corpo text-[0.82rem] tabular-nums shrink-0 mt-0.5 transition"
+                style={{ color: marcado ? 'var(--vela)' : 'var(--pergaminho)', opacity: marcado ? 1 : 0.6 }}
+              >
+                + {reais(e.precoCentavos)}
+              </span>
+            </button>
           );
         })}
-      </ul>
+      </div>
 
-      {/*
-        A confirmação do que acabou de ser marcado, colada na caixinha.
-
-        O total do pedido existe logo abaixo, no painel do gateway, e ele já
-        muda sozinho. Mas ele fica a uma rolagem de distância do dedo que
-        marcou — e feedback que aparece fora do campo de visão é feedback que
-        não aconteceu. Esta linha é a resposta imediata; o total lá embaixo é
-        a confirmação.
-      */}
-      {marcados.length > 0 && (
-        <p
-          className="font-corpo text-[11.5px] px-1 pt-0.5"
-          style={{ color: 'var(--vela)' }}
-        >
-          {marcados.length === 1
-            ? '1 ebook somado'
-            : `${marcados.length} ebooks somados`}
-          {' · '}
-          {reais(somaCentavos)} a mais, já no total abaixo
-        </p>
-      )}
+      <p className="font-corpo font-light text-[0.68rem] leading-snug text-pergaminho/35 px-1">
+        Fica na sua biblioteca para sempre, mesmo sem assinatura.
+      </p>
     </section>
   );
 }

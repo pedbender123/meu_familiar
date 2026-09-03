@@ -19,7 +19,7 @@ import type { ItemDeMenu } from '@/nucleo/modulos';
  * clica é recebido pela ficção.
  */
 export interface ItemDeNavegacao extends ItemDeMenu {
-  icone: 'inicio' | 'oraculo' | 'familiar' | 'horoscopo' | 'perfil';
+  icone: 'inicio' | 'oraculo' | 'familiar' | 'horoscopo' | 'biblioteca' | 'perfil';
 }
 
 const ICONES: Record<ItemDeNavegacao['icone'], React.ReactNode> = {
@@ -43,6 +43,14 @@ const ICONES: Record<ItemDeNavegacao['icone'], React.ReactNode> = {
   horoscopo: (
     <>
       <path d="M12 3.5 13.9 9.4h6.2l-5 3.7 1.9 6-5-3.7-5 3.7 1.9-6-5-3.7h6.2Z" />
+    </>
+  ),
+  /* Um livro aberto, do mesmo traço fino do resto. */
+  biblioteca: (
+    <>
+      <path d="M12 6.8C10.4 5.6 8.4 5 6 5H3.5v12.5H6c2.4 0 4.4.6 6 1.8" />
+      <path d="M12 6.8C13.6 5.6 15.6 5 18 5h2.5v12.5H18c-2.4 0-4.4.6-6 1.8" />
+      <path d="M12 6.8v12.5" opacity="0.45" />
     </>
   ),
   perfil: (

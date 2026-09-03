@@ -6,27 +6,30 @@ o arquivo ao catálogo em `src/nucleo/biblioteca/catalogo.ts`.
 ## Onde vai o quê
 
 ```
-biblioteca/pdfs/magia-elemental.pdf     Aprenda Magia Elemental em 7 Dias — R$ 9,90
-biblioteca/pdfs/ler-o-futuro.pdf        Aprenda Como Ler seu Futuro com Cartas — R$ 14,90
-biblioteca/pdfs/terceiro-olho.pdf       Aprenda a Despertar seu Terceiro Olho — R$ 17,90
+biblioteca/texto/magia-elemental.md     Aprenda Magia Elemental em 7 Dias — R$ 9,90
+biblioteca/texto/ler-o-futuro.md        Aprenda Como Ler seu Futuro com Cartas — R$ 14,90
+biblioteca/texto/terceiro-olho.md       Aprenda a Despertar seu Terceiro Olho — R$ 17,90
 
 biblioteca/capas/magia-elemental.jpg
 biblioteca/capas/ler-o-futuro.jpg
 biblioteca/capas/terceiro-olho.jpg
 ```
 
+**O livro é o `.md`, não o PDF.** O formato está em `PROMPT-ESCRITA.md`; o
+`biblioteca/pdfs/` guarda só a fonte de pesquisa de onde o assunto saiu.
+
 ## O que acontece quando o arquivo chega
 
 **O livro aparece sozinho.** Não precisa mexer em código, nem reiniciar nada:
-o catálogo confere o disco a cada visita. Sem PDF, o livro não é oferecido no
+o catálogo confere o disco a cada visita. Sem o `.md`, o livro não é oferecido no
 checkout nem vendido — de propósito.
 
-Essa é a trava mais importante daqui. Um livro anunciado cujo PDF não existe
-faria a pessoa pagar a mais, o pagamento confirmar, e a entrega devolver 404.
+Essa é a trava mais importante daqui. Um livro anunciado cujo texto não existe
+faria a pessoa pagar a mais, o pagamento confirmar, e a leitura abrir vazia.
 Enquanto o arquivo não estiver aqui, ninguém consegue pagar por ele.
 
-A capa é enfeite: sem ela o livro ainda vende, só aparece sem imagem. O PDF é
-que manda.
+A capa é enfeite: sem ela o livro ainda vende, só aparece sem imagem. O texto
+é que manda.
 
 ## Nome errado
 

@@ -8,7 +8,7 @@ import {
   bumpsValidos,
   somaDosBumps,
   ebooksAVenda,
-  caminhoDoPdf,
+  caminhoDoTexto,
   PASTA_DA_BIBLIOTECA,
 } from './catalogo';
 import { desbloquear, desbloqueiosDe, estanteDe, podeAbrir } from './desbloqueios';
@@ -30,13 +30,13 @@ const EMAIL = 'quem@comprou.com';
 
 function criarArquivosFalsos() {
   fs.mkdirSync(PASTA_DA_BIBLIOTECA, { recursive: true });
-  for (const e of EBOOKS) fs.writeFileSync(caminhoDoPdf(e), 'pdf de teste');
+    for (const e of EBOOKS) fs.writeFileSync(caminhoDoTexto(e), '## Capítulo\n\nTexto de teste.');
 }
 
 function apagarArquivosFalsos() {
   for (const e of EBOOKS) {
     try {
-      fs.unlinkSync(caminhoDoPdf(e));
+      fs.unlinkSync(caminhoDoTexto(e));
     } catch {
       /* já não existe */
     }
@@ -62,7 +62,7 @@ describe('a pasta de largar arquivo', () => {
     const leiaMe = fs.readFileSync('biblioteca/LEIA-ME.md', 'utf8');
     for (const e of EBOOKS) {
       assert.ok(
-        leiaMe.includes(`biblioteca/pdfs/${e.arquivo}`),
+        leiaMe.includes(`biblioteca/texto/${e.arquivo}`),
         `o LEIA-ME não menciona ${e.arquivo}`
       );
       assert.ok(
@@ -74,8 +74,8 @@ describe('a pasta de largar arquivo', () => {
 
   test('os arquivos são procurados na raiz, onde se larga', () => {
     assert.ok(
-      caminhoDoPdf(EBOOKS[0]).includes(path.join('biblioteca', 'pdfs')),
-      'o PDF mora em biblioteca/pdfs'
+      caminhoDoTexto(EBOOKS[0]).includes(path.join('biblioteca', 'texto')),
+      'o livro mora em biblioteca/texto'
     );
   });
 });
@@ -86,7 +86,7 @@ describe('o catálogo só vende o que consegue entregar', () => {
    * o pagamento confirma, e a entrega devolve 404. Ela pagou por um arquivo
    * que não existe.
    */
-  test('livro sem PDF em disco não é oferecido nem cobrado', () => {
+  test('livro sem texto em disco não é oferecido nem cobrado', () => {
     apagarArquivosFalsos();
     assert.equal(ebooksAVenda().length, 0, 'sem arquivo, sem oferta');
     assert.equal(somaDosBumps(['magia-elemental']), 0, 'e sem cobrança');

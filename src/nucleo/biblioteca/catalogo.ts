@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { BIBLIOTECA_PDFS, BIBLIOTECA_CAPAS } from '../../lib/caminhos';
+import { BIBLIOTECA_TEXTO, BIBLIOTECA_CAPAS, BIBLIOTECA_PDFS } from '../../lib/caminhos';
 
 /**
  * A biblioteca: os ebooks que o Bruxário vende e entrega.
@@ -30,8 +30,13 @@ import { BIBLIOTECA_PDFS, BIBLIOTECA_CAPAS } from '../../lib/caminhos';
  *
  * ── Onde ficam os arquivos ────────────────────────────────────────────────
  *
- *     biblioteca/pdfs/     o livro
+ *     biblioteca/texto/    O LIVRO — Markdown, e é ele que a pessoa lê
  *     biblioteca/capas/    a imagem da capa
+ *     biblioteca/pdfs/     a fonte de pesquisa, quando houve uma
+ *
+ * O PDF deixou de ser o produto. Ele não sabe carregar trilha de fundo, nem
+ * bloco de prática, nem onde a pessoa parou — e no celular é zoom e rolagem
+ * lateral num visualizador cinza, fora do mundo do produto. Ver `formato.ts`.
  *
  * Na raiz porque é uma pasta de largar arquivo: quem põe um livro novo ali
  * não está mexendo em código. Ver `BIBLIOTECA` em `caminhos.ts`.
@@ -48,7 +53,12 @@ export interface Ebook {
   /** A promessa em uma linha — é o que decide o bump no checkout. */
   promessa: string;
   precoCentavos: number;
-  /** Nome do PDF dentro de `src/assets/biblioteca/`. */
+  /**
+   * O nome do Markdown em `biblioteca/texto/`. **É ele o produto.**
+   *
+   * O PDF de origem, quando existe, é matéria-prima de pesquisa e fica em
+   * `biblioteca/pdfs/` — não é o que a pessoa recebe.
+   */
   arquivo: string;
   /** Nome da capa dentro de `src/assets/biblioteca/capas/`. */
   capa: string;
@@ -69,7 +79,7 @@ export const EBOOKS: readonly Ebook[] = [
     titulo: 'Aprenda Magia Elemental em 7 Dias',
     promessa: 'Um elemento por dia, com o ritual de cada um.',
     precoCentavos: 990,
-    arquivo: 'magia-elemental.pdf',
+    arquivo: 'magia-elemental.md',
     capa: 'magia-elemental.jpg',
     ordem: 1,
   },
@@ -78,7 +88,7 @@ export const EBOOKS: readonly Ebook[] = [
     titulo: 'Aprenda Como Ler seu Futuro com Cartas',
     promessa: 'As tiragens que respondem pergunta de verdade.',
     precoCentavos: 1490,
-    arquivo: 'ler-o-futuro.pdf',
+    arquivo: 'ler-o-futuro.md',
     capa: 'ler-o-futuro.jpg',
     ordem: 2,
   },
@@ -87,7 +97,7 @@ export const EBOOKS: readonly Ebook[] = [
     titulo: 'Aprenda a Despertar seu Terceiro Olho',
     promessa: 'O treino de percepção, sem misticismo vazio.',
     precoCentavos: 1790,
-    arquivo: 'terceiro-olho.pdf',
+    arquivo: 'terceiro-olho.md',
     capa: 'terceiro-olho.jpg',
     ordem: 3,
   },
@@ -100,10 +110,19 @@ export function buscarEbook(id: string | null | undefined): Ebook | undefined {
 }
 
 /** Exportada para o teste conferir o que existe em disco. */
-export const PASTA_DA_BIBLIOTECA = BIBLIOTECA_PDFS;
+export const PASTA_DA_BIBLIOTECA = BIBLIOTECA_TEXTO;
 
-export function caminhoDoPdf(ebook: Ebook): string {
-  return path.join(BIBLIOTECA_PDFS, ebook.arquivo);
+/** O Markdown do livro — o que a pessoa lê. */
+export function caminhoDoTexto(ebook: Ebook): string {
+  return path.join(BIBLIOTECA_TEXTO, ebook.arquivo);
+}
+
+/**
+ * O PDF de origem, se existir. Só pesquisa: nem todo livro tem um, e nenhum
+ * leitor recebe este arquivo.
+ */
+export function caminhoDoPdfDeOrigem(ebook: Ebook): string {
+  return path.join(BIBLIOTECA_PDFS, ebook.arquivo.replace(/\.md$/, '.pdf'));
 }
 
 export function caminhoDaCapa(ebook: Ebook): string {
@@ -115,10 +134,10 @@ export function caminhoDaCapa(ebook: Ebook): string {
  *
  * ── Por que isto existe, e por que é checado em runtime ───────────────────
  *
- * O catálogo nasce antes dos arquivos: os PDFs e as capas chegam depois. Um
- * livro anunciado no checkout cujo PDF não está em disco é a pior falha
+ * O catálogo nasce antes dos arquivos: o texto e as capas chegam depois. Um
+ * livro anunciado no checkout cujo Markdown não está em disco é a pior falha
  * possível deste fluxo — a pessoa paga a mais, o pagamento confirma, e a
- * entrega devolve 404. Ela pagou por um arquivo que não existe.
+ * leitura abre vazia. Ela pagou por um livro que não existe.
  *
  * Então o checkout só oferece o que ele consegue entregar, conferindo o
  * disco. Enquanto o PDF não chegar, o livro simplesmente não aparece — e
@@ -126,7 +145,7 @@ export function caminhoDaCapa(ebook: Ebook): string {
  */
 export function ebookEntregavel(ebook: Ebook): boolean {
   try {
-    return fs.existsSync(caminhoDoPdf(ebook));
+    return fs.existsSync(caminhoDoTexto(ebook));
   } catch {
     return false;
   }
