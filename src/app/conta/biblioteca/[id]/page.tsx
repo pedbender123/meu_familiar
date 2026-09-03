@@ -4,6 +4,7 @@ import { buscarConta } from '@/lib/autenticacao';
 import { assinaturaPagaAtiva } from '@/nucleo/assinaturas';
 import { downloadDoLivro, podeAbrir } from '@/nucleo/biblioteca/desbloqueios';
 import { lerEbook } from '@/nucleo/biblioteca/leitura';
+import { trilhasNoAr } from '@/nucleo/trilhas/servidor';
 import { Leitor } from '@/components/biblioteca/Leitor';
 
 export const dynamic = 'force-dynamic';
@@ -54,6 +55,8 @@ export default async function LerLivro({ params }: { params: Promise<{ id: strin
         nenhum — a assinatura vende leitura, a compra vende o livro.
       */
       download={downloadDoLivro(sessao.email, id)}
+      /* Só as faixas que existem em disco — ver o comentário no `Leitor`. */
+      trilhasDisponiveis={trilhasNoAr().map((t) => t.id)}
     />
   );
 }

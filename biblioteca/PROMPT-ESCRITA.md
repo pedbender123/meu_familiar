@@ -9,29 +9,39 @@ reescrita" no fim deste arquivo.
 
 ---
 
-## Antes de colar: o tamanho
+## Antes de colar: a matemática das páginas e o tamanho
 
-A primeira leva saiu com 6 a 7 capítulos de ~400 palavras — **um livro de 15
-minutos**. Está no formato certo e é curto demais para o preço.
+O leitor do app quebra o texto em folhas de pergaminho de **~290 palavras**
+(`PALAVRAS_POR_PAGINA = 290` em `src/nucleo/biblioteca/formato.ts`).
 
-Modelo de linguagem encolhe sozinho quando você pede "um capítulo": ele
-entrega a versão resumida do que sabe. A correção não é pedir "escreva mais",
-que produz enchimento — é dar **estrutura suficiente para o tamanho ser
-consequência**. Por isso o prompt abaixo pede seções nomeadas dentro de cada
-capítulo, e um capítulo por vez.
+A primeira leva saiu com 6 a 7 capítulos de ~250 palavras — **um livro de 8
+minutos**, onde cada capítulo cabia numa única folha de tela. Isso é um panfleto,
+não um livro que justifica alguém pagar R$ 9,90 a R$ 17,90 para ler no pergaminho.
 
-Alvo: **3 a 5 módulos, 4 a 6 capítulos por módulo, 900 a 1.400 palavras por
-capítulo.** Isso dá um livro de 60 a 90 minutos de leitura, que é o que
-justifica R$ 9,90 a R$ 17,90.
+Nosso padrão do produto: **cada capítulo precisa ter pelo menos 8 a 12 páginas de
+pergaminho no leitor (alvo: 10 páginas por capítulo)**.
 
-O leitor quebra capítulo longo em folhas de ~290 palavras sozinho — um
-capítulo de 1.200 vira quatro páginas de pergaminho, com o título só na
-primeira. Você não precisa paginar nada.
+Fazendo as contas:
+- 10 páginas de pergaminho × 290 palavras = **2.500 a 3.200 palavras por capítulo**.
+- Um livro com 6 a 8 capítulos terá **18.000 a 26.000 palavras** (70 a 90 páginas
+  de pergaminho no total).
+- Isso dá uma leitura substancial de **90 a 130 minutos** (a 200 palavras por minuto),
+  com 12 a 16 minutos por capítulo. É o que transforma o app num grimório de verdade.
 
-**Peça um capítulo por vez.** Pedir o livro inteiro numa mensagem é o jeito
-mais confiável de receber 5.000 palavras rasas: o modelo divide o orçamento
-que ele acha que tem e cada capítulo sai pela metade.
+### Por que o modelo encolhe e como resolver
 
+Modelos de linguagem resumem por padrão. Se você pedir apenas "escreva um
+capítulo longo", ele para com 700 palavras e jura que desenvolveu tudo. Se você
+pedir "escreva 3.000 palavras" sem dar o mapa, ele preenche com enrolação e
+frases redundantes.
+
+A única forma de produzir 2.500 a 3.200 palavras densas, ricas e sem encher
+linguiça é fornecer uma **arquitetura interna com 6 movimentos obrigatórios**,
+com objetivos narrativos e sensoriais claros em cada um.
+
+**Peça um capítulo por vez.** Pedir o livro inteiro numa mensagem é o jeito mais
+confiável de receber 3.000 palavras rasas divididas por 6 capítulos. O fluxo é
+sempre: um capítulo por resposta, conferido no terminal antes de ir para o próximo.
 ---
 
 ## O prompt
@@ -62,45 +72,114 @@ Assunto: <ASSUNTO EM UMA FRASE>
 Fonte de ASSUNTO (leia para saber do que se trata, não para copiar):
 <CAMINHO DO .txt EM biblioteca/texto/>
 
-## O tamanho, que é a parte que costuma sair errada
+## O tamanho obrigatório: 10 páginas por capítulo
 
-3 a 5 módulos. 4 a 6 capítulos por módulo. **900 a 1.400 palavras por
-capítulo** — e essa faixa não é sugestão, é o piso do produto.
+O leitor do app quebra o texto em páginas de ~290 palavras. Para que o leitor
+tenha a experiência de um livro de verdade, **cada capítulo precisa ter entre
+2.500 e 3.200 palavras** (o equivalente a 9 a 12 páginas de pergaminho).
 
-Um capítulo abaixo de 900 palavras é um resumo, e resumo é o que sai por
-padrão quando ninguém pede o contrário. Se você chegar ao fim de um capítulo
-com 600 palavras, o problema não é falta de espaço: é que faltou desenvolver
-alguma das quatro seções abaixo.
+Qualquer capítulo abaixo de 2.200 palavras é considerado incompleto e será
+rejeitado para reescrita.
 
-**Cada capítulo tem estas quatro partes, nesta ordem, sem subtítulo nenhum
-separando — o texto corre inteiro:**
+Para atingir essa densidade com profundidade e sem enrolação, **cada capítulo
+precisa desenvolver integralmente os 6 movimentos abaixo, nesta ordem exata,
+como texto corrido** (sem subtítulos de Markdown — o texto flui contínuo em
+parágrafos até o bloco `:::pratica`):
 
-1. **O erro comum** (150–250 palavras). Como quase todo mundo entende essa
-   matéria errado, e o que isso custa na prática. Sempre comece por aqui: é o
-   que faz quem já sabe alguma coisa continuar lendo.
-2. **O que é de verdade** (300–450). A explicação, com o mecanismo. Não basta
-   afirmar que funciona — diga *por que*, mesmo que o porquê seja
-   psicológico e não sobrenatural. O Bruxário nunca pede fé.
-3. **Um caso concreto** (200–350). Uma situação inteira, com pessoa, contexto
-   e desfecho. Inventada, e escrita como cena — não como exemplo hipotético
-   em uma frase. É o pedaço que a pessoa vai lembrar daqui a um mês.
-4. **O aviso** (100–200). Onde essa técnica falha, para quem ela não serve, ou
-   o excesso que ela produz. Um livro que só elogia a própria matéria é
-   panfleto, e o leitor sente.
+---
 
-Só então vem o bloco `:::pratica`.
+### Os 6 movimentos obrigatórios de cada capítulo
+
+1. **A Desmistificação e a Anatomia do Engano** (350–500 palavras | ~1,5 páginas)
+   - Desmonte a caricatura da cultura pop, das redes sociais ou do esoterismo
+     comercial sobre esse tema.
+   - Mostre como as pessoas abordam isso errado: a pressa, a busca por
+     espetáculo visual, a expectativa ingênua de que a matéria se dobra ao
+     desejo sem esforço.
+   - Descreva a frustração concreta de quem tenta fazer do jeito errado (a
+     agitação mental, o cansaço, a sensação de que nada aconteceu).
+   - Mostre o custo invisível desse engano: como a busca por pirotecnia cega a
+     pessoa para a percepção sutil que estava ali o tempo todo.
+
+2. **A Mecânica Subjacente e os Fundamentos Ocultos** (700–900 palavras | ~2,5 a 3 páginas)
+   - Aprofunde a técnica real. Como essa força ou princípio funciona de verdade?
+     Explique o mecanismo invisível sem recorrer a fé cega: a relação entre
+     atenção focada, matéria, silêncio e psicologia profunda.
+   - A fisiologia do ofício: o que o corpo físico experimenta (respiração,
+     tensão muscular, temperatura das mãos, pulso, o que os órgãos e os sentidos
+     percebem antes da mente formular em palavras).
+   - As correspondências e a física do ofício: elementos, direções, tempos do
+     dia ou da noite, peso da matéria.
+   - A gradação: como essa força se manifesta em níveis — do quase imperceptível
+     ao evidente, e por que a repetição diária constrói uma trilha na mente.
+
+3. **A Crônica de Ofício: Caso Narrativo em Profundidade** (800–1.000 palavras | ~3 páginas)
+   - Uma cena inteira, com densidade de conto literário, ambientada no mundo
+     contemporâneo real. Não é um exemplo hipotético de duas frases: é uma
+     narrativa completa.
+   - A personagem e o cenário: dê nome, profissão ou rotina comum, detalhes
+     sensoriais do ambiente (a luz fria da cozinha de madrugada, o café
+     esfriando na mesa, o barulho distante de carros na avenida, a poeira
+     suspensa no ar).
+   - O conflito: uma questão concreta de vida (um desgaste prolongado, uma
+     escolha que paralisa, uma perda, uma atmosfera pesada que se instalou na
+     casa).
+   - O erro inicial: a tentativa da personagem de resolver com impulsividade ou
+     da forma superficial que ela achava que funcionava.
+   - A virada na prática: ela aplicando com disciplina exata a técnica deste
+     capítulo. O silêncio, a resistência interna, a mudança sutil no corpo.
+   - O desfecho sóbrio: o que realmente mudou dias depois. Sem milagres de
+     cinema; uma mudança de postura firme, um silêncio restaurado, uma
+     decisão lúcida executada sem tremor.
+
+4. **As Armadilhas, Alucinações e Contraindicações** (350–500 palavras | ~1,5 páginas)
+   - Onde essa técnica vira veneno: a linha exata que separa percepção e
+     intuição real de fantasia mental, autoengano ou ansiedade projetada.
+   - Sintomas de descompasso: sinais de que a pessoa está exagerando, ficando
+     obsessiva ou usando o ofício para fugir dos seus problemas mundanos.
+   - Para quem essa prática NÃO serve neste momento: momentos de fragilidade
+     psicológica aguda, períodos de desespero financeiro ou emocional onde a
+     mente não tem chão para a quietude.
+   - O princípio da sobriedade: a magia do Bruxário sempre precisa deixar a
+     pessoa mais funcional, lúcida e presente no mundo ordinário, e nunca mais
+     alienada.
+
+5. **A Liturgia Doméstica: Transição e Preparação** (250–350 palavras | ~1 página)
+   - Como preparar o quarto, a sala ou a mesa antes de começar.
+   - Condições mínimas: luz baixa de vela, circulação de ar, roupas confortáveis,
+     eliminação de notificações e distrações sonoras.
+   - O rito de descompressão: como transitar da agitação mecânica do trabalho ou
+     do dia para o estado de vigília e presença que a prática exige.
+
+6. **O Roteiro da Prática (`:::pratica`)** (350–500 palavras | ~1,5 páginas)
+   - Instrução minuciosa, direta, na segunda pessoa ("você").
+   - Itens necessários: apenas objetos simples de casa (uma tigela com água,
+     uma vela comum, um fósforo, papel comum e grafite, etc.).
+   - Passo 1 — O Assento e o Ritmo da Respiração: postura física e contagem
+     (minutos exatos, ritmo inspirar-reter-soltar).
+   - Passo 2 — A Ação Focal: o que fazer com as mãos, com o olhar e com a
+     atenção nos primeiros 5 minutos.
+   - Passo 3 — O Teste do Silêncio e a Sustentação: como lidar com a enxurrada
+     de pensamentos que vai surgir e onde fixar a percepção.
+   - Passo 4 — O Selamento e o Registro: o gesto de fechamento (lavar as mãos
+     com água fria, apagar o fogo sem sopro violento) e o que anotar exatamente
+     no caderno (a hora, a sensação física e o que permaneceu).
+
+---
 
 ## Uma mensagem, um capítulo
 
-Não escreva o livro todo de uma vez. Escreva o esqueleto primeiro — módulos e
-títulos de capítulo — e depois **um capítulo por resposta**, na íntegra.
+**JAMAIS escreva o livro todo de uma vez.**
 
-Livro inteiro numa mensagem só produz 5.000 palavras rasas: o orçamento é
-dividido e cada capítulo sai pela metade. Um por vez, cada um com as quatro
-partes completas.
+Pedir o livro inteiro numa mensagem só divide o orçamento de tokens do modelo
+e produz 3.000 palavras rasas espalhadas por 6 capítulos.
 
-Ao terminar cada capítulo, acrescente-o ao arquivo `.md` em vez de reescrever
-o arquivo inteiro.
+O processo é estritamente sequencial:
+1. Escreva o esqueleto primeiro (módulos e títulos dos capítulos).
+2. Escreva **um capítulo por resposta**, na íntegra, desenvolvendo os 6
+   movimentos completos (2.500 a 3.200 palavras).
+3. Ao terminar cada capítulo, acrescente-o ao arquivo `.md` em vez de reescrever
+   o arquivo inteiro, e confira a contagem no terminal.
 
 ## A regra mais importante
 
@@ -184,11 +263,12 @@ Regras do formato, todas checadas por `lerLivro` em
 - Não prometa cura, dinheiro, amor ou proteção contra nada.
 - Não trate o leitor como iniciante burro nem como iniciado que já sabe tudo.
 - **Não encha linguiça para bater a contagem.** A meta de palavras se atinge
-  desenvolvendo as quatro partes, nunca esticando frases. Se você se pegar
-  escrevendo "como vimos anteriormente" ou repetindo em outras palavras o que
-  já foi dito, apague e desenvolva o caso concreto — é sempre ele que está
-  curto quando o capítulo não fecha o tamanho.
-- Não escreva subtítulo dentro do capítulo. As quatro partes são estrutura
+  desenvolvendo a fundo os 6 movimentos (especialmente o mecanismo, a crônica
+  narrativa em detalhes literários e a prática passo a passo), nunca esticando frases.
+  Se você se pegar escrevendo "como vimos anteriormente" ou repetindo em outras
+  palavras o que já foi dito, apague e desenvolva a crônica ou o mecanismo — são
+  sempre eles que estão curtos quando o capítulo não fecha o tamanho.
+- Não escreva subtítulo dentro do capítulo. Os 6 movimentos são estrutura
   para VOCÊ, não seções na tela: o texto corre inteiro, e é o `:::pratica` que
   quebra a folha.
 ````
@@ -206,43 +286,73 @@ Escrever do zero sobre o mesmo assunto resolve as duas coisas ao mesmo tempo:
 sai do risco e produz um livro que soa como o resto do produto, em vez de um
 PDF de outra pessoa com a nossa capa.
 
-## Depois que o `.md` existir
+## Depois que o `.md` existir: a conferência de páginas
 
-O arquivo é lido por `lerLivro`. Para conferir se o formato saiu certo antes de
+O arquivo é lido por `lerLivro` e paginado por `paginarCapitulo`. Para conferir
+se o formato saiu certo e se atingiu as **10 páginas por capítulo** antes de
 publicar:
 
 ```bash
 npx tsx -e "
-import { lerLivro } from './src/nucleo/biblioteca/formato';
+import { lerLivro, paginarCapitulo } from './src/nucleo/biblioteca/formato';
 import fs from 'fs';
-const l = lerLivro(fs.readFileSync('biblioteca/texto/<id>.md','utf8'));
-console.log(l.meta, l.modulos.length + ' módulos', l.palavras + ' palavras', l.minutos + ' min');
+
+const id = process.argv[1] || 'magia-elemental';
+const caminho = 'biblioteca/texto/' + id + '.md';
+
+if (!fs.existsSync(caminho)) {
+  console.error('Arquivo não encontrado:', caminho);
+  process.exit(1);
+}
+
+const l = lerLivro(fs.readFileSync(caminho, 'utf8'));
+let totalPaginas = 0;
+
+console.log('\\n======================================================');
+console.log(' LIVRO:', l.meta.titulo ?? id);
+console.log(' Módulos:', l.modulos.length, '| Palavras:', l.palavras, '| Leitura:', l.minutos, 'minutos');
+console.log('======================================================\\n');
+
 for (const m of l.modulos) {
   console.log('#', m.titulo);
   for (const c of m.capitulos) {
     const palavras = c.blocos.reduce((s, b) =>
-      s + b.paragrafos.reduce((t, p) => t + p.split(/\\s+/).length, 0), 0);
+      s + b.paragrafos.reduce((t, p) => t + p.split(/\\s+/).filter(Boolean).length, 0), 0);
+    const paginas = paginarCapitulo(c).length;
+    totalPaginas += paginas;
     const praticas = c.blocos.filter(b => b.tipo === 'pratica').length;
-    const curto = palavras < 900 ? '  ← CURTO' : '';
-    console.log('   ', c.titulo, '·', palavras + ' palavras ·', c.som ?? 'sem som', '·', praticas + ' prática(s)' + curto);
+    const status = paginas < 8
+      ? '  ← CURTO (' + paginas + ' págs, meta: 10 págs / 2.500+ pal)'
+      : '  ✓ (' + paginas + ' págs)';
+
+    console.log('   ##', c.titulo);
+    console.log('      ' + palavras + ' palavras | ' + paginas + ' páginas | som: ' + (c.som ?? 'nenhum') + ' | ' + praticas + ' prática(s)' + status);
   }
 }
-"
+
+console.log('\\nTOTAL DO LIVRO:', totalPaginas, 'páginas de pergaminho.');
+if (totalPaginas < 60) {
+  console.log('ALERTA: Livro curto demais para o leitor (' + totalPaginas + ' págs)! Expanda os capítulos marcados.\\n');
+} else {
+  console.log('✓ LIVRO VOLUMOSO: ' + totalPaginas + ' páginas de pergaminho prontas para o leitor.\\n');
+}
+" <id-do-livro>
 ```
 
 Se aparecer um capítulo chamado `Abertura` que você não escreveu, sobrou texto
 antes do primeiro `##`. Se um capítulo veio sem prática, o modelo esqueceu o
 bloco.
 
-**Confira o tamanho, que é o que costuma vir errado.** O comando imprime as
-palavras de cada capítulo. Menos de 900 num capítulo quer dizer que ele saiu
-resumido — mande reescrever aquele capítulo específico, citando qual das
-quatro partes ficou curta. Reescrever um capítulo é barato; descobrir na hora
-de publicar que o livro inteiro tem 2.000 palavras não é.
+**Confira as páginas de cada capítulo.** Menos de 8 páginas num capítulo quer dizer
+que ele saiu resumido — mande o agente reescrever aquele capítulo específico,
+apontando qual dos 6 movimentos ficou raso (na grande maioria das vezes, foi a
+crônica narrativa ou o mecanismo). Reescrever um capítulo é rápido; descobrir
+depois que o cliente pagou por um livro de 10 minutos quebra o produto.
 
 Referência do que dá um livro que se paga:
 
-| | palavras | leitura |
-| --- | --- | --- |
-| Curto demais | menos de 8.000 | menos de 40 min |
-| Alvo | 18.000 a 30.000 | 90 a 150 min |
+| Classificação | Palavras / Cap. | Páginas / Cap. | Total no Livro (6-8 caps) | Tempo Total de Leitura |
+| --- | --- | --- | --- | --- |
+| **Inaceitável (panfleto)** | menos de 500 | 1 a 2 páginas | menos de 15 páginas | 7 a 10 min |
+| **Abaixo do ideal** | 800 a 1.400 | 3 a 5 páginas | 25 a 40 páginas | 35 a 55 min |
+| **Alvo do Bruxário** | **2.500 a 3.200** | **9 a 12 páginas** | **70 a 95 páginas** | **100 a 140 min** |

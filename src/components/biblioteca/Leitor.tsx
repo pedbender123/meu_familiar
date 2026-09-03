@@ -56,10 +56,22 @@ export function Leitor({
   titulo,
   livro,
   download,
+  trilhasDisponiveis = [],
 }: {
   ebookId: string;
   titulo: string;
   livro: LivroLido;
+  /**
+   * Os ids das trilhas que existem em disco HOJE.
+   *
+   * O `som:` do capítulo é uma intenção do livro, escrita antes de as faixas
+   * existirem — e a maioria delas ainda não existe. Sem esta lista o leitor
+   * pediria uma faixa ausente, o tocador cairia na primeira disponível, e o
+   * botão ficaria aceso dizendo que o som do capítulo está tocando enquanto
+   * toca outro. Capítulo cuja faixa ainda não chegou é lido em silêncio, e o
+   * botão diz isso.
+   */
+  trilhasDisponiveis?: string[];
   /**
    * O estado do arquivo para levar embora. Só existe para quem COMPROU o
    * livro — assinante lê e não baixa. Ver `downloadDoLivro`.
@@ -149,7 +161,11 @@ export function Leitor({
    * página não pode religar um som que ela desligou. Ver `lib/trilha.ts`.
    */
   useEffect(() => {
-    pedirTrilha(plano[posicao]?.capitulo.som);
+    const som = plano[posicao]?.capitulo.som;
+    if (som && trilhasDisponiveis.includes(som)) pedirTrilha(som);
+    // `trilhasDisponiveis` é uma lista nova a cada render do servidor; o que
+    // importa é o conteúdo, e ele só muda quando alguém publica uma faixa.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plano, posicao]);
 
   // Fechar com Esc: a fita aberta cobre o texto, e cobrir texto sem saída pelo
@@ -165,7 +181,11 @@ export function Leitor({
   if (!atual) return null;
 
   const cor = corDoModulo(atual.moduloIndice);
-  const tocandoEsteCapitulo = trilha.tocando && trilha.id === atual.capitulo.som;
+  const somDoCapitulo =
+    atual.capitulo.som && trilhasDisponiveis.includes(atual.capitulo.som)
+      ? atual.capitulo.som
+      : null;
+  const tocandoEsteCapitulo = trilha.tocando && trilha.id === somDoCapitulo;
 
   function irPara(i: number) {
     setPosicao(Math.max(0, Math.min(plano.length - 1, i)));
@@ -201,13 +221,15 @@ export function Leitor({
           é o do capítulo.
         */}
         <button
-          onClick={() => atual.capitulo.som && alternarTrilha(atual.capitulo.som)}
-          disabled={!atual.capitulo.som}
+          onClick={() => somDoCapitulo && alternarTrilha(somDoCapitulo)}
+          disabled={!somDoCapitulo}
           aria-label={tocandoEsteCapitulo ? 'Desligar a trilha' : 'Ligar a trilha'}
           title={
-            atual.capitulo.som
-              ? `Trilha: ${atual.capitulo.som}`
-              : 'Este capítulo é lido em silêncio'
+            somDoCapitulo
+              ? `Trilha: ${somDoCapitulo}`
+              : atual.capitulo.som
+                ? 'A trilha deste capítulo ainda está sendo gravada'
+                : 'Este capítulo é lido em silêncio'
           }
           className="shrink-0 w-9 h-9 rounded-full border flex items-center justify-center transition disabled:opacity-20"
           style={{
