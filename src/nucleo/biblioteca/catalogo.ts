@@ -69,7 +69,32 @@ export interface Ebook {
   sinopse: string;
   /** Quantos capítulos, para a lombada mostrar peso sem abrir o arquivo. */
   capitulos: number;
+  /**
+   * O preço **dentro do pedido** — o bump. É o que a pessoa paga quando leva
+   * o livro junto com a revelação, e é o único que o servidor cobra hoje.
+   */
   precoCentavos: number;
+  /**
+   * O preço do livro **sozinho**, e é ele que aparece riscado no checkout.
+   *
+   * ── Por que existe um segundo número ────────────────────────────────────
+   *
+   * O bump não tinha âncora nenhuma: dizia "R$ 17,90" e pronto. Preço sem
+   * "de" não lê como oferta, lê como mais uma cobrança no meio de um
+   * pagamento — e foi exatamente por isso que o time de marketing mandou o
+   * print de um concorrente, onde está escrito "De R$ 27,90 Por apenas
+   * R$ 9,90".
+   *
+   * ── O riscado precisa ser preço de verdade ──────────────────────────────
+   *
+   * Este número não é decoração. É o que o livro **vai** custar avulso na
+   * estante, e é o que a compra avulsa dentro do app tem de cobrar quando ela
+   * existir. Riscado inventado — um "de" que ninguém pagou nem vai pagar — é
+   * publicidade enganosa pelo art. 37 do CDC, e num produto cujo risco
+   * principal é estorno, é o pior lugar possível para economizar honestidade.
+   * Quem mexer no preço avulso mexe aqui, e nos dois lugares.
+   */
+  precoAvulsoCentavos: number;
   /**
    * O nome do Markdown em `biblioteca/texto/`. **É ele o produto.**
    *
@@ -104,6 +129,7 @@ export const EBOOKS: readonly Ebook[] = [
       'conta de tudo o que é pedido aqui.',
     capitulos: 7,
     precoCentavos: 990,
+    precoAvulsoCentavos: 2490,
     arquivo: 'magia-elemental.md',
     capa: 'magia-elemental.jpg',
     ordem: 1,
@@ -121,6 +147,7 @@ export const EBOOKS: readonly Ebook[] = [
       'qualquer baralho, inclusive o que está na sua gaveta.',
     capitulos: 6,
     precoCentavos: 1490,
+    precoAvulsoCentavos: 2990,
     arquivo: 'ler-o-futuro.md',
     capa: 'ler-o-futuro.jpg',
     ordem: 2,
@@ -139,6 +166,7 @@ export const EBOOKS: readonly Ebook[] = [
       'absorveu dos outros.',
     capitulos: 6,
     precoCentavos: 1790,
+    precoAvulsoCentavos: 3490,
     arquivo: 'terceiro-olho.md',
     capa: 'terceiro-olho.jpg',
     ordem: 3,
@@ -263,6 +291,7 @@ export function ebooksParaCheckout(): {
   sinopse: string;
   capitulos: number;
   precoCentavos: number;
+  precoAvulsoCentavos: number;
 }[] {
   return ebooksAVenda().map((e) => ({
     id: e.id,
@@ -271,5 +300,6 @@ export function ebooksParaCheckout(): {
     sinopse: e.sinopse,
     capitulos: e.capitulos,
     precoCentavos: e.precoCentavos,
+    precoAvulsoCentavos: e.precoAvulsoCentavos,
   }));
 }

@@ -357,3 +357,32 @@ describe('quem pode BAIXAR o arquivo', () => {
     assert.equal(downloadDoLivro(EMAIL, 'magia-elemental', HOJE).liberado, false);
   });
 });
+
+describe('o riscado do bump', () => {
+  /**
+   * O "de" do checkout precisa ser um preço maior que o "por", senão a linha
+   * mostra "De R$ 9,90 · R$ 17,90" e a oferta lê como aumento. É o tipo de
+   * erro que só aparece depois de publicado, porque quem mexe no preço mexe
+   * no número que está cobrando e esquece do outro.
+   */
+  test('o preço avulso é sempre maior que o preço dentro do pedido', () => {
+    for (const e of EBOOKS) {
+      assert.ok(
+        e.precoAvulsoCentavos > e.precoCentavos,
+        `${e.id}: avulso ${e.precoAvulsoCentavos} não é maior que o bump ${e.precoCentavos}`
+      );
+    }
+  });
+
+  /**
+   * Desconto de menos de 15% não convence ninguém a somar um item ao pedido,
+   * e desconto acima de 85% faz o preço cheio parecer inventado — que é
+   * justamente o que não pode ser (ver `precoAvulsoCentavos` no catálogo).
+   */
+  test('o desconto fica numa faixa que dá para defender', () => {
+    for (const e of EBOOKS) {
+      const off = Math.round((1 - e.precoCentavos / e.precoAvulsoCentavos) * 100);
+      assert.ok(off >= 15 && off <= 85, `${e.id}: desconto de ${off}%`);
+    }
+  });
+});

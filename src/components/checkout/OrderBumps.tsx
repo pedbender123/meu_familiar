@@ -1,37 +1,43 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, Plus, X } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 
 /**
  * A estante no checkout.
  *
- * ── Por que capa, e não lista ─────────────────────────────────────────────
+ * ── Por que isto deixou de ser uma prateleira ─────────────────────────────
  *
- * A primeira versão era uma lista de caixinhas com título e preço. Ela
- * funcionava e era feia — e num produto que vende ritual, feio não é só
- * questão de gosto: a lista dizia "isto aqui é um adicional de e-commerce",
- * quando o que está sendo vendido é um livro.
+ * A versão anterior era bonita e vendia mal, e foi o time de marketing que
+ * apontou por quê — mandaram o print de um checkout comum, do tipo que
+ * qualquer pessoa já viu dez vezes, e pediram "essa estrutura aí".
  *
- * Capa muda a natureza da coisa oferecida. Um retângulo com texto é um item;
- * uma capa com lombada é um objeto que se pega. E o objeto tinha sido
- * desenhado e estava sem uso, o que é a pior forma de desperdício.
+ * A prateleira mostrava três capas de 88px lado a lado. Para saber o que era
+ * cada livro, a pessoa tinha que TOCAR na capa e ler uma sinopse que abria
+ * por cima. Ou seja: no meio de um pagamento, o argumento de venda dos três
+ * livros estava atrás de um gesto que quase ninguém faz. Quem não tocava via
+ * três miniaturas ilegíveis e um preço solto — e três miniaturas ilegíveis
+ * não são uma oferta, são um obstáculo entre a pessoa e o botão de pagar.
  *
- * ── Os detalhes que não têm função ────────────────────────────────────────
+ * Agora é uma linha por livro, empilhada, com tudo visível sem gesto nenhum:
+ * capa pequena, título, a promessa de uma linha, o preço com âncora e o botão
+ * de somar. É o formato mais batido que existe em checkout brasileiro, e essa
+ * é a vantagem dele: a pessoa reconhece o padrão e sabe o que fazer sem
+ * aprender nada.
  *
- * A lombada mais escura na borda esquerda, o livro que sobe dois pixels ao
- * passar o mouse, o brilho que atravessa a capa quando ela é marcada, o selo
- * que gira ao entrar. Nada disso serve para nada.
+ * ── O que foi preservado da versão bonita ─────────────────────────────────
  *
- * É de propósito. Detalhe gratuito é o que separa produto feito com cuidado
- * de produto montado — e as pessoas reparam nele muito mais do que na
- * funcionalidade, porque a funcionalidade elas esperam e o detalhe não.
+ * A capa continua aqui, com a lombada e o brilho ao marcar. O que ela perdeu
+ * foi o monopólio da informação — ela ilustra a linha em vez de ser a única
+ * coisa na linha. A sinopse também continua, agora atrás de um link discreto
+ * ("ler a sinopse") em vez de ser o único caminho para saber do que se trata.
  *
- * ── A sinopse abre por cima, e uma de cada vez ────────────────────────────
+ * ── O riscado ─────────────────────────────────────────────────────────────
  *
- * Empurrar as outras capas para baixo faria a grade saltar no clique, e
- * salto no meio de um checkout é a coisa mais fácil de fazer alguém desistir.
- * Ela abre sobreposta, fecha ao tocar fora, e nunca há duas abertas.
+ * `precoAvulsoCentavos` é o preço do livro sozinho, e está declarado no
+ * catálogo justamente para que o "de" seja um número que existe. Ver o
+ * comentário longo em `nucleo/biblioteca/catalogo.ts` sobre por que um
+ * riscado inventado não entra aqui.
  */
 
 export interface EbookDoCheckout {
@@ -41,6 +47,7 @@ export interface EbookDoCheckout {
   sinopse: string;
   capitulos: number;
   precoCentavos: number;
+  precoAvulsoCentavos: number;
 }
 
 function reais(centavos: number): string {
@@ -48,6 +55,11 @@ function reais(centavos: number): string {
     style: 'currency',
     currency: 'BRL',
   });
+}
+
+function desconto(e: EbookDoCheckout): number {
+  if (e.precoAvulsoCentavos <= e.precoCentavos) return 0;
+  return Math.round((1 - e.precoCentavos / e.precoAvulsoCentavos) * 100);
 }
 
 export function OrderBumps({
@@ -66,139 +78,190 @@ export function OrderBumps({
 
   const emAberto = ebooks.find((e) => e.id === aberto);
 
+  // O maior desconto da estante vira o número da chamada. É o que o print do
+  // marketing faz ("com 90% de desconto") e é honesto desde que seja o maior
+  // de verdade e a palavra "até" esteja lá.
+  const maiorDesconto = Math.max(...ebooks.map(desconto));
+
   return (
-    <section className="relative flex flex-col gap-3">
-      <div className="flex items-baseline justify-between gap-3 px-1">
-        <h2 className="font-corpo text-[0.68rem] tracking-[0.18em] uppercase text-pergaminho/45">
-          Leve junto
+    <section className="relative flex flex-col gap-2.5">
+      <div className="flex flex-col gap-0.5 px-1">
+        <h2 className="font-corpo text-[0.68rem] tracking-[0.18em] uppercase text-vela">
+          {maiorDesconto > 0
+            ? `Leve junto com até ${maiorDesconto}% de desconto`
+            : 'Leve junto'}
         </h2>
-        <span className="font-corpo font-light text-[0.66rem] text-pergaminho/30">
-          toque na capa para ver
-        </span>
+        <p className="font-corpo font-light text-[0.66rem] text-pergaminho/35">
+          Só agora, dentro deste pedido. Fica na sua biblioteca para sempre.
+        </p>
       </div>
 
-      {/*
-        Três colunas fixas, inclusive no celular.
-
-        Uma estante com scroll horizontal esconde o terceiro livro, e livro
-        escondido não é comprado. Em 320px a capa fica com 88px de largura —
-        pequena, e ainda assim reconhecível como capa, que é o que importa.
-      */}
-      <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
+      <div className="flex flex-col gap-2.5">
         {ebooks.map((e, i) => {
           const marcado = marcados.includes(e.id);
+          const off = desconto(e);
           return (
-            <div key={e.id} className="flex flex-col gap-2">
-              <button
-                type="button"
-                onClick={() => setAberto(aberto === e.id ? null : e.id)}
-                aria-expanded={aberto === e.id}
-                className="group relative block w-full"
-                style={{
-                  // A entrada escalonada: cada livro chega 90ms depois do
-                  // anterior, como quem põe três volumes na prateleira.
-                  animation: `livroChega 620ms cubic-bezier(.2,.8,.2,1) ${i * 90}ms both`,
-                }}
-              >
+            <div
+              key={e.id}
+              className="rounded-xl border p-3 flex flex-col gap-2.5 transition"
+              style={{
+                borderColor: marcado
+                  ? 'rgba(217,164,65,0.55)'
+                  : 'color-mix(in srgb, var(--pergaminho) 14%, transparent)',
+                background: marcado ? 'rgba(217,164,65,0.07)' : 'transparent',
+                // A entrada escalonada: cada livro chega 90ms depois do
+                // anterior, como quem põe três volumes na prateleira.
+                animation: `livroChega 620ms cubic-bezier(.2,.8,.2,1) ${i * 90}ms both`,
+              }}
+            >
+              <div className="flex items-start gap-3">
+                {/*
+                  A caixa de marcar, no canto onde todo checkout põe.
+
+                  Ela é `aria-hidden` e não recebe foco de propósito: o alvo
+                  acessível é o botão inteiro lá embaixo, que diz em palavras
+                  o que faz. Duas coisas focáveis para a mesma ação fariam o
+                  leitor de tela anunciar a oferta duas vezes.
+                */}
                 <span
-                  className="relative block w-full aspect-[3/4] rounded-[3px] overflow-hidden transition-all duration-300 ease-out group-hover:-translate-y-[3px]"
+                  aria-hidden="true"
+                  className="mt-0.5 shrink-0 size-[18px] rounded-[5px] border flex items-center justify-center transition"
                   style={{
-                    boxShadow: marcado
-                      ? '0 10px 22px -8px rgba(0,0,0,0.8), 0 0 0 1.5px var(--vela), 0 0 26px -6px rgba(217,164,65,0.5)'
-                      : '0 6px 16px -8px rgba(0,0,0,0.75), 0 0 0 1px rgba(234,224,204,0.10)',
+                    borderColor: marcado
+                      ? 'var(--vela)'
+                      : 'color-mix(in srgb, var(--pergaminho) 30%, transparent)',
+                    background: marcado ? 'var(--vela)' : 'transparent',
                   }}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={`/api/biblioteca/capa/${e.id}`}
-                    alt={e.titulo}
-                    className="w-full h-full object-cover transition duration-500"
-                    style={{
-                      filter: marcado ? 'none' : 'saturate(0.82) brightness(0.82)',
-                    }}
-                  />
+                  {marcado && <Check size={12} strokeWidth={3} className="text-tinta" />}
+                </span>
 
-                  {/*
-                    A lombada: uma faixa escura na borda esquerda com um fio
-                    de luz. É o que faz o retângulo virar livro em vez de
-                    cartão — e custa duas linhas de gradiente.
-                  */}
+                <button
+                  type="button"
+                  onClick={() => setAberto(aberto === e.id ? null : e.id)}
+                  aria-expanded={aberto === e.id}
+                  aria-label={`Ler a sinopse de ${e.titulo}`}
+                  className="group relative shrink-0 w-[52px]"
+                >
                   <span
-                    aria-hidden="true"
-                    className="absolute inset-y-0 left-0 w-[9px]"
+                    className="relative block w-full aspect-[3/4] rounded-[3px] overflow-hidden transition-all duration-300 ease-out group-hover:-translate-y-[2px]"
                     style={{
-                      background:
-                        'linear-gradient(90deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.28) 45%, rgba(255,255,255,0.10) 72%, transparent 100%)',
+                      boxShadow: marcado
+                        ? '0 8px 18px -8px rgba(0,0,0,0.8), 0 0 0 1.5px var(--vela)'
+                        : '0 5px 14px -8px rgba(0,0,0,0.75), 0 0 0 1px rgba(234,224,204,0.10)',
                     }}
-                  />
-
-                  {/* O brilho que atravessa a capa no instante em que ela é marcada. */}
-                  {marcado && (
-                    <span
-                      aria-hidden="true"
-                      className="absolute inset-0 pointer-events-none"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={`/api/biblioteca/capa/${e.id}`}
+                      alt=""
+                      className="w-full h-full object-cover transition duration-500"
                       style={{
-                        background:
-                          'linear-gradient(105deg, transparent 35%, rgba(255,236,190,0.42) 50%, transparent 65%)',
-                        animation: 'brilhoDaCapa 900ms ease-out 1',
+                        filter: marcado ? 'none' : 'saturate(0.85) brightness(0.85)',
                       }}
                     />
-                  )}
-
-                  {/* O selo de marcado, que gira ao entrar. */}
-                  {marcado && (
+                    {/*
+                      A lombada: faixa escura na borda esquerda com um fio de
+                      luz. É o que faz o retângulo virar livro em vez de
+                      cartão, e custa duas linhas de gradiente.
+                    */}
                     <span
-                      className="absolute top-1.5 right-1.5 w-[22px] h-[22px] rounded-full flex items-center justify-center"
+                      aria-hidden="true"
+                      className="absolute inset-y-0 left-0 w-[6px]"
                       style={{
-                        background: 'var(--vela)',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
-                        animation: 'seloGira 380ms cubic-bezier(.2,1.4,.4,1) both',
+                        background:
+                          'linear-gradient(90deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.28) 45%, rgba(255,255,255,0.10) 72%, transparent 100%)',
                       }}
-                    >
-                      <Check size={13} strokeWidth={3} className="text-tinta" />
+                    />
+                    {marcado && (
+                      <span
+                        aria-hidden="true"
+                        className="absolute inset-0 pointer-events-none"
+                        style={{
+                          background:
+                            'linear-gradient(105deg, transparent 35%, rgba(255,236,190,0.42) 50%, transparent 65%)',
+                          animation: 'brilhoDaCapa 900ms ease-out 1',
+                        }}
+                      />
+                    )}
+                  </span>
+                </button>
+
+                <div className="flex-1 min-w-0 flex flex-col gap-1">
+                  <h3 className="font-corpo font-medium text-[0.82rem] leading-snug text-pergaminho">
+                    {e.titulo}
+                  </h3>
+                  <p className="font-corpo font-light text-[0.72rem] leading-snug text-pergaminho/50">
+                    {e.promessa}
+                  </p>
+
+                  {/*
+                    Preço e âncora na mesma linha, com `flex-wrap`: em 320px
+                    os dois números não cabem lado a lado, e o que não pode
+                    acontecer de jeito nenhum é o preço final sair cortado —
+                    esse bug acabou de ser corrigido nos cartões de plano.
+                  */}
+                  <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 pt-0.5">
+                    {e.precoAvulsoCentavos > e.precoCentavos && (
+                      <span className="font-corpo text-[0.72rem] text-pergaminho/35 line-through tabular-nums">
+                        {reais(e.precoAvulsoCentavos)}
+                      </span>
+                    )}
+                    <span className="font-corpo font-medium text-[0.95rem] text-vela tabular-nums">
+                      {reais(e.precoCentavos)}
                     </span>
-                  )}
-                </span>
-              </button>
+                    {off > 0 && (
+                      <span className="font-corpo text-[0.58rem] tracking-[0.12em] uppercase text-vela/70 border border-vela/30 rounded-full px-1.5 py-px">
+                        {`-${off}%`}
+                      </span>
+                    )}
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={() => setAberto(e.id)}
+                    className="self-start font-corpo font-light text-[0.66rem] text-pergaminho/40 underline underline-offset-2 hover:text-vela transition"
+                  >
+                    ler a sinopse
+                  </button>
+                </div>
+              </div>
 
               {/*
-                O botão de marcar é separado da capa.
+                O botão que decide, em largura cheia e com verbo.
 
-                Tocar na capa abre a sinopse; marcar é outro gesto, com outro
-                alvo. Juntar os dois faria quem só queria olhar comprar sem
-                querer — e compra sem querer volta como estorno.
+                Na versão anterior o gesto de marcar era um retângulo pequeno
+                com o preço dentro e nenhum verbo — dava para olhar aquilo e
+                não saber que era clicável. "Adicionar ao pedido" é feio de
+                tão comum, e é exatamente por isso que funciona.
               */}
               <button
                 type="button"
                 role="checkbox"
                 aria-checked={marcado}
                 onClick={() => aoMarcar(e.id)}
-                className="w-full rounded-lg border px-2 py-1.5 flex items-center justify-center gap-1.5 transition"
-                style={{
-                  borderColor: marcado
-                    ? 'rgba(217,164,65,0.55)'
-                    : 'color-mix(in srgb, var(--pergaminho) 16%, transparent)',
-                  background: marcado ? 'rgba(217,164,65,0.12)' : 'transparent',
-                  color: marcado ? 'var(--vela)' : 'color-mix(in srgb, var(--pergaminho) 62%, transparent)',
-                }}
+                className="w-full rounded-lg py-2 font-corpo text-[0.78rem] transition border"
+                style={
+                  marcado
+                    ? {
+                        borderColor: 'color-mix(in srgb, var(--pergaminho) 20%, transparent)',
+                        color: 'color-mix(in srgb, var(--pergaminho) 55%, transparent)',
+                        background: 'transparent',
+                      }
+                    : {
+                        borderColor: 'rgba(217,164,65,0.55)',
+                        color: 'var(--vela)',
+                        background: 'rgba(217,164,65,0.10)',
+                        fontWeight: 500,
+                      }
+                }
               >
-                {marcado ? (
-                  <Check size={12} strokeWidth={2.5} />
-                ) : (
-                  <Plus size={12} strokeWidth={2} />
-                )}
-                <span className="font-corpo text-[0.7rem] tabular-nums">
-                  {reais(e.precoCentavos)}
-                </span>
+                {marcado ? 'Tirar do pedido' : `Adicionar por ${reais(e.precoCentavos)}`}
               </button>
             </div>
           );
         })}
       </div>
-
-      <p className="font-corpo font-light text-[0.68rem] leading-snug text-pergaminho/35 px-1">
-        Fica na sua biblioteca para sempre, mesmo sem assinatura.
-      </p>
 
       {/* ── a sinopse, por cima ── */}
       {emAberto && (
@@ -263,7 +326,7 @@ export function OrderBumps({
             >
               {marcados.includes(emAberto.id)
                 ? 'Tirar do pedido'
-                : `Somar ${reais(emAberto.precoCentavos)} ao pedido`}
+                : `Adicionar por ${reais(emAberto.precoCentavos)}`}
             </button>
           </div>
         </>
