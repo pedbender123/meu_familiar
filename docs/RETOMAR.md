@@ -51,6 +51,12 @@ npx tsx scripts/religar-utmify.ts --aplicar   # partes 1 e 2, sem enviar nada
 
 ## Onde as coisas estão
 
+- **`biblioteca/pdfs/` e `biblioteca/capas/`** — os ebooks vendidos. Largar o
+  arquivo com o nome certo é tudo: o livro aparece sozinho no checkout, e sem
+  PDF ele não é oferecido nem cobrado. Ver `biblioteca/LEIA-ME.md`.
+- **`docs/wiven/`** — as três páginas da documentação da Wiven salvas em HTML.
+  O conteúdo está dentro das tags `<script>`; procurar sem elas devolve nada.
+
 - **Local:** `/home/pedro/Área de trabalho/Micro_Projects/meu_familiar`
 - **Produção:** `ssh root@100.126.229.42` → `/root/apps/bruxario`
   (só pela tailnet; a chave já está no agente)

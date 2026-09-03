@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { ASSETS } from '../../lib/caminhos';
+import { BIBLIOTECA_PDFS, BIBLIOTECA_CAPAS } from '../../lib/caminhos';
 
 /**
  * A biblioteca: os ebooks que o Bruxário vende e entrega.
@@ -30,11 +30,15 @@ import { ASSETS } from '../../lib/caminhos';
  *
  * ── Onde ficam os arquivos ────────────────────────────────────────────────
  *
- * `src/assets/biblioteca/` — a raiz que a convenção de `caminhos.ts` reserva
- * para o que "entra no repositório, é lido em runtime, nunca é escrito". É
- * exatamente o caso: o PDF é o produto, ele não muda por pedido, e precisa
- * viajar no deploy. `var/` seria pior — o `rsync` do deploy não leva `var/`,
- * então cada livro novo viraria um upload manual esquecível.
+ *     biblioteca/pdfs/     o livro
+ *     biblioteca/capas/    a imagem da capa
+ *
+ * Na raiz porque é uma pasta de largar arquivo: quem põe um livro novo ali
+ * não está mexendo em código. Ver `BIBLIOTECA` em `caminhos.ts`.
+ *
+ * O nome do arquivo é o que liga um ao outro — `arquivo` e `capa` abaixo.
+ * Nome errado não quebra nada: o livro simplesmente não aparece, porque
+ * `ebookEntregavel` não acha o PDF.
  */
 
 export interface Ebook {
@@ -95,15 +99,15 @@ export function buscarEbook(id: string | null | undefined): Ebook | undefined {
   return EBOOKS.find((e) => e.id === id);
 }
 
-/** A raiz dos arquivos. Exportada para o teste conferir o que existe em disco. */
-export const PASTA_DA_BIBLIOTECA = path.join(ASSETS, 'biblioteca');
+/** Exportada para o teste conferir o que existe em disco. */
+export const PASTA_DA_BIBLIOTECA = BIBLIOTECA_PDFS;
 
 export function caminhoDoPdf(ebook: Ebook): string {
-  return path.join(PASTA_DA_BIBLIOTECA, ebook.arquivo);
+  return path.join(BIBLIOTECA_PDFS, ebook.arquivo);
 }
 
 export function caminhoDaCapa(ebook: Ebook): string {
-  return path.join(PASTA_DA_BIBLIOTECA, 'capas', ebook.capa);
+  return path.join(BIBLIOTECA_CAPAS, ebook.capa);
 }
 
 /**

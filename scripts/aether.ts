@@ -10,7 +10,7 @@ import { resumoDeToques, vendasPorAtribuicao, jornadaLegivel } from '../src/lib/
 import { precoDoPedido } from '../src/lib/cupons';
 
 /**
- * A ponte com o Petrus (AetherOS), pelo protocolo do `AETHER_LINK.md`.
+ * A ponte com o Petrus (AetherOS), pelo protocolo do `docs/AETHER_LINK.md`.
  *
  * ── Por que processo separado e não dentro do Next ────────────────────────
  *

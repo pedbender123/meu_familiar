@@ -51,6 +51,35 @@ beforeEach(() => {
 
 afterEach(apagarArquivosFalsos);
 
+describe('a pasta de largar arquivo', () => {
+  /**
+   * O `LEIA-ME.md` diz os nomes exatos que o catálogo procura. Renomear um
+   * arquivo no catálogo e esquecer o documento faria alguém largar o PDF com
+   * o nome antigo — e o sintoma seria o livro simplesmente não aparecer, sem
+   * erro nenhum para explicar por quê.
+   */
+  test('o LEIA-ME lista exatamente os nomes que o catálogo procura', () => {
+    const leiaMe = fs.readFileSync('biblioteca/LEIA-ME.md', 'utf8');
+    for (const e of EBOOKS) {
+      assert.ok(
+        leiaMe.includes(`biblioteca/pdfs/${e.arquivo}`),
+        `o LEIA-ME não menciona ${e.arquivo}`
+      );
+      assert.ok(
+        leiaMe.includes(`biblioteca/capas/${e.capa}`),
+        `o LEIA-ME não menciona a capa ${e.capa}`
+      );
+    }
+  });
+
+  test('os arquivos são procurados na raiz, onde se larga', () => {
+    assert.ok(
+      caminhoDoPdf(EBOOKS[0]).includes(path.join('biblioteca', 'pdfs')),
+      'o PDF mora em biblioteca/pdfs'
+    );
+  });
+});
+
 describe('o catálogo só vende o que consegue entregar', () => {
   /**
    * O pior desfecho possível deste fluxo: a pessoa paga a mais por um livro,

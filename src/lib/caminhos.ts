@@ -11,6 +11,7 @@ import path from 'path';
  * - `var/`       — escrito em runtime, nunca versionado, nunca sobrescrito
  *                  por deploy (banco e artes geradas por pedido)
  * - `conteudo/`  — matéria-prima de divulgação, fora do runtime do app
+ * - `biblioteca/`— os ebooks vendidos: PDF e capa, largados à mão
  */
 const RAIZ = process.cwd();
 
@@ -33,6 +34,27 @@ export const PEDIDOS = path.join(RAIZ, 'var', 'storage', 'orders');
 export const BACKUPS = path.join(RAIZ, 'var', 'backups');
 
 export const CONTEUDO = path.join(RAIZ, 'conteudo');
+
+/**
+ * Os ebooks da biblioteca — PDF e capa.
+ *
+ * ── Por que na raiz, e não em `src/assets` ────────────────────────────────
+ *
+ * Porque é uma pasta de LARGAR ARQUIVO. Quem põe um livro novo ali não está
+ * mexendo em código, e enterrar isso três níveis dentro de `src/` transforma
+ * uma tarefa de dois segundos numa caça ao diretório certo.
+ *
+ * A convenção continua valendo: é lido em runtime e nunca escrito pelo app,
+ * como `src/assets`. A diferença é só quem mexe.
+ *
+ * Vai no repositório de propósito. O `rsync` do deploy leva a raiz inteira
+ * menos o que está excluído — então o livro chega em produção junto do
+ * código. Em `var/` cada livro novo viraria um upload manual esquecível, e
+ * esquecer significa vender um PDF que não existe do outro lado.
+ */
+export const BIBLIOTECA = path.join(RAIZ, 'biblioteca');
+export const BIBLIOTECA_PDFS = path.join(BIBLIOTECA, 'pdfs');
+export const BIBLIOTECA_CAPAS = path.join(BIBLIOTECA, 'capas');
 export const ENV = path.join(RAIZ, '.env');
 
 export function pastaDoPedido(pedidoId: string) {

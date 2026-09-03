@@ -28,7 +28,7 @@ const CODIGO_DE_TESTE = process.env.NEXT_PUBLIC_META_PIXEL_TEST_CODE;
 export function MetaPixel() {
   const caminho = usePathname();
   // O Horóscopo é outro produto, com pixel próprio (`MetaPixelHoroscopo`) —
-  // ver AETHER_LINK.md/decisão do produto separado. Sem este guard, os dois
+  // ver docs/AETHER_LINK.md/decisão do produto separado. Sem este guard, os dois
   // pixels disparariam juntos ali e misturariam a atribuição dos dois anúncios.
   if (!PIXEL_ID || caminho?.startsWith('/horoscopo')) return null;
   return (

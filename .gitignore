@@ -46,6 +46,9 @@ next-env.d.ts
 *.png
 !/public/**/*.png
 !/src/assets/**/*.png
+# As capas dos ebooks entram no repositório: elas viajam no deploy junto do
+# código, como o PDF. Ver biblioteca/LEIA-ME.md.
+!/biblioteca/**/*.png
 
 # A versão reduzida para entrega a terceiro: gerada, não versionada.
 entrega-terceiro/bruxario/node_modules
