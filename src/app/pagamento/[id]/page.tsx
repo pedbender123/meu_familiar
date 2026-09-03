@@ -104,6 +104,6 @@ function itensDoProduto(id: string): string[] {
   return [
     'Quem é o seu familiar, com o retrato e o nome secreto',
     'A leitura escrita a partir das suas 26 respostas',
-    'PDF e as artes no seu e-mail, na hora',
+    'O seu Bruxário aberto na hora, com a carta e as artes',
   ];
 }

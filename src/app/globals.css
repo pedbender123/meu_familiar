@@ -354,3 +354,21 @@ body {
     transform: translateX(0);
   }
 }
+
+/* O aviso de que a página continua, no `/seu-familiar`. Sobe e desce de leve
+   porque um sinal parado no rodapé some dentro do layout — vira mais um
+   enfeite. O movimento é curto (4px) para chamar sem virar pisca-pisca, e a
+   regra global de `prefers-reduced-motion` lá em cima desliga isto sozinha
+   para quem pediu menos movimento. Ver `components/RoleParaBaixo.tsx`. */
+.chamando-para-baixo {
+  animation: chamandoParaBaixo 2.4s ease-in-out infinite;
+}
+
+@keyframes chamandoParaBaixo {
+  0%, 100% {
+    transform: translate(-50%, 0);
+  }
+  50% {
+    transform: translate(-50%, 4px);
+  }
+}

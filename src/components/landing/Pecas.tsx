@@ -169,7 +169,7 @@ export function Precos({ descontoPercentual }: { descontoPercentual: number }) {
             <span className="font-corpo font-light text-xs text-pergaminho/55 leading-relaxed">
               {produto.id === 'completa'
                 ? 'Leitura longa, os gráficos do seu perfil e link público para sempre.'
-                : 'Seu familiar, a leitura, a carta e o PDF. Link público por 7 dias.'}
+                : 'Seu familiar, a leitura e a carta, no seu Bruxário. Link público por 7 dias.'}
             </span>
           </div>
         ))}
@@ -241,7 +241,7 @@ export function ComoFunciona() {
       n: '3',
       titulo: 'Fica com você',
       texto:
-        'Conta no Bruxário para sempre, mais o PDF e as imagens no seu e-mail.',
+        'Conta no Bruxário para sempre, com a leitura e as imagens dentro.',
     },
   ];
 

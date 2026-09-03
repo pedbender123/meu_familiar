@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import { notFound, redirect } from 'next/navigation';
 import { PoeiraNaLuz } from '@/components/PoeiraNaLuz';
+import { RoleParaBaixo } from '@/components/RoleParaBaixo';
 import { RodapeLegal } from '@/components/RodapeLegal';
 import { Oferta } from '@/components/Oferta';
 import { MarcoDaOferta } from '@/components/MarcoDaOferta';
@@ -78,6 +79,13 @@ export default async function SeuFamiliar({
     <>
       <PoeiraNaLuz />
       <MarcoDaOferta />
+      {/*
+        O véu ocupa a primeira dobra inteira e parece o fim da página. Sem
+        este aviso, gente que chegou até aqui — treze minutos de ritual — sai
+        sem nunca ter visto os três sigilos, a prova do teste nem o preço.
+        Ver `RoleParaBaixo` para o porquê de não ser scroll automático.
+      */}
+      <RoleParaBaixo />
       <main className="quarto-de-vela relative z-10 flex-1 flex flex-col items-center gap-10 sm:gap-12 px-5 py-12">
         {/* ── a chegada ── */}
         <section className="w-full max-w-md flex flex-col items-center gap-5 text-center">

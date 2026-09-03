@@ -74,7 +74,7 @@ function beneficiosDe(direitos: Direitos): string[] {
    * a oferta de R$ 7,90 se descrevia como "os gráficos e o calendário da
    * semana", escondendo a única coisa pela qual a pessoa está pagando.
    */
-  if (direitos.pdf) lista.push('O texto completo da sua revelação, em PDF');
+  if (direitos.pdf) lista.push('O texto completo da sua revelação');
 
   if (direitos.leiturasPorMes > 0) {
     lista.push(

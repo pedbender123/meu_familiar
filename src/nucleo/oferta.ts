@@ -66,7 +66,7 @@ const CHAMADAS: Record<PlanoDaOfertaId, string> = {
 const GANHOS: Record<PlanoDaOfertaId, string[]> = {
   avulsa_simples: [
     'O texto completo da sua revelação',
-    'PDF e imagens para baixar',
+    'As imagens prontas para postar',
     'Calendário da semana inteira',
   ],
   avulsa_completa: [

@@ -194,12 +194,12 @@ const PASSOS = [
   {
     titulo: 'Ele te encontra',
     texto:
-      'O resultado sai das suas escolhas, não do seu signo. O Sol e a Lua entram depois, como textura da leitura — nunca na conta.',
+      'O resultado sai das suas escolhas, e o seu Sol e a sua Lua entram na leitura que ele escreve sobre você.',
   },
   {
     titulo: 'Fica com você',
     texto:
-      'A revelação vem em PDF e em imagens prontas pra postar, e chega também no seu e-mail. Se quiser um endereço permanente e o perfil no Bruxário, é a Completa que faz isso.',
+      'A revelação abre no seu Bruxário na hora, com as imagens prontas pra postar, e o link chega também no seu e-mail. Se quiser um endereço permanente e o perfil completo, é a Completa que faz isso.',
   },
 ];
 
@@ -269,7 +269,7 @@ function OsProdutos() {
           <ul className="flex flex-col gap-2">
             {[
               'O seu familiar, revelado',
-              'A leitura em PDF e as imagens',
+              'A leitura e as imagens, no seu Bruxário',
               'Sua conta no Bruxário, para sempre',
               'Uma leitura do Oráculo por mês',
               'O calendário da sua semana',

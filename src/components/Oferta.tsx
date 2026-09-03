@@ -232,7 +232,14 @@ export function Oferta({
       itens: [
         `Seu familiar: nome, retrato e o nome secreto`,
         `A leitura de por que ${ele} te escolheu`,
-        'PDF e artes no seu e-mail, na hora',
+        /*
+          Dizia "PDF e artes no seu e-mail, na hora" — e virou mentira no dia
+          em que o PDF saiu do anexo e passou a abrir só depois de sete dias
+          (ver `nucleo/carencia.ts`). Prometer arquivo na hora e entregar
+          conta é exatamente o caminho do estorno que a carência existe para
+          evitar. O que a pessoa recebe de fato, na hora, é a porta aberta.
+        */
+        'O seu Bruxário aberto na hora, com tudo dentro',
       ],
       destaque: false,
     },
@@ -321,8 +328,21 @@ export function Oferta({
                   : 'border-pergaminho/18 hover:border-pergaminho/35',
               ].join(' ')}
             >
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="font-display italic text-2xl text-pergaminho flex items-baseline gap-2">
+              {/*
+                `flex-wrap` aqui não é capricho: era o bug que o marketing
+                mandou por print. Nome e preço ficavam na mesma linha rígida,
+                e nos dois cartões que têm selo ("mais escolhida", "30 dias")
+                a pílula do selo empurrava o preço para fora da borda — em
+                tela de 390px o "R$ 24,90" aparecia cortado ao meio. Preço
+                cortado na tela de escolher plano é o pior lugar possível
+                para um bug de layout.
+
+                Com a quebra, em tela estreita o preço desce para a segunda
+                linha (`ml-auto` mantém ele encostado à direita, alinhado com
+                os outros cartões) e em tela larga nada muda.
+              */}
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                <span className="font-display italic text-2xl text-pergaminho flex flex-wrap items-baseline gap-2 min-w-0">
                   <span
                     aria-hidden="true"
                     className={[
@@ -339,7 +359,7 @@ export function Oferta({
                     </span>
                   )}
                 </span>
-                <span className="flex items-baseline gap-2 shrink-0">
+                <span className="flex items-baseline gap-2 shrink-0 ml-auto">
                   {/*
                     O riscado é a âncora da vitrine, e não o resultado de uma
                     conta: ele aparece quando existe um "de" maior que o
