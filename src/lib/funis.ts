@@ -63,7 +63,7 @@ export const FUNIS: Record<FunilId, Funil> = {
     nome: 'Sete perguntas',
     aposta:
       'Sete perguntas curtas sobre ela, revelação do grupo, e só então o preço. Aposta em curiosidade rápida: chegar ao valor enquanto a pessoa ainda quer saber.',
-    ativo: false,
+    ativo: true,
   },
   familiar: {
     id: 'familiar',
@@ -72,33 +72,40 @@ export const FUNIS: Record<FunilId, Funil> = {
     nome: 'Ritual longo',
     aposta:
       'Funil comprido no formato validado por quem já vende neste mercado: nascimento com signo ao vivo, leitura do mapa, medidor de energia que sobe, recapitulação. Aposta em investimento acumulado — quem respondeu doze passos larga mais difícil.',
-    ativo: false,
+    ativo: true,
   },
 };
 
 export const FUNIL_PADRAO: FunilId = 'padrao';
 
 /**
- * **O teste A/B de funil está desligado. Toda campanha usa as 26 cenas.**
+ * O caminho de cada funil, para montar o link publicável.
  *
- * ── Por que ─────────────────────────────────────────────────────────────
+ * ── Por que a campanha guarda um caminho, e não só um nome ────────────────
  *
- * Porque só ele vende, e porque o teste é o melhor qualificador de lead que
- * existe aqui: quem atravessa vinte e seis cenas já decidiu que quer o
- * resultado. Os outros dois eram apostas de que dá para vender com menos
- * atrito, e tiveram tráfego suficiente para não terem provado nada.
+ * Porque é o link que faz o teste existir. Uma campanha que aponta para
+ * `/familiar` traz gente que só vê aquele funil, e nenhum outro tráfego cai
+ * ali: não há link para `/familiar` em lugar nenhum do site — nem menu, nem
+ * landing, nem e-mail. É isso que torna o resultado comparável.
  *
- * ── Por que uma constante, e não apagar os outros ───────────────────────
- *
- * Porque o histórico precisa deles. Existem pedidos gravados com
- * `funil = 'atravessar'`, e o relatório os lê pelo código de duas letras — um
- * registro sem a entrada faria a jornada de agosto virar linha em branco.
- * Eles continuam aqui, `ativo: false`, invisíveis para quem cria campanha.
- *
- * Religar é trocar `false` por `true` neste arquivo e devolver o seletor ao
- * formulário de campanha. Não é uma porta fechada — é uma decisão tomada.
+ * O `?c=` continua sendo o que liga a chegada à campanha e faz o relatório
+ * separar os números. Os dois juntos — caminho e código — são o link do
+ * anúncio, e é ele que o painel entrega pronto para copiar.
  */
-export const ESCOLHA_DE_FUNIL_LIGADA = false;
+export function caminhoDoFunil(id: FunilId): string {
+  return FUNIS[id]?.caminho ?? FUNIS[FUNIL_PADRAO].caminho;
+}
+
+/**
+ * O link publicável de uma campanha: o caminho do funil dela mais o código.
+ *
+ * `/` vira string vazia para não sair `bruxario.com.br/?c=` com barra
+ * sobrando — detalhe bobo que aparece em toda legenda de anúncio.
+ */
+export function linkDaCampanha(base: string, funil: FunilId, codigo: string): string {
+  const caminho = caminhoDoFunil(funil);
+  return `${base.replace(/\/$/, '')}${caminho === '/' ? '' : caminho}?c=${codigo}`;
+}
 
 /**
  * Quais funis uma campanha usa é decisão DELA, não uma lista global.
@@ -160,13 +167,6 @@ export const COOKIE_DO_FUNIL = 'bx_f2';
  * funcionou em vez de servir tela em branco.
  */
 export function funisDaCampanha(bruto: string | null | undefined): FunilId[] {
-  /*
-    Com a escolha desligada, o que está gravado na campanha não importa: toda
-    campanha — inclusive as que guardaram `atravessar` meses atrás — serve as
-    26 cenas. A coluna continua no banco, intacta, esperando o dia em que
-    alguém religue o teste.
-  */
-  if (!ESCOLHA_DE_FUNIL_LIGADA) return [FUNIL_PADRAO];
   if (!bruto) return [FUNIL_PADRAO];
   try {
     const lista = JSON.parse(bruto);

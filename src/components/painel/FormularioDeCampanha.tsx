@@ -3,7 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { EscolhaDeCheckout } from './EscolhaDeCheckout';
-import { FUNIL_PADRAO, type FunilId } from '@/lib/funis';
+import { EscolhaDoCaminho } from './EscolhaDoCaminho';
+import { FUNIL_PADRAO, linkDaCampanha, type FunilId } from '@/lib/funis';
 import type { NomeDoGateway } from '@/nucleo/checkouts/nomes';
 import { agoraEmBrasilia } from '@/lib/periodo';
 
@@ -38,12 +39,19 @@ export function FormularioDeCampanha() {
    * nova nascer apontando para uma aposta não validada seria trocar o certo
    * pelo talvez sem ninguém ter decidido isso.
    */
-  /*
-    Fixo nas 26 cenas. A campanha continua gravando a coluna `funis` — é o
-    formato que a rota espera e o histórico usa —, só não há mais o que
-    escolher. Ver `ESCOLHA_DE_FUNIL_LIGADA` em `lib/funis.ts`.
-  */
-  const funis: FunilId[] = [FUNIL_PADRAO];
+  const [funil, setFunil] = useState<FunilId>(FUNIL_PADRAO);
+
+  /**
+   * O link fica na tela depois de criar, em vez de a caixa simplesmente
+   * fechar.
+   *
+   * Criar a campanha e ter que caçar o código dela na lista para montar o
+   * link à mão é onde o processo quebrava: quem monta à mão erra o caminho,
+   * esquece o `?c=`, ou publica o anúncio apontando para a raiz. Aqui ele sai
+   * pronto, no mesmo gesto.
+   */
+  const [pronto, setPronto] = useState<string | null>(null);
+  const [copiado, setCopiado] = useState(false);
   /** `null` = segue o padrão do servidor, como toda campanha antiga. */
   const [gateway, setGateway] = useState<NomeDoGateway | null>(null);
 
@@ -57,7 +65,7 @@ export function FormularioDeCampanha() {
       const r = await fetch('/api/painel/campanha', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, funis, gateway }),
+        body: JSON.stringify({ ...form, funis: [funil], gateway }),
       });
       const d = await r.json();
       if (!r.ok) {
@@ -65,14 +73,74 @@ export function FormularioDeCampanha() {
         setSalvando(false);
         return;
       }
-      setAberto(false);
       setSalvando(false);
       setForm((f) => ({ ...f, nome: '', investido: '', nota: '' }));
+      if (d.codigo) {
+        setPronto(linkDaCampanha(window.location.origin, funil, d.codigo));
+      } else {
+        setAberto(false);
+      }
       router.refresh();
     } catch {
       setErro('Falha de rede.');
       setSalvando(false);
     }
+  }
+
+  if (pronto) {
+    return (
+      <div className="w-full rounded-xl border border-vela/40 bg-vela/[0.06] px-5 py-4 flex flex-col gap-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h3 className="font-corpo font-medium text-sm text-pergaminho/85">
+            Campanha criada. O link é este:
+          </h3>
+          <span className="font-corpo text-[11px] text-pergaminho/40">
+            é só este — não precisa de mais nada
+          </span>
+        </div>
+
+        {/*
+          Numa linha só, e selecionável. Quebrado em várias, um copiar-e-colar
+          desavisado leva o espaço junto e a URL chega quebrada no gerenciador
+          — erro que só aparece depois de o anúncio já ter gasto dinheiro.
+        */}
+        <code className="font-mono text-[12px] leading-relaxed text-vela break-all select-all">
+          {pronto}
+        </code>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(pronto);
+                setCopiado(true);
+                setTimeout(() => setCopiado(false), 2000);
+              } catch {
+                // Área de transferência bloqueada: o link está na tela.
+              }
+            }}
+            className="font-corpo text-xs px-4 py-2 rounded-full bg-vela text-tinta font-medium hover:brightness-110 transition"
+          >
+            {copiado ? 'Copiado' : 'Copiar o link'}
+          </button>
+          <button
+            onClick={() => {
+              setPronto(null);
+              setAberto(false);
+            }}
+            className="font-corpo text-xs px-4 py-2 rounded-full border border-pergaminho/20 text-pergaminho/60 hover:text-pergaminho transition"
+          >
+            Fechar
+          </button>
+        </div>
+
+        <p className="font-corpo text-[11px] leading-relaxed text-pergaminho/40">
+          As macros de UTM da Meta continuam valendo e podem ser coladas depois
+          do <code className="font-mono">?c=</code> — quem separa os números
+          desta campanha é o código, e ele já está aí.
+        </p>
+      </div>
+    );
   }
 
   if (!aberto) {
@@ -98,15 +166,8 @@ export function FormularioDeCampanha() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <Campo rotulo="Nome" valor={form.nome} onChange={set('nome')}
           placeholder="Story 07/08 — teste do bilhete" />
-        <div className="sm:col-span-2">
-          {/*
-            O seletor de funis saiu da tela.
-
-            Toda campanha serve as 26 cenas — ver `ESCOLHA_DE_FUNIL_LIGADA` em
-            `lib/funis.ts`. Uma escolha que só tem uma resposta certa não é uma
-            escolha: é uma chance de alguém errar. O componente continua no
-            repositório para o dia em que o teste voltar.
-          */}
+        <div className="sm:col-span-2 flex flex-col gap-4">
+          <EscolhaDoCaminho valor={funil} onChange={setFunil} />
           <EscolhaDeCheckout valor={gateway} onChange={setGateway} />
         </div>
 

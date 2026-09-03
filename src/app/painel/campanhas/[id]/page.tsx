@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { FUNIS, funisDaCampanha, linkDaCampanha } from '@/lib/funis';
+import { LinkDaCampanha } from '@/components/painel/LinkDaCampanha';
 import { notFound, redirect } from 'next/navigation';
 import { sessaoAtual } from '@/lib/sessao-servidor';
 import {
@@ -142,6 +144,12 @@ export default async function RelatorioDaCampanha({
   const horas =
     (new Date(janela.ate).getTime() - new Date(janela.de).getTime()) / 3600_000;
 
+  /*
+    Uma campanha guarda um caminho só. A coluna é uma lista por herança do
+    tempo em que ela sorteava entre funis; o primeiro é o que vale.
+  */
+  const funilDaCampanha = funisDaCampanha(campanha.funis)[0];
+
   return (
     <div className="flex flex-col gap-5 max-w-6xl">
       <header className="flex flex-wrap items-start justify-between gap-4">
@@ -194,6 +202,23 @@ export default async function RelatorioDaCampanha({
             </Link>
           </div>
         </header>
+
+        {/*
+          O link vem do caminho do funil desta campanha mais o código dela —
+          ver `linkDaCampanha`. É o que faz o teste de funil existir: sem
+          endereço próprio, mandar tráfego para outra aposta exigiria trocar o
+          que a raiz serve para todo mundo.
+        */}
+        {campanha.codigo && (
+          <LinkDaCampanha
+            link={linkDaCampanha(
+              process.env.BASE_URL || 'https://bruxario.com.br',
+              funilDaCampanha,
+              campanha.codigo
+            )}
+            nomeDoFunil={FUNIS[funilDaCampanha].nome}
+          />
+        )}
 
         {/*
           Zero aqui quase nunca quer dizer "ninguém veio" — quer dizer "veio

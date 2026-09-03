@@ -2,40 +2,74 @@ import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  ESCOLHA_DE_FUNIL_LIGADA,
   FUNIL_PADRAO,
   FUNIS,
+  caminhoDoFunil,
   funilPorCodigo,
   funisDaCampanha,
+  linkDaCampanha,
   sortearEntre,
 } from './funis';
 
 /**
- * A escolha de funil está desligada, e este arquivo é a trava disso.
- *
- * O teste A/B existia e não provou nada: só as 26 cenas venderam. Enquanto
- * `ESCOLHA_DE_FUNIL_LIGADA` for `false`, toda campanha serve as 26 cenas — e
- * o que quebra essa promessa é justamente o caso silencioso: uma campanha
- * antiga com `atravessar` gravado na coluna continuar servindo `atravessar`
- * para tráfego pago sem ninguém perceber.
+ * O funil de uma campanha vem do que ela guardou; sem nada guardado, as 26
+ * cenas. É o único jeito de uma campanha antiga — criada antes de a coluna
+ * existir — continuar servindo o que sempre serviu.
  */
-describe('com a escolha desligada', () => {
-  test('campanha nenhuma escapa das 26 cenas', () => {
-    assert.equal(ESCOLHA_DE_FUNIL_LIGADA, false);
+describe('o funil da campanha', () => {
+  test('sem nada guardado, as 26 cenas', () => {
     assert.deepEqual(funisDaCampanha(null), [FUNIL_PADRAO]);
-    assert.deepEqual(funisDaCampanha('["atravessar"]'), [FUNIL_PADRAO]);
-    assert.deepEqual(funisDaCampanha('["atravessar","familiar"]'), [FUNIL_PADRAO]);
     assert.deepEqual(funisDaCampanha('lixo que não é json'), [FUNIL_PADRAO]);
+    assert.deepEqual(funisDaCampanha('["inventado"]'), [FUNIL_PADRAO]);
   });
 
-  test('sortear entre os inativos cai no padrão', () => {
-    assert.equal(sortearEntre(['atravessar', 'familiar']), FUNIL_PADRAO);
+  test('o que ela guardou é o que ela serve', () => {
+    assert.deepEqual(funisDaCampanha('["familiar"]'), ['familiar']);
+    assert.deepEqual(funisDaCampanha('["atravessar"]'), ['atravessar']);
+  });
+
+  test('sortear entre uma lista vazia cai no padrão', () => {
     assert.equal(sortearEntre([]), FUNIL_PADRAO);
   });
 
-  test('só as 26 cenas estão ativas', () => {
+  test('os três estão ativos', () => {
     const ativos = Object.values(FUNIS).filter((f) => f.ativo).map((f) => f.id);
-    assert.deepEqual(ativos, [FUNIL_PADRAO]);
+    assert.deepEqual(ativos.sort(), ['atravessar', 'familiar', 'padrao']);
+  });
+});
+
+/**
+ * O link publicável — o que o painel entrega pronto para colar no anúncio.
+ *
+ * É aqui que o teste de funil deixa de ser teoria: sem um endereço próprio, a
+ * única forma de mandar tráfego para outra aposta seria trocar o que a raiz
+ * serve para todo mundo.
+ */
+describe('o link da campanha', () => {
+  test('as 26 cenas ficam na raiz, sem barra sobrando', () => {
+    assert.equal(caminhoDoFunil('padrao'), '/');
+    assert.equal(
+      linkDaCampanha('https://bruxario.com.br', 'padrao', 'a5'),
+      'https://bruxario.com.br?c=a5'
+    );
+  });
+
+  test('cada aposta tem o endereço dela', () => {
+    assert.equal(
+      linkDaCampanha('https://bruxario.com.br', 'familiar', 'a5'),
+      'https://bruxario.com.br/familiar?c=a5'
+    );
+    assert.equal(
+      linkDaCampanha('https://bruxario.com.br', 'atravessar', 'a6'),
+      'https://bruxario.com.br/atravessar?c=a6'
+    );
+  });
+
+  test('a barra do fim da base não vira barra dupla', () => {
+    assert.equal(
+      linkDaCampanha('https://bruxario.com.br/', 'familiar', 'a5'),
+      'https://bruxario.com.br/familiar?c=a5'
+    );
   });
 });
 

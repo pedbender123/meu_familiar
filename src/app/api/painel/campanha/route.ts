@@ -3,6 +3,7 @@ import { exigirEdicaoNoPainel } from '@/lib/guarda-painel';
 import {
   apagarCampanha,
   atualizarCampanha,
+  buscarCampanha,
   criarCampanha,
 } from '@/lib/campanhas';
 import { deLocalParaUtc } from '@/lib/periodo';
@@ -84,7 +85,14 @@ export async function POST(req: NextRequest) {
     nota: String(c.nota ?? '').trim().slice(0, 500) || null,
   });
 
-  return NextResponse.json({ ok: true, id });
+  /*
+    O código volta junto: é ele que forma o link do anúncio, e quem acabou de
+    criar a campanha está exatamente no momento de copiá-lo. Sem isto, a tela
+    teria que recarregar a lista e caçar a campanha nova para descobrir duas
+    letras que o servidor já tinha na mão.
+  */
+  const criada = buscarCampanha(id);
+  return NextResponse.json({ ok: true, id, codigo: criada?.codigo ?? null });
 }
 
 export async function PATCH(req: NextRequest) {
