@@ -51,12 +51,15 @@ interface PixGerado {
 export function CheckoutCaktoPix({
   pedidoId,
   valorEmReais,
+  bumps = [],
   nome,
   cpf,
   base = 'pedido',
 }: {
   pedidoId: string;
   valorEmReais: number;
+  /** Ids dos ebooks marcados. O preço deles é somado no servidor. */
+  bumps?: string[];
   nome: string;
   cpf: string | null;
   /**
@@ -115,6 +118,8 @@ export function CheckoutCaktoPix({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          // Só os ids: o preço é somado no servidor, contra o catálogo.
+          bumps,
           cakto: {
             metodo: 'pix',
             nome,

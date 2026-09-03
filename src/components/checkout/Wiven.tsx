@@ -69,6 +69,7 @@ export function CheckoutWiven({
   pedidoId,
   meio,
   valorEmReais,
+  bumps = [],
   nome,
   cpf,
   itens,
@@ -78,6 +79,8 @@ export function CheckoutWiven({
   pedidoId: string;
   meio: 'pix' | 'cartao';
   valorEmReais: number;
+  /** Ids dos ebooks marcados. O preço deles é somado no servidor. */
+  bumps?: string[];
   nome: string;
   cpf: string | null;
   itens?: string[];
@@ -209,6 +212,8 @@ export function CheckoutWiven({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           utm: utmsDaSessao(),
+          // Só os ids: o preço é somado no servidor, contra o catálogo.
+          bumps,
           wiven: {
             meio,
             nome,

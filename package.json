@@ -29,6 +29,7 @@
     "assinaturas": "tsx scripts/assinaturas.ts",
     "religar-utmify": "tsx scripts/religar-utmify.ts",
     "limpar-campanhas": "tsx scripts/limpar-campanhas.ts",
+    "extrair-ebook": "tsx scripts/extrair-ebook.ts",
     "convite-planos": "tsx scripts/convite-dos-planos.ts",
     "acesso-gratis": "tsx scripts/acesso-gratis.ts",
     "dia-de-ouro": "tsx scripts/dia-de-ouro.ts",

@@ -560,6 +560,16 @@ export const MARCOS = [
    */
   'checkout_pix',
   'checkout_cartao',
+  /**
+   * Os ebooks somados no checkout.
+   *
+   * Os dois, e não só o marcado: marcar muito e pagar pouco é preço; marcar e
+   * DESMARCAR é a oferta não sobrevivendo ao segundo pensamento — e as duas
+   * pedem correções opostas. Contar só o `marcado` faria a segunda parecer a
+   * primeira.
+   */
+  'bump_marcado',
+  'bump_desmarcado',
   'pagamento_tentado',
   /**
    * Os passos do funil longo (`/familiar`), um por tela.

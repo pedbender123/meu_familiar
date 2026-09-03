@@ -66,6 +66,7 @@ export function CheckoutMercadoPago({
   pedidoId,
   chavePublica,
   valorEmReais,
+  bumps = [],
   nomeProduto,
   cupom,
   modo,
@@ -97,6 +98,8 @@ export function CheckoutMercadoPago({
   pedidoId: string;
   chavePublica: string;
   valorEmReais: number;
+  /** Ids dos ebooks marcados. O preço deles é somado no servidor. */
+  bumps?: string[];
   nomeProduto: string;
   /** Sete dos doze familiares são femininos — o texto precisa concordar. */
   generoDoFamiliar?: 'm' | 'f';
@@ -216,7 +219,8 @@ export function CheckoutMercadoPago({
                 // A origem vai junto: o pedido já nasce com ela, mas quem
                 // chegou por um link antigo, ou apagou o armazenamento no
                 // meio do caminho, ainda tem esta segunda chance.
-                body: JSON.stringify({ formData, utm: utmsDaSessao() }),
+                // Só os ids: o preço é somado no servidor, contra o catálogo.
+                body: JSON.stringify({ formData, utm: utmsDaSessao(), bumps }),
               });
               const dados = await resposta.json();
 

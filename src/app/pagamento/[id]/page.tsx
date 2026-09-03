@@ -9,6 +9,7 @@ import { gatewayConferido } from '@/nucleo/checkouts/gateway';
 import { PagamentoFake } from '@/components/PagamentoFake';
 import { MarcoDoCheckout } from '@/components/MarcoDoCheckout';
 import { FAMILIARES, type FamiliarId } from '@/lib/familiares';
+import { ebooksParaCheckout } from '@/nucleo/biblioteca/catalogo';
 
 /**
  * Server component de propósito: o preço é lido do produto no servidor, não
@@ -75,6 +76,11 @@ export default async function Pagamento({
           cpf={pedido.cpf}
           gatewayPix={gatewayPix}
           gatewayCartao={gatewayCartao}
+          /*
+            Lido a cada visita, não no build: a promessa do `LEIA-ME.md` é que
+            largar o PDF na pasta faz o livro aparecer sozinho.
+          */
+          ebooks={ebooksParaCheckout()}
         />
       )}
     </main>

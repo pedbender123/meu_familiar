@@ -6,6 +6,7 @@ import { CheckoutMercadoPago } from './MercadoPago';
 import { CheckoutCaktoPix } from './Cakto';
 import { CheckoutWiven } from './Wiven';
 import { marcar } from '@/lib/marcar';
+import { OrderBumps, type EbookDoCheckout } from './OrderBumps';
 
 /**
  * A tela de pagamento: escolhe o meio, e só então o gateway daquele meio.
@@ -57,6 +58,7 @@ export function Checkout({
   somenteCartao = false,
   caminho = 'pagamento',
   destino,
+  ebooks = [],
 }: {
   pedidoId: string;
   chavePublica: string;
@@ -86,9 +88,44 @@ export function Checkout({
   somenteCartao?: boolean;
   caminho?: 'pagamento' | 'melhorar';
   destino?: string;
+  /**
+   * Os ebooks que podem ser somados a este pedido.
+   *
+   * Vem do servidor já filtrado por `ebooksAVenda()` — livro sem PDF em disco
+   * não chega aqui, então não há como marcar o que não pode ser entregue.
+   * Vazio esconde a seção inteira.
+   */
+  ebooks?: EbookDoCheckout[];
 }) {
   const [meio, setMeio] = useState<MeioEscolhido>(somenteCartao ? 'cartao' : 'pix');
   const gatewayDoMeio = meio === 'pix' ? gatewayPix : gatewayCartao;
+
+  const [marcados, setMarcados] = useState<string[]>([]);
+
+  /**
+   * O total que a tela mostra e que o servidor vai cobrar.
+   *
+   * Os dois números saem da mesma lista de ids: aqui somando os preços que o
+   * servidor mandou para desenhar, lá somando os mesmos preços a partir do
+   * catálogo. O que não pode acontecer é a tela mostrar um valor e o cartão
+   * ser debitado por outro — por isso o preço não viaja no POST, só o id.
+   */
+  const extrasCentavos = ebooks
+    .filter((e) => marcados.includes(e.id))
+    .reduce((s, e) => s + e.precoCentavos, 0);
+  const totalEmReais = valorEmReais + extrasCentavos / 100;
+
+  function alternarBump(id: string) {
+    setMarcados((atuais) =>
+      atuais.includes(id) ? atuais.filter((v) => v !== id) : [...atuais, id]
+    );
+    /*
+      Marcar e desmarcar são leituras diferentes do funil: muito marcado e
+      pouco pago é preço; muito desmarcado é a oferta não convencendo depois
+      de a pessoa pensar.
+    */
+    marcar(marcados.includes(id) ? 'bump_desmarcado' : 'bump_marcado');
+  }
 
   function escolher(novo: MeioEscolhido) {
     if (novo === meio) return;
@@ -138,6 +175,15 @@ export function Checkout({
         8px de deslocamento fazem o bloco novo *chegar* em vez de aparecer.
         Quem pediu menos movimento no sistema não recebe nenhum.
       */}
+      {/*
+        Os ebooks vêm ANTES do formulário de pagamento.
+
+        Depois do botão de pagar ninguém lê — a pessoa já está com o dedo no
+        caminho de sair. Antes do formulário ela ainda está decidindo, e a
+        caixinha é a última coisa entre a decisão e o cartão.
+      */}
+      <OrderBumps ebooks={ebooks} marcados={marcados} aoMarcar={alternarBump} />
+
       <div key={`painel-${meio}`} className="painel-do-checkout">
       {/*
         A tabela de despacho. Um gateway novo é uma linha aqui e uma no
@@ -149,7 +195,8 @@ export function Checkout({
           key={`wiven-${meio}`}
           pedidoId={pedidoId}
           meio={meio}
-          valorEmReais={valorEmReais}
+          valorEmReais={totalEmReais}
+          bumps={marcados}
           nome={nome}
           cpf={cpf}
           itens={itens}
@@ -160,7 +207,8 @@ export function Checkout({
         <CheckoutCaktoPix
           key="pix-cakto"
           pedidoId={pedidoId}
-          valorEmReais={valorEmReais}
+          valorEmReais={totalEmReais}
+          bumps={marcados}
           nome={nome}
           cpf={cpf}
           base={base}
@@ -171,7 +219,8 @@ export function Checkout({
           meios={[meio]}
           pedidoId={pedidoId}
           chavePublica={chavePublica}
-          valorEmReais={valorEmReais}
+          valorEmReais={totalEmReais}
+          bumps={marcados}
           nomeProduto={nomeProduto}
           generoDoFamiliar={generoDoFamiliar}
           itens={itens}

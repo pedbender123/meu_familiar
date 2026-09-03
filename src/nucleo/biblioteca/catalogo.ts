@@ -143,6 +143,31 @@ export function ebooksAVenda(): Ebook[] {
 }
 
 /**
+ * O que o checkout precisa saber para desenhar os bumps.
+ *
+ * O preço vai junto **para desenhar**, não para cobrar: o navegador mostra
+ * este número e devolve só o id. Quem soma o que será debitado é
+ * `somaDosBumps`, aqui no servidor.
+ *
+ * `capa: null` quando o arquivo não chegou — o livro vende sem imagem.
+ */
+export function ebooksParaCheckout(): {
+  id: string;
+  titulo: string;
+  promessa: string;
+  precoCentavos: number;
+  capa: string | null;
+}[] {
+  return ebooksAVenda().map((e) => ({
+    id: e.id,
+    titulo: e.titulo,
+    promessa: e.promessa,
+    precoCentavos: e.precoCentavos,
+    capa: fs.existsSync(caminhoDaCapa(e)) ? `/api/biblioteca/${e.id}/capa` : null,
+  }));
+}
+
+/**
  * O preço de uma lista de ids, ignorando o que não existe ou não é entregável.
  *
  * É a única função que soma dinheiro de bump, e ela é usada tanto pela tela
