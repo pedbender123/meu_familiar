@@ -1,6 +1,6 @@
 import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { lerLivro } from './formato';
+import { lerLivro, paginarCapitulo } from './formato';
 
 /**
  * O parser do livro precisa aguentar texto escrito por gente — e por modelo
@@ -125,5 +125,71 @@ describe('o que o parser aguenta sem quebrar', () => {
   test('`som:` só vale antes do texto do capítulo', () => {
     const livro = lerLivro('## Cap\n\nUm texto qualquer.\n\nsom: outro-som\n');
     assert.equal(livro.modulos[0].capitulos[0].som, null);
+  });
+});
+
+describe('as páginas dentro do capítulo', () => {
+  function capituloCom(...tamanhos: { tipo: 'texto' | 'pratica'; palavras: number }[]) {
+    return {
+      titulo: 'Cap',
+      som: null,
+      minutos: 0,
+      blocos: tamanhos.map((t) => ({
+        tipo: t.tipo,
+        paragrafos: [Array.from({ length: t.palavras }, () => 'palavra').join(' ')],
+      })),
+    };
+  }
+
+  /**
+   * Parágrafo cortado ao meio pela virada de página é o defeito mais visível
+   * que um leitor digital pode ter — e prática partida é instrução que
+   * ninguém executa direito.
+   */
+  test('nenhum bloco é partido entre páginas', () => {
+    const paginas = paginarCapitulo(capituloCom(
+      { tipo: 'texto', palavras: 200 },
+      { tipo: 'texto', palavras: 200 },
+      { tipo: 'texto', palavras: 200 }
+    ), 290);
+
+    const total = paginas.reduce((s, p) => s + p.blocos.length, 0);
+    assert.equal(total, 3, 'os três blocos continuam inteiros');
+    assert.ok(paginas.length > 1, 'e couberam em mais de uma folha');
+  });
+
+  /** A virada de página vira o convite para parar e fazer. */
+  test('a prática fecha a página', () => {
+    const paginas = paginarCapitulo(capituloCom(
+      { tipo: 'texto', palavras: 50 },
+      { tipo: 'pratica', palavras: 40 },
+      { tipo: 'texto', palavras: 50 }
+    ), 290);
+
+    assert.equal(paginas.length, 2);
+    assert.equal(paginas[0].blocos[1].tipo, 'pratica', 'a prática é o fim da primeira');
+    assert.equal(paginas[1].blocos[0].tipo, 'texto');
+  });
+
+  /**
+   * Bloco maior que a folha inteira ocupa uma página sozinho. Melhor uma
+   * folha longa que uma folha em branco antes dela.
+   */
+  test('bloco gigante não gera página vazia', () => {
+    const paginas = paginarCapitulo(capituloCom({ tipo: 'texto', palavras: 900 }), 290);
+    assert.equal(paginas.length, 1);
+    assert.equal(paginas[0].blocos.length, 1);
+  });
+
+  test('capítulo curto continua sendo uma página só', () => {
+    const paginas = paginarCapitulo(capituloCom({ tipo: 'texto', palavras: 80 }), 290);
+    assert.equal(paginas.length, 1);
+  });
+
+  /** Capítulo vazio ainda precisa ser navegável, não sumir. */
+  test('capítulo sem texto vira uma página em branco', () => {
+    const paginas = paginarCapitulo(capituloCom(), 290);
+    assert.equal(paginas.length, 1);
+    assert.deepEqual(paginas[0].blocos, []);
   });
 });

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight, Volume2, VolumeX } from 'lucide-react';
 import { FolhaPergaminho } from '@/components/FolhaPergaminho';
-import type { LivroLido } from '@/nucleo/biblioteca/formato';
+import { paginarCapitulo, type LivroLido } from '@/nucleo/biblioteca/formato';
 
 /**
  * O modo de leitura — um livro apoiado na mesa, não uma página de site.
@@ -49,15 +49,33 @@ export function Leitor({
   titulo: string;
   livro: LivroLido;
 }) {
+  /**
+   * A linha reta da leitura: uma entrada por PÁGINA, não por capítulo.
+   *
+   * ── Por que o capítulo virou várias folhas ──────────────────────────────
+   *
+   * Um capítulo de mil palavras numa folha só transforma o pergaminho em rolo,
+   * e o efeito de estar lendo um livro — que é a razão do desenho inteiro —
+   * desaparece na terceira tela de rolagem.
+   *
+   * Paginando, "próximo" vira virar a página, e a última página do capítulo
+   * cai naturalmente no capítulo seguinte. A pessoa nunca precisa saber que
+   * existe uma fronteira entre as duas coisas.
+   */
   const plano = useMemo(
     () =>
       livro.modulos.flatMap((m, mi) =>
-        m.capitulos.map((c, ci) => ({
-          modulo: m,
-          moduloIndice: mi,
-          capitulo: c,
-          capituloIndice: ci,
-        }))
+        m.capitulos.flatMap((c, ci) =>
+          paginarCapitulo(c).map((pagina, pi, todas) => ({
+            modulo: m,
+            moduloIndice: mi,
+            capitulo: c,
+            capituloIndice: ci,
+            pagina,
+            paginaIndice: pi,
+            paginasDoCapitulo: todas.length,
+          }))
+        )
       ),
     [livro]
   );
@@ -170,7 +188,20 @@ export function Leitor({
         */}
         <nav
           aria-label="Módulos"
-          className="absolute z-20 left-[-14px] sm:left-[-26px] top-10 flex flex-col gap-2"
+          /*
+            ── Elas acompanham a rolagem ─────────────────────────────────────
+
+            Antes eram `absolute` no topo do papel: sumiam na primeira rolagem
+            e reapareciam no fim, e essa ausência é o tipo de coisa que a
+            pessoa sente antes de saber o que é — ela percebe que tem algo
+            estranho ali sem conseguir nomear.
+
+            Fita de livro não fica numa altura do papel; fica na lateral, na
+            sua mão, o tempo todo. `fixed` ancorado à esquerda da tela é o
+            equivalente disso — a fita continua ali enquanto a folha corre por
+            baixo.
+          */
+          className="fixed z-20 left-0 top-1/2 -translate-y-1/2 flex flex-col gap-2.5"
         >
           {livro.modulos.map((m, i) => {
             const ativo = i === atual.moduloIndice;
@@ -180,17 +211,36 @@ export function Leitor({
                 onClick={() => setFitasAbertas((v) => !v)}
                 aria-label={`Módulos — ${m.titulo}`}
                 aria-expanded={fitasAbertas}
-                className="fita-do-modulo block rounded-l-[2px] transition-all duration-300"
+                className="fita-do-modulo group relative block rounded-r-[3px] transition-all duration-300 hover:!w-[54px]"
                 style={{
-                  width: ativo ? 26 : 18,
-                  height: 7,
+                  /*
+                    Maiores do que eram: 7px de altura por 18 de largura era
+                    quase invisível — a pessoa não achava o que clicar. Agora a
+                    fita tem espessura de fita, e a ativa avança mais para
+                    fora, como a que ficou marcando a página onde se parou.
+                  */
+                  width: ativo ? 44 : 30,
+                  height: 13,
                   background: corDoModulo(i),
-                  opacity: ativo ? 1 : 0.5,
-                  // A fita ativa "sai" um pouco mais do livro, como a que se
-                  // deixou marcando a página em que se parou.
-                  boxShadow: ativo ? `0 1px 6px ${corDoModulo(i)}66` : 'none',
+                  opacity: ativo ? 1 : 0.62,
+                  boxShadow: ativo
+                    ? `0 2px 10px ${corDoModulo(i)}88, inset -1px 0 0 rgba(255,255,255,0.18)`
+                    : 'inset -1px 0 0 rgba(255,255,255,0.10)',
                 }}
-              />
+              >
+                {/*
+                  O corte em V na ponta, que é o que faz uma tira de tecido
+                  parecer fita e não retângulo. Não serve para nada.
+                */}
+                <span
+                  aria-hidden="true"
+                  className="absolute right-0 top-0 h-full w-[7px]"
+                  style={{
+                    background: 'var(--tinta)',
+                    clipPath: 'polygon(100% 0, 0 50%, 100% 100%)',
+                  }}
+                />
+              </button>
             );
           })}
         </nav>
@@ -228,10 +278,16 @@ export function Leitor({
                     style={{ background: 'rgba(24,19,32,0.96)' }}
                   >
                     {m.capitulos.map((c, ci) => {
+                      // A primeira folha do capítulo: é para onde o sumário
+                      // leva, nunca para o meio dele.
                       const indice = plano.findIndex(
-                        (p) => p.moduloIndice === mi && p.capituloIndice === ci
+                        (p) =>
+                          p.moduloIndice === mi &&
+                          p.capituloIndice === ci &&
+                          p.paginaIndice === 0
                       );
-                      const aqui = indice === posicao;
+                      const aqui =
+                        atual.moduloIndice === mi && atual.capituloIndice === ci;
                       return (
                         <li key={c.titulo}>
                           <button
@@ -261,26 +317,45 @@ export function Leitor({
             Tudo daqui para baixo é grimório: mesma tinta, mesma tipografia da
             revelação. Nenhum botão vive aqui dentro.
           */}
-          <span
-            className="font-corpo text-[0.6rem] tracking-[0.22em] uppercase"
-            style={{ color: cor }}
-          >
-            {atual.modulo.titulo}
-          </span>
+          {/*
+            O título abre o capítulo e não se repete nas folhas seguintes —
+            como num livro impresso, onde ele aparece na página de abertura e
+            some. Repetir a cada folha diria "cada página é um começo", que é
+            o contrário do que uma leitura contínua deve sentir.
+          */}
+          {atual.paginaIndice === 0 ? (
+            <>
+              <span
+                className="font-corpo text-[0.6rem] tracking-[0.22em] uppercase"
+                style={{ color: cor }}
+              >
+                {atual.modulo.titulo}
+              </span>
 
-          <h1 className="font-display italic text-[1.6rem] sm:text-[2rem] leading-tight text-center text-escrita text-balance max-w-[24ch]">
-            {atual.capitulo.titulo}
-          </h1>
+              <h1 className="font-display italic text-[1.6rem] sm:text-[2rem] leading-tight text-center text-escrita text-balance max-w-[24ch]">
+                {atual.capitulo.titulo}
+              </h1>
 
-          {/* O filete que separa o título do corpo, como num livro impresso. */}
-          <span
-            aria-hidden="true"
-            className="block h-px w-16"
-            style={{ background: `linear-gradient(90deg, transparent, ${cor}88, transparent)` }}
-          />
+              {/* O filete que separa o título do corpo, como num livro impresso. */}
+              <span
+                aria-hidden="true"
+                className="block h-px w-16"
+                style={{ background: `linear-gradient(90deg, transparent, ${cor}88, transparent)` }}
+              />
+            </>
+          ) : (
+            /*
+              Nas folhas seguintes, só a cabeça de página: o título do capítulo
+              pequeno e apagado, do jeito que livro impresso faz. É o que diz
+              "você ainda está no mesmo capítulo" sem ocupar a folha.
+            */
+            <span className="font-corpo text-[0.62rem] tracking-[0.14em] uppercase text-escrita-fraca/50 self-center">
+              {atual.capitulo.titulo}
+            </span>
+          )}
 
           <div className="w-full flex flex-col gap-5 max-w-[46ch]">
-            {atual.capitulo.blocos.map((bloco, i) =>
+            {atual.pagina.blocos.map((bloco, i) =>
               bloco.tipo === 'pratica' ? (
                 /*
                   A prática é a margem do livro: recuo, filete na cor do
@@ -329,7 +404,9 @@ export function Leitor({
             em vez de uma tela com texto.
           */}
           <span className="font-corpo text-[0.68rem] tabular-nums text-escrita-fraca/60 mt-3">
-            {posicao + 1} / {plano.length}
+            {atual.paginasDoCapitulo > 1
+              ? `${atual.paginaIndice + 1} de ${atual.paginasDoCapitulo} · ${posicao + 1}/${plano.length}`
+              : `${posicao + 1} / ${plano.length}`}
           </span>
         </FolhaPergaminho>
       </div>
@@ -345,7 +422,7 @@ export function Leitor({
         </button>
 
         <span className="font-corpo text-[0.7rem] text-pergaminho/25 tabular-nums">
-          {atual.capitulo.minutos} min
+          {atual.pagina.minutos} min
         </span>
 
         {posicao === plano.length - 1 ? (

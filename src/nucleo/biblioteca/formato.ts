@@ -217,3 +217,85 @@ export function lerLivro(markdown: string): LivroLido {
 
   return { meta, modulos, palavras, minutos: minutosDe(palavras) };
 }
+
+/* ── páginas dentro do capítulo ───────────────────────────────────────────*/
+
+/**
+ * Quantas palavras cabem numa folha antes de ela virar rolagem.
+ *
+ * ── De onde sai o número ──────────────────────────────────────────────────
+ *
+ * Não é arbitrário: é o que preenche a folha de pergaminho na largura em que
+ * ela é lida (46ch) sem passar de uma tela e meia no celular. Acima disso o
+ * papiro deixa de ser uma folha e vira um rolo, e o efeito de estar lendo um
+ * livro — que é a razão de todo o desenho — desaparece.
+ *
+ * Um livro impresso de bolso tem entre 250 e 300 palavras por página. Estamos
+ * no mesmo lugar, e não por coincidência.
+ */
+export const PALAVRAS_POR_PAGINA = 290;
+
+export interface PaginaDoCapitulo {
+  blocos: Bloco[];
+  minutos: number;
+}
+
+/**
+ * Quebra um capítulo em páginas, sem partir bloco nenhum.
+ *
+ * ── Por que o bloco nunca se parte ────────────────────────────────────────
+ *
+ * Um parágrafo cortado ao meio pela virada de página é o defeito mais visível
+ * que um leitor digital pode ter, e a prática partida é pior: ela é uma
+ * instrução, e instrução dividida em duas telas é instrução que ninguém
+ * executa direito.
+ *
+ * O preço é a página irregular — uma com 210 palavras, a seguinte com 340.
+ * Livro impresso resolve isso com entrelinha e hifenização; aqui a folha tem
+ * altura variável e ninguém percebe. É a troca certa.
+ *
+ * ── A prática fecha a página quando dá ────────────────────────────────────
+ *
+ * Ela é o ponto em que a pessoa deve parar de ler e fazer. Deixá-la no fim da
+ * folha é usar a virada de página como o próprio convite para parar — o mesmo
+ * truque que um livro bem paginado usa para terminar o capítulo numa frase
+ * que dá vontade de continuar.
+ */
+export function paginarCapitulo(
+  capitulo: CapituloDoLivro,
+  palavrasPorPagina = PALAVRAS_POR_PAGINA
+): PaginaDoCapitulo[] {
+  const paginas: PaginaDoCapitulo[] = [];
+  let atual: Bloco[] = [];
+  let palavras = 0;
+
+  const fechar = () => {
+    if (atual.length === 0) return;
+    paginas.push({ blocos: atual, minutos: minutosDe(palavras) });
+    atual = [];
+    palavras = 0;
+  };
+
+  for (const bloco of capitulo.blocos) {
+    const doBloco = contarPalavras(bloco.paragrafos);
+
+    /*
+      Cabe? Entra. Não cabe e a página já tem coisa? Vira página nova.
+
+      A checagem `atual.length > 0` é o que impede um bloco maior que a folha
+      inteira de gerar uma página vazia antes dele. Bloco gigante ocupa uma
+      página sozinho, e tudo bem — melhor uma folha longa que uma em branco.
+    */
+    if (palavras > 0 && palavras + doBloco > palavrasPorPagina) fechar();
+
+    atual.push(bloco);
+    palavras += doBloco;
+
+    // A prática encerra a folha: ela é o convite para parar e fazer.
+    if (bloco.tipo === 'pratica') fechar();
+  }
+  fechar();
+
+  // Capítulo sem texto nenhum ainda é uma página — em branco, mas navegável.
+  return paginas.length > 0 ? paginas : [{ blocos: [], minutos: 0 }];
+}
