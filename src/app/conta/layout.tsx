@@ -4,11 +4,8 @@ import { buscarConta } from '@/lib/autenticacao';
 import { direitosEfetivos } from '@/nucleo/acesso';
 import { SEM_DIREITOS } from '@/nucleo/direitos';
 import { PoeiraNaLuz } from '@/components/PoeiraNaLuz';
-import {
-  NavegacaoDaPlataforma,
-  type ItemDeNavegacao,
-} from '@/plataforma/NavegacaoDaPlataforma';
-import { Tocador } from '@/plataforma/Tocador';
+import { type ItemDeNavegacao } from '@/plataforma/NavegacaoDaPlataforma';
+import { CascaDaConta } from '@/plataforma/CascaDaConta';
 import { trilhasNoAr } from '@/nucleo/trilhas/servidor';
 import { assinaturaPagaAtiva } from '@/nucleo/assinaturas';
 
@@ -88,34 +85,22 @@ export default async function LayoutDaConta({
   return (
     <>
       <PoeiraNaLuz />
-      <div className="quarto-de-vela relative z-10 flex-1 flex flex-col lg:pl-56">
-        <NavegacaoDaPlataforma itens={itens} email={sessao.email} />
-        {/*
-          `pb-24` no celular abre espaço para a barra inferior fixa não cobrir
-          o fim do conteúdo — sem isso o último parágrafo de toda página fica
-          escondido atrás dela.
-        */}
-        <main className="w-full flex-1 flex flex-col items-center px-5 pb-24 lg:pb-16 lg:pt-8">
-          {children}
-        </main>
-      </div>
 
       {/*
-        O tocador mora no LAYOUT, e não em cada página.
+        A casca decide sozinha quando desaparecer: na leitura de um livro o
+        menu some e a folha ocupa a tela. Ver `plataforma/modo-leitura.ts`.
 
-        É o que faz a trilha atravessar a navegação: escolheu chuva na
-        revelação, continua chovendo no Oráculo e dentro do livro. Se ele
-        vivesse na página, cada clique no menu recomeçaria o áudio do zero —
-        que é a diferença entre uma plataforma com som e um site que toca
-        música na sua cara.
-
-        A lista vem do disco (`trilhasNoAr`): faixa anunciada e sem arquivo é
-        promessa quebrada no clique. Ver `nucleo/trilhas/catalogo.ts`.
+        A lista de trilhas vem do disco (`trilhasNoAr`) — faixa anunciada e sem
+        arquivo é promessa quebrada no clique.
       */}
-      <Tocador
+      <CascaDaConta
+        itens={itens}
+        email={sessao.email}
         trilhas={trilhasNoAr()}
         assinaturaAtiva={conta ? assinaturaPagaAtiva(conta.id) : false}
-      />
+      >
+        {children}
+      </CascaDaConta>
     </>
   );
 }

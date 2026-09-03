@@ -330,3 +330,27 @@ body {
   from { opacity: 0; transform: translateX(-18px) rotate(-1.5deg); }
   to   { opacity: 1; transform: translateX(0) rotate(0deg); }
 }
+
+/* ── o nome da faixa passando, no rádio ────────────────────────────────────
+
+   Vai e volta em vez de rolar em loop infinito: a marquise clássica precisa
+   do texto duplicado para não deixar buraco, e para um nome de três palavras
+   isso é maquinário demais. O vaivém diz a mesma coisa — "não coube" — com
+   uma linha de CSS, e a pausa nas pontas é o que dá tempo de ler.
+
+   `prefers-reduced-motion` já desliga isto pela regra global lá em cima. */
+.trilha-passando {
+  animation: trilhaVaiVem 9s ease-in-out infinite;
+}
+
+@keyframes trilhaVaiVem {
+  0%, 12% {
+    transform: translateX(0);
+  }
+  48%, 60% {
+    transform: translateX(calc(-100% + 9.5rem));
+  }
+  96%, 100% {
+    transform: translateX(0);
+  }
+}

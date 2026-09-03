@@ -37,11 +37,25 @@ export interface EstadoDaTrilha {
   tocando: boolean;
   /** 0 a 1. */
   volume: number;
+  /**
+   * O rádio está à mostra?
+   *
+   * **Não é guardado de propósito.** O padrão é escondido, em toda visita: o
+   * tocador é uma coisa que a pessoa chama quando quer, não um painel que
+   * ocupa canto de tela para sempre. Guardar "estava aberto ontem" faria dele
+   * exatamente o que ele deixou de ser.
+   */
+  aberto: boolean;
 }
 
 const VOLUME_PADRAO = 0.45;
 
-let estado: EstadoDaTrilha = { id: null, tocando: false, volume: VOLUME_PADRAO };
+let estado: EstadoDaTrilha = {
+  id: null,
+  tocando: false,
+  volume: VOLUME_PADRAO,
+  aberto: false,
+};
 let hidratado = false;
 
 function lerGuardado(): void {
@@ -53,7 +67,8 @@ function lerGuardado(): void {
     estado = {
       id: id || null,
       tocando: false,
-      volume: Number.isFinite(volume) && volume > 0 && volume <= 1 ? volume : VOLUME_PADRAO,
+      volume: Number.isFinite(volume) && volume >= 0 && volume <= 1 ? volume : VOLUME_PADRAO,
+      aberto: false,
     };
   } catch {
     // Navegador com armazenamento bloqueado: o tocador funciona igual, só não
@@ -68,7 +83,7 @@ export function estadoDaTrilha(): EstadoDaTrilha {
 
 /** O valor do servidor, para `useSyncExternalStore` não divergir na hidratação. */
 export function estadoDaTrilhaNoServidor(): EstadoDaTrilha {
-  return { id: null, tocando: false, volume: VOLUME_PADRAO };
+  return { id: null, tocando: false, volume: VOLUME_PADRAO, aberto: false };
 }
 
 export function assinarTrilha(ouvinte: () => void): () => void {
@@ -81,7 +96,12 @@ function mudar(novo: Partial<EstadoDaTrilha>): void {
   lerGuardado();
   const anterior = estado;
   estado = { ...estado, ...novo };
-  if (estado.id === anterior.id && estado.tocando === anterior.tocando && estado.volume === anterior.volume) {
+  if (
+    estado.id === anterior.id &&
+    estado.tocando === anterior.tocando &&
+    estado.volume === anterior.volume &&
+    estado.aberto === anterior.aberto
+  ) {
     return;
   }
 
@@ -112,6 +132,43 @@ export function alternarTrilha(id: string): void {
 
 export function definirVolumeDaTrilha(volume: number): void {
   mudar({ volume: Math.min(1, Math.max(0, volume)) });
+}
+
+/* ── o rádio ─────────────────────────────────────────────────────────────
+   Abrir e fechar não mexe no som: quem fecha o rádio com música tocando
+   quer sumir com o controle, não com a trilha. É a diferença entre esconder
+   o aparelho e desligá-lo. */
+
+export function abrirRadio(): void {
+  mudar({ aberto: true });
+}
+
+export function fecharRadio(): void {
+  mudar({ aberto: false });
+}
+
+export function alternarRadio(): void {
+  mudar({ aberto: !estadoDaTrilha().aberto });
+}
+
+/**
+ * A próxima faixa da lista, em roda.
+ *
+ * `disponiveis` vem de quem chama porque só o tocador sabe quais faixas a
+ * pessoa pode ouvir — este módulo não conhece assinatura nem disco. Em roda
+ * porque um rádio que acaba não é um rádio.
+ */
+export function passarTrilha(disponiveis: string[], sentido: 1 | -1): void {
+  if (disponiveis.length === 0) return;
+
+  const atual = estadoDaTrilha();
+  const onde = atual.id ? disponiveis.indexOf(atual.id) : -1;
+  const proxima =
+    disponiveis[(onde + sentido + disponiveis.length * 2) % disponiveis.length];
+
+  // Trocar de faixa é um gesto de quem quer ouvir: sai tocando, mesmo que o
+  // rádio estivesse pausado. É o botão de avançar de qualquer aparelho.
+  mudar({ id: proxima, tocando: true });
 }
 
 /**

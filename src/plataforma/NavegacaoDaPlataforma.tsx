@@ -2,7 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useSyncExternalStore } from 'react';
 import type { ItemDeMenu } from '@/nucleo/modulos';
+import {
+  alternarRadio,
+  assinarTrilha,
+  estadoDaTrilha,
+  estadoDaTrilhaNoServidor,
+} from '@/lib/trilha';
 
 /**
  * A navegação da plataforma (Fase 5 de docs/reestruturacao.md).
@@ -79,6 +86,77 @@ function Icone({ nome }: { nome: ItemDeNavegacao['icone'] }) {
   );
 }
 
+/**
+ * O botão que chama o rádio.
+ *
+ * ── Por que ele mora no menu ──────────────────────────────────────────────
+ *
+ * Porque o rádio deixou de ficar solto num canto da tela. Ele era uma
+ * pastilha fixa que, no celular, caía exatamente em cima da barra de
+ * navegação e tapava dois botões — o controle de uma coisa opcional ocupando
+ * o lugar de como se anda pelo produto. Agora ele nasce escondido e é chamado
+ * daqui, que é onde se procura por um controle.
+ *
+ * Não vira item de navegação: item leva a algum lugar, e este não leva — ele
+ * acende um aparelho por cima da tela em que a pessoa já está.
+ */
+function BotaoDoRadio({ compacto = false }: { compacto?: boolean }) {
+  const estado = useSyncExternalStore(
+    assinarTrilha,
+    estadoDaTrilha,
+    estadoDaTrilhaNoServidor
+  );
+
+  const aceso = estado.aberto || estado.tocando;
+
+  return (
+    <button
+      onClick={alternarRadio}
+      aria-pressed={estado.aberto}
+      aria-label={estado.aberto ? 'Esconder o rádio' : 'Abrir o rádio'}
+      title={estado.aberto ? 'Esconder o rádio' : 'Abrir o rádio'}
+      className={
+        compacto
+          ? [
+              'inline-flex items-center justify-center w-9 h-9 rounded-full border transition-colors',
+              aceso
+                ? 'border-vela/50 text-vela'
+                : 'border-pergaminho/20 text-pergaminho/60',
+            ].join(' ')
+          : [
+              'flex items-center gap-3 px-3 py-2.5 rounded-lg font-corpo text-sm transition-colors',
+              aceso
+                ? 'text-vela hover:bg-pergaminho/[0.06]'
+                : 'text-pergaminho/50 hover:text-pergaminho hover:bg-pergaminho/[0.04]',
+            ].join(' ')
+      }
+    >
+      <IconeDeRadio tocando={estado.tocando} />
+      {!compacto && (estado.tocando ? 'Trilha tocando' : 'Trilha')}
+    </button>
+  );
+}
+
+/** Ondas saindo de um ponto — som, sem virar caixa de som de loja. */
+function IconeDeRadio({ tocando }: { tocando: boolean }) {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <circle cx="8" cy="12" r="2" fill="currentColor" stroke="none" />
+      <path d="M12.5 8.5a5 5 0 0 1 0 7" opacity={tocando ? 1 : 0.55} />
+      <path d="M15.8 6a9 9 0 0 1 0 12" opacity={tocando ? 0.75 : 0.3} />
+    </svg>
+  );
+}
+
 function Marca() {
   return (
     <Link href="/conta" className="flex items-center gap-2.5 group">
@@ -133,11 +211,15 @@ export function NavegacaoDaPlataforma({
           ))}
         </nav>
 
+        <div className="mt-auto">
+          <BotaoDoRadio />
+        </div>
+
         <Link
           href="/conta/perfil"
           title={email}
           className={[
-            'mt-auto flex items-center gap-3 px-3 py-2.5 rounded-lg font-corpo text-sm transition-colors',
+            'flex items-center gap-3 px-3 py-2.5 rounded-lg font-corpo text-sm transition-colors',
             ativo('/conta/perfil')
               ? 'text-vela bg-pergaminho/[0.06]'
               : 'text-pergaminho/50 hover:text-pergaminho',
@@ -151,19 +233,22 @@ export function NavegacaoDaPlataforma({
       {/* ── Topo enxuto (só no celular, a barra de baixo é quem navega) ── */}
       <header className="lg:hidden w-full flex items-center justify-between px-5 py-4">
         <Marca />
-        <Link
-          href="/conta/perfil"
-          aria-label={`Perfil de ${email}`}
-          title={email}
-          className={[
-            'inline-flex items-center justify-center w-9 h-9 rounded-full border transition-colors',
-            ativo('/conta/perfil')
-              ? 'border-vela text-vela'
-              : 'border-pergaminho/20 text-pergaminho/60',
-          ].join(' ')}
-        >
-          <Icone nome="perfil" />
-        </Link>
+        <div className="flex items-center gap-2">
+          <BotaoDoRadio compacto />
+          <Link
+            href="/conta/perfil"
+            aria-label={`Perfil de ${email}`}
+            title={email}
+            className={[
+              'inline-flex items-center justify-center w-9 h-9 rounded-full border transition-colors',
+              ativo('/conta/perfil')
+                ? 'border-vela text-vela'
+                : 'border-pergaminho/20 text-pergaminho/60',
+            ].join(' ')}
+          >
+            <Icone nome="perfil" />
+          </Link>
+        </div>
       </header>
 
       {/*

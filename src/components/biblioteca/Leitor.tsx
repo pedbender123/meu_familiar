@@ -10,11 +10,13 @@ import {
   type LivroLido,
 } from '@/nucleo/biblioteca/formato';
 import {
-  alternarTrilha,
+  abrirRadio,
+  alternarRadio,
   assinarTrilha,
   estadoDaTrilha,
   estadoDaTrilhaNoServidor,
   pedirTrilha,
+  tocarTrilha,
 } from '@/lib/trilha';
 
 /**
@@ -215,23 +217,34 @@ export function Leitor({
         </div>
 
         {/*
-          O botão liga a trilha DESTE capítulo no tocador da plataforma. Ele
-          fica aceso enquanto a faixa pedida for a que está tocando — se a
-          pessoa trocar de faixa no tocador, ele apaga, porque aí o som já não
-          é o do capítulo.
+          O som, aqui dentro.
+
+          Dentro do livro o menu não existe — a folha ocupa a tela inteira —,
+          então este é o único caminho até o rádio. Ele faz as duas coisas de
+          uma vez: acende o aparelho e põe a trilha DESTE capítulo para tocar.
+          Quem só queria ver os controles fecha no X do próprio rádio.
+
+          Capítulo cuja faixa ainda não foi gravada não some com o botão: ele
+          continua abrindo o rádio, e a pessoa escolhe o que quiser ouvir.
         */}
         <button
-          onClick={() => somDoCapitulo && alternarTrilha(somDoCapitulo)}
-          disabled={!somDoCapitulo}
-          aria-label={tocandoEsteCapitulo ? 'Desligar a trilha' : 'Ligar a trilha'}
+          onClick={() => {
+            if (trilha.aberto && !somDoCapitulo) {
+              alternarRadio();
+              return;
+            }
+            abrirRadio();
+            if (somDoCapitulo && !tocandoEsteCapitulo) tocarTrilha(somDoCapitulo);
+          }}
+          aria-label={trilha.aberto ? 'Esconder o rádio' : 'Ouvir com trilha'}
           title={
             somDoCapitulo
-              ? `Trilha: ${somDoCapitulo}`
+              ? `Trilha deste capítulo: ${somDoCapitulo}`
               : atual.capitulo.som
                 ? 'A trilha deste capítulo ainda está sendo gravada'
                 : 'Este capítulo é lido em silêncio'
           }
-          className="shrink-0 w-9 h-9 rounded-full border flex items-center justify-center transition disabled:opacity-20"
+          className="shrink-0 w-9 h-9 rounded-full border flex items-center justify-center transition"
           style={{
             borderColor: tocandoEsteCapitulo
               ? 'rgba(217,164,65,0.5)'
@@ -241,7 +254,7 @@ export function Leitor({
               : 'color-mix(in srgb, var(--pergaminho) 50%, transparent)',
           }}
         >
-          {tocandoEsteCapitulo ? <Volume2 size={15} strokeWidth={1.5} /> : <VolumeX size={15} strokeWidth={1.5} />}
+          {trilha.tocando ? <Volume2 size={15} strokeWidth={1.5} /> : <VolumeX size={15} strokeWidth={1.5} />}
         </button>
       </header>
 
