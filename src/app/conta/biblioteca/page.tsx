@@ -60,103 +60,117 @@ export default async function Biblioteca() {
           Nenhum livro publicado ainda.
         </p>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {estante.map(({ ebook, liberado, por }) => {
-            const lido = lerEbook(ebook.id);
-            const capitulos = lido
-              ? lido.livro.modulos.reduce((s, m) => s + m.capitulos.length, 0)
-              : 0;
+        /*
+          ── A prateleira ──────────────────────────────────────────────────
 
-            const conteudo = (
-              <>
-                {/*
-                  A capa com proporção fixa: sem ela, três imagens de alturas
-                  diferentes desalinham a grade inteira e a estante parece
-                  montada às pressas.
-                */}
-                <div
-                  className="relative w-full aspect-[3/4] rounded-lg overflow-hidden border"
+          Capas grandes, lado a lado, com a madeira embaixo. A versão anterior
+          era uma grade de cartões com título e preço — funcionava e parecia
+          catálogo de e-commerce, que é o oposto do que uma estante deve
+          sentir.
+
+          A sombra que cada livro projeta na prateleira e o fio de luz na
+          lombada não servem para nada. É de propósito: detalhe gratuito é o
+          que faz a coisa parecer cuidada, e as pessoas reparam nele mais do
+          que na funcionalidade.
+        */
+        <section className="relative flex flex-col gap-0">
+          <div className="grid grid-cols-3 gap-3 sm:gap-6 items-end">
+            {estante.map(({ ebook, liberado, por }, i) => {
+              const lido = liberado ? lerEbook(ebook.id) : null;
+
+              const livro = (
+                <span
+                  className="relative block w-full aspect-[3/4] rounded-[3px] overflow-hidden transition-all duration-300 ease-out group-hover:-translate-y-[5px]"
                   style={{
-                    borderColor: 'color-mix(in srgb, var(--pergaminho) 12%, transparent)',
+                    animation: `livroChega 640ms cubic-bezier(.2,.8,.2,1) ${i * 110}ms both`,
+                    boxShadow: liberado
+                      ? '0 14px 26px -12px rgba(0,0,0,0.85), 0 0 0 1px rgba(234,224,204,0.10)'
+                      : '0 8px 18px -10px rgba(0,0,0,0.8), 0 0 0 1px rgba(234,224,204,0.06)',
                   }}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={`/api/biblioteca/capa/${ebook.id}`}
-                    alt=""
-                    className="w-full h-full object-cover transition duration-500 group-hover:scale-[1.03]"
+                    alt={ebook.titulo}
+                    className="w-full h-full object-cover transition duration-700"
                     style={{
-                      // Livro fechado fica dessaturado: a diferença precisa
-                      // ser vista de longe, antes de ler qualquer palavra.
-                      filter: liberado ? 'none' : 'grayscale(0.7) brightness(0.55)',
+                      filter: liberado
+                        ? 'none'
+                        : 'grayscale(0.75) brightness(0.42) contrast(0.95)',
                     }}
                   />
+
+                  {/* A lombada — é ela que faz o retângulo virar livro. */}
+                  <span
+                    aria-hidden="true"
+                    className="absolute inset-y-0 left-0 w-[10px]"
+                    style={{
+                      background:
+                        'linear-gradient(90deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.3) 45%, rgba(255,255,255,0.12) 74%, transparent 100%)',
+                    }}
+                  />
+
                   {!liberado && (
                     <span className="absolute inset-0 flex items-center justify-center">
                       <span
-                        className="w-9 h-9 rounded-full flex items-center justify-center border"
+                        className="w-10 h-10 rounded-full flex items-center justify-center border"
                         style={{
-                          borderColor: 'rgba(217,164,65,0.5)',
-                          background: 'rgba(20,16,26,0.72)',
+                          borderColor: 'rgba(217,164,65,0.45)',
+                          background: 'rgba(18,14,24,0.8)',
                         }}
                       >
-                        <Lock size={15} strokeWidth={1.5} className="text-vela" />
+                        <Lock size={16} strokeWidth={1.5} className="text-vela" />
                       </span>
                     </span>
                   )}
+
                   {por === 'assinatura' && (
                     <span
-                      className="absolute top-2 left-2 font-corpo text-[0.6rem] tracking-[0.14em] uppercase px-2 py-0.5 rounded-full border"
+                      className="absolute top-2 left-3 font-corpo text-[0.55rem] tracking-[0.16em] uppercase px-2 py-0.5 rounded-full"
                       style={{
-                        color: 'var(--vela)',
-                        borderColor: 'rgba(217,164,65,0.45)',
-                        background: 'rgba(20,16,26,0.72)',
+                        color: 'var(--tinta)',
+                        background: 'var(--vela)',
                       }}
                     >
                       assinatura
                     </span>
                   )}
-                </div>
+                </span>
+              );
 
-                <div className="flex flex-col gap-1">
-                  <h2 className="font-corpo text-sm leading-snug text-pergaminho/90">
+              const legenda = (
+                <span className="flex flex-col gap-0.5 pt-3">
+                  <span className="font-corpo text-[0.78rem] leading-snug text-pergaminho/85">
                     {ebook.titulo}
-                  </h2>
-                  <p className="font-corpo font-light text-[0.72rem] leading-snug text-pergaminho/40">
-                    {ebook.promessa}
-                  </p>
-                  <p className="font-corpo text-[0.7rem] text-pergaminho/35 mt-0.5 tabular-nums">
+                  </span>
+                  <span className="font-corpo text-[0.68rem] text-pergaminho/35 tabular-nums">
                     {liberado
-                      ? `${capitulos} capítulos · ${lido?.livro.minutos ?? 0} min`
+                      ? `${ebook.capitulos} capítulos · ${lido?.livro.minutos ?? 0} min`
                       : reais(ebook.precoCentavos)}
-                  </p>
+                  </span>
+                </span>
+              );
+
+              return liberado ? (
+                <Link
+                  key={ebook.id}
+                  href={`/conta/biblioteca/${ebook.id}`}
+                  className="group flex flex-col no-underline"
+                >
+                  {livro}
+                  {legenda}
+                </Link>
+              ) : (
+                <div key={ebook.id} className="group flex flex-col">
+                  {livro}
+                  {legenda}
                 </div>
-              </>
-            );
-
-            return liberado ? (
-              <Link
-                key={ebook.id}
-                href={`/conta/biblioteca/${ebook.id}`}
-                className="group flex flex-col gap-3 no-underline"
-              >
-                {conteudo}
-              </Link>
-            ) : (
-              /*
-                Fechado não é link para lugar nenhum ainda.
-
-                A compra avulsa dentro do app é a próxima peça; até ela
-                existir, um clique que não leva a nada é pior que nenhum
-                clique — a pessoa toca, nada acontece, e conclui que quebrou.
-              */
-              <div key={ebook.id} className="group flex flex-col gap-3 opacity-90">
-                {conteudo}
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        </section>
       )}
+
     </div>
   );
 }

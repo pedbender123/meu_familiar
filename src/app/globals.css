@@ -271,3 +271,62 @@ body {
     transform: translateY(0);
   }
 }
+
+/* ── a estante do checkout ──────────────────────────────────────────────────
+   Animações que não servem para nada, e é esse o ponto: detalhe gratuito é o
+   que separa produto feito com cuidado de produto montado, e as pessoas
+   reparam nele mais do que na funcionalidade — porque a funcionalidade elas
+   já esperavam.
+
+   Todas respeitam `prefers-reduced-motion` no bloco do fim: quem pediu menos
+   movimento no sistema operacional recebe as mesmas telas, paradas.
+*/
+@keyframes livroChega {
+  from { opacity: 0; transform: translateY(14px) rotate(-2deg); }
+  to   { opacity: 1; transform: translateY(0) rotate(0deg); }
+}
+
+@keyframes brilhoDaCapa {
+  from { transform: translateX(-115%); }
+  to   { transform: translateX(115%); }
+}
+
+@keyframes seloGira {
+  from { opacity: 0; transform: scale(0.3) rotate(-140deg); }
+  to   { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+
+@keyframes veuEntra {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes sinopseAbre {
+  from { opacity: 0; transform: translateY(calc(-50% + 16px)) scale(0.97); }
+  to   { opacity: 1; transform: translateY(-50%) scale(1); }
+}
+
+@media (min-width: 640px) {
+  @keyframes sinopseAbre {
+    from { opacity: 0; transform: translate(-50%, calc(-50% + 16px)) scale(0.97); }
+    to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fita-do-modulo,
+  [style*='livroChega'],
+  [style*='brilhoDaCapa'],
+  [style*='seloGira'],
+  [style*='sinopseAbre'],
+  [style*='veuEntra'] {
+    animation: none !important;
+  }
+}
+
+/* A fita que se joga sobre o papel: ela cai da margem, girando um pouco, como
+   uma fita de tecido que se solta do miolo do livro. */
+@keyframes fitaCai {
+  from { opacity: 0; transform: translateX(-18px) rotate(-1.5deg); }
+  to   { opacity: 1; transform: translateX(0) rotate(0deg); }
+}

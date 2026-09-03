@@ -769,6 +769,82 @@ export async function enviarCompraConfirmada(params: {
 }
 
 /**
+ * Os livros que a pessoa comprou junto do pedido, com o caminho até eles.
+ *
+ * ── Por que este e-mail precisa existir ───────────────────────────────────
+ *
+ * O ebook é vendido como adicional no checkout, e o que a pessoa recebe não é
+ * um arquivo: é acesso a uma leitura dentro do app. Sem este e-mail, ela paga
+ * R$ 9,90 a mais, vê "obrigado" na tela e **não tem como chegar ao livro** —
+ * teria que descobrir sozinha que existe uma biblioteca, e adivinhar que
+ * precisa entrar na conta para achá-la.
+ *
+ * Isso não produz chamado de suporte. Produz estorno, e produz uma pessoa que
+ * conta para as amigas que pagou por algo que não recebeu.
+ *
+ * ── O link já entra logada ────────────────────────────────────────────────
+ *
+ * É um link mágico apontando direto para a biblioteca. Pedir login aqui seria
+ * pôr uma porta entre alguém que acabou de pagar e o que ela comprou — e é
+ * exatamente nessa porta que as pessoas desistem.
+ */
+export async function enviarLivrosComprados(params: {
+  nome: string;
+  email: string;
+  /** O link mágico, já apontando para `/conta/biblioteca`. */
+  url: string;
+  livros: { titulo: string; capitulos: number }[];
+}): Promise<void> {
+  const { nome, email, url, livros } = params;
+  if (livros.length === 0) return;
+
+  const umSo = livros.length === 1;
+  const lista = livros
+    .map(
+      (l) =>
+        `<li style="margin:0 0 8px;font-family:Georgia,serif;font-size:15px;line-height:1.6;color:#2E2438;">
+           <strong>${l.titulo}</strong>
+           <span style="color:#6B5F72;font-size:13px;"> — ${l.capitulos} capítulos</span>
+         </li>`
+    )
+    .join('');
+
+  await enviar({
+    para: email,
+    assunto: umSo
+      ? `${nome}, seu livro está na sua biblioteca`
+      : `${nome}, seus livros estão na sua biblioteca`,
+    html: moldura(`
+      <p style="margin:0 0 16px;font-family:Georgia,serif;font-size:15px;line-height:1.7;color:#2E2438;">
+        ${nome},
+      </p>
+      <p style="margin:0 0 16px;font-family:Georgia,serif;font-size:15px;line-height:1.7;color:#2E2438;">
+        ${umSo ? 'O livro que você levou junto já está' : 'Os livros que você levou junto já estão'}
+        na sua biblioteca:
+      </p>
+      <ul style="margin:0 0 20px;padding-left:20px;">${lista}</ul>
+      <p style="margin:0 0 8px;">${botao(url, umSo ? 'Abrir meu livro' : 'Abrir minha biblioteca')}</p>
+      <p style="margin:20px 0 0;font-family:Arial,sans-serif;font-size:13px;line-height:1.7;color:#6B5F72;">
+        A leitura acontece dentro do Bruxário, com a trilha de fundo de cada
+        capítulo e guardando onde você parou. Não é um PDF para baixar — é um
+        lugar para voltar.
+      </p>
+      <p style="margin:14px 0 0;font-family:Arial,sans-serif;font-size:12px;line-height:1.6;color:#6B5F72;">
+        ${umSo ? 'Ele é seu' : 'Eles são seus'} para sempre, com ou sem assinatura.
+        Guarde este e-mail: o link acima é o caminho de volta.
+      </p>
+    `),
+    texto: [
+      `${nome},`,
+      `${umSo ? 'O livro que você levou junto já está' : 'Os livros que você levou junto já estão'} na sua biblioteca:`,
+      livros.map((l) => `· ${l.titulo} (${l.capitulos} capítulos)`).join('\n'),
+      `Abra por aqui: ${url}`,
+      `A leitura acontece dentro do Bruxário, guardando onde você parou. ${umSo ? 'Ele é seu' : 'Eles são seus'} para sempre.`,
+    ].join('\n\n'),
+  });
+}
+
+/**
  * O resgate de quem pagou e parou no meio do ritual.
  *
  * O corpo vem pronto de fora (gerado por IA com as respostas que já existem)

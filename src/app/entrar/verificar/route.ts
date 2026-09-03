@@ -63,7 +63,34 @@ export async function GET(req: NextRequest) {
    * o retorno de quem clica no link de acesso ficaria invisível na jornada —
    * que é justamente o buraco que este rastreio existe para fechar.
    */
-  const destino = (tipo === 'admin' ? '/painel' : '/conta') + '?e=lg';
+  /**
+   * Um destino pedido pelo link, quando ele existe.
+   *
+   * O e-mail dos livros aponta para `/conta/biblioteca`: mandar quem acabou de
+   * comprar para a home da conta faria ela procurar sozinha o que pagou, e
+   * procurar é onde as pessoas desistem.
+   *
+   * ── Só caminho interno, e só da lista ───────────────────────────────────
+   *
+   * `destino` vem da URL, e URL é do mundo. Aceitar qualquer valor faria
+   * `?destino=https://outro-site` virar um redirecionamento aberto assinado
+   * pelo nosso domínio — o material clássico de golpe de phishing, e ainda por
+   * cima logando a vítima antes de mandá-la embora.
+   *
+   * A defesa é uma lista fixa: nada além do que o nosso próprio e-mail usa.
+   * Validar "começa com barra" seria quase certo e deixaria passar `//evil`,
+   * que o navegador lê como outro host.
+   */
+  const DESTINOS_PERMITIDOS = new Set(['/conta/biblioteca']);
+  const pedido = req.nextUrl.searchParams.get('destino');
+  const paraOnde =
+    tipo === 'conta' && pedido && DESTINOS_PERMITIDOS.has(pedido)
+      ? pedido
+      : tipo === 'admin'
+        ? '/painel'
+        : '/conta';
+
+  const destino = `${paraOnde}?e=lg`;
   const resposta = NextResponse.redirect(destinoAbsoluto(destino, req));
 
   resposta.cookies.set(COOKIE_DA_SESSAO, sessao, {

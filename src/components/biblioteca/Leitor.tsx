@@ -2,41 +2,42 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ChevronLeft, ChevronRight, List, X, Volume2, VolumeX } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Volume2, VolumeX } from 'lucide-react';
+import { FolhaPergaminho } from '@/components/FolhaPergaminho';
 import type { LivroLido } from '@/nucleo/biblioteca/formato';
 
 /**
- * O modo de leitura.
+ * O modo de leitura — um livro apoiado na mesa, não uma página de site.
  *
- * ── Por que não é um PDF ──────────────────────────────────────────────────
+ * ── A regra que a primeira versão violou ──────────────────────────────────
  *
- * Três coisas que só existem aqui, e são a razão de o livro ter virado texto:
- * a pessoa **continua de onde parou**, o capítulo tem **trilha de fundo**, e a
- * leitura acontece dentro do mundo do produto — pergaminho, vela, a mesma
- * tipografia da revelação — em vez de um visualizador cinza do navegador.
+ * A estética do Bruxário tem uma regra de composição: **o que é grimório vai
+ * DENTRO da folha; o que é interface fica FORA, no quarto.** A primeira
+ * versão deste leitor pôs o texto direto sobre o fundo escuro, com títulos e
+ * botões misturados — e o resultado foi exatamente o que se esperaria: leu
+ * como post de blog. Texto claro sobre roxo é ruim de ler e não é livro
+ * nenhum.
  *
- * ── As fitinhas ───────────────────────────────────────────────────────────
+ * Agora o capítulo mora no pergaminho, com a mesma tinta e a mesma tipografia
+ * da revelação. Navegação, som e fitas ficam do lado de fora.
  *
- * O sumário é uma coluna de marcadores coloridos na lateral, um por módulo,
- * como as fitas que se deixam num livro grosso. Elas resolvem o problema real
- * de ler num telefone: saber ONDE você está sem sair da página.
+ * ── As fitas ──────────────────────────────────────────────────────────────
  *
- * A cor não é decoração — é a única forma de reconhecer um módulo de relance,
- * antes de ler o título. Por isso são poucas e fixas.
+ * Vivem na faixa entre a borda esquerda da tela e a borda do papel — o espaço
+ * que num livro grosso é onde as fitas realmente ficam. Em repouso são só
+ * cor: nenhum texto, nenhuma caixa. Tocou, elas **se jogam por cima do
+ * papel**, cada uma com o nome do módulo, e os capítulos daquele módulo
+ * descem embaixo.
  *
- * ── Onde a pessoa parou mora no navegador ─────────────────────────────────
- *
- * `localStorage`, não banco. A alternativa seria uma escrita no servidor a
- * cada troca de capítulo — muito custo para um dado que só interessa a esta
- * pessoa neste aparelho, e que perder não dói: o pior caso é ela reabrir no
- * capítulo um e tocar duas vezes.
+ * Aparecer o tempo todo com nome as transformaria em menu lateral, que é
+ * interface — e interface sobre pergaminho lê como anacronismo.
  */
 
-/** As fitas. Poucas e fixas: cor demais deixa de identificar coisa nenhuma. */
-const CORES_DOS_MODULOS = ['#D9A441', '#8E7CC3', '#6FA287', '#C97B6B', '#7FA1C4'];
+/** As cores das fitas. Poucas e fixas: cor demais deixa de identificar nada. */
+const CORES = ['#9C3B2E', '#2F5D50', '#4A3B7A', '#8A6B1F', '#3B5470'];
 
 function corDoModulo(i: number) {
-  return CORES_DOS_MODULOS[i % CORES_DOS_MODULOS.length];
+  return CORES[i % CORES.length];
 }
 
 export function Leitor({
@@ -62,17 +63,15 @@ export function Leitor({
   );
 
   const [posicao, setPosicao] = useState(0);
-  const [sumarioAberto, setSumarioAberto] = useState(false);
+  const [fitasAbertas, setFitasAbertas] = useState(false);
   const [somLigado, setSomLigado] = useState(false);
 
   const chave = `bx_leitura_${ebookId}`;
 
   /*
-    A retomada roda depois da primeira pintura, não durante.
-
-    Ler `localStorage` no corpo do componente faria servidor e navegador
-    renderizarem capítulos diferentes — o React reclama e o texto pisca. Aqui
-    a página abre no capítulo um e salta para o guardado um quadro depois.
+    A retomada roda depois da primeira pintura. Ler `localStorage` durante a
+    renderização faria servidor e navegador desenharem capítulos diferentes —
+    o React reclama e o texto pisca.
   */
   useEffect(() => {
     try {
@@ -91,51 +90,51 @@ export function Leitor({
     }
   }, [chave, posicao]);
 
-  // Trocar de capítulo volta ao topo: continuar na altura anterior joga a
-  // pessoa no meio de um texto que ela não começou.
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [posicao]);
+
+  // Fechar com Esc: a fita aberta cobre o texto, e cobrir texto sem saída pelo
+  // teclado é o tipo de coisa que prende quem lê no computador.
+  useEffect(() => {
+    if (!fitasAbertas) return;
+    const aoTeclar = (e: KeyboardEvent) => e.key === 'Escape' && setFitasAbertas(false);
+    window.addEventListener('keydown', aoTeclar);
+    return () => window.removeEventListener('keydown', aoTeclar);
+  }, [fitasAbertas]);
 
   const atual = plano[posicao];
   if (!atual) return null;
 
   const cor = corDoModulo(atual.moduloIndice);
-  const progresso = ((posicao + 1) / plano.length) * 100;
 
   function irPara(i: number) {
     setPosicao(Math.max(0, Math.min(plano.length - 1, i)));
-    setSumarioAberto(false);
+    setFitasAbertas(false);
   }
 
-  const borda = 'color-mix(in srgb, var(--pergaminho) 16%, transparent)';
-
   return (
-    <div className="w-full max-w-3xl flex flex-col gap-6 py-6">
-      <header className="flex items-center gap-3">
+    <div className="relative w-full flex flex-col items-center gap-6 py-6">
+      {/* ── o quarto: navegação, fora da folha ── */}
+      <header className="w-full max-w-2xl flex items-center gap-3 px-1">
         <Link
           href="/conta/biblioteca"
           aria-label="Voltar para a biblioteca"
-          className="shrink-0 w-9 h-9 rounded-full border flex items-center justify-center text-pergaminho/60 hover:text-vela transition"
-          style={{ borderColor: borda }}
+          className="shrink-0 w-9 h-9 rounded-full border flex items-center justify-center text-pergaminho/55 hover:text-vela transition"
+          style={{ borderColor: 'color-mix(in srgb, var(--pergaminho) 15%, transparent)' }}
         >
           <ChevronLeft size={16} strokeWidth={1.5} />
         </Link>
 
         <div className="flex-1 min-w-0">
-          <p className="font-corpo text-[0.68rem] tracking-[0.14em] uppercase text-pergaminho/35 truncate">
+          <p className="font-corpo text-[0.66rem] tracking-[0.16em] uppercase text-pergaminho/30 truncate">
             {titulo}
           </p>
-          <p className="font-corpo text-[0.72rem] text-pergaminho/50 truncate">
+          <p className="font-corpo text-[0.72rem] text-pergaminho/45 truncate">
             {atual.modulo.titulo}
           </p>
         </div>
 
-        {/*
-          O botão de som fica desabilitado, e não escondido, quando o capítulo
-          não tem trilha: sumir e voltar a cada capítulo faria o cabeçalho
-          dançar, e o `title` explica por que ele está apagado.
-        */}
         <button
           onClick={() => setSomLigado((v) => !v)}
           disabled={!atual.capitulo.som}
@@ -145,217 +144,226 @@ export function Leitor({
               ? `Trilha: ${atual.capitulo.som}`
               : 'Este capítulo é lido em silêncio'
           }
-          className="shrink-0 w-9 h-9 rounded-full border flex items-center justify-center transition disabled:opacity-25"
+          className="shrink-0 w-9 h-9 rounded-full border flex items-center justify-center transition disabled:opacity-20"
           style={{
-            borderColor: somLigado ? 'rgba(217,164,65,0.5)' : borda,
-            color: somLigado ? 'var(--vela)' : 'color-mix(in srgb, var(--pergaminho) 55%, transparent)',
+            borderColor: somLigado
+              ? 'rgba(217,164,65,0.5)'
+              : 'color-mix(in srgb, var(--pergaminho) 15%, transparent)',
+            color: somLigado
+              ? 'var(--vela)'
+              : 'color-mix(in srgb, var(--pergaminho) 50%, transparent)',
           }}
         >
           {somLigado ? <Volume2 size={15} strokeWidth={1.5} /> : <VolumeX size={15} strokeWidth={1.5} />}
         </button>
-
-        <button
-          onClick={() => setSumarioAberto((v) => !v)}
-          aria-label="Sumário"
-          className="shrink-0 w-9 h-9 rounded-full border flex items-center justify-center text-pergaminho/60 hover:text-vela transition"
-          style={{ borderColor: borda }}
-        >
-          <List size={16} strokeWidth={1.5} />
-        </button>
       </header>
 
-      <div
-        className="h-[2px] w-full rounded-full overflow-hidden"
-        style={{ background: 'color-mix(in srgb, var(--pergaminho) 10%, transparent)' }}
-      >
-        <div
-          className="h-full rounded-full transition-all duration-500"
-          style={{ width: `${progresso}%`, background: cor }}
-        />
-      </div>
-
-      <div className="flex gap-4">
+      {/* ── a folha, com as fitas na margem ── */}
+      <div className="relative w-full max-w-2xl">
         {/*
-          As fitinhas ficam sempre à vista no desktop, coladas na lateral do
-          texto. No celular somem — 320px não têm espaço para uma coluna
-          lateral, e lá o mesmo sumário abre pelo botão do cabeçalho.
+          As fitas em repouso: uma coluna de cor colada na borda esquerda,
+          entre o fim da tela e o começo do papel. Sem texto, sem caixa.
+
+          O deslocamento negativo as põe FORA do papel — é a margem do quarto,
+          não da folha. Em telas estreitas elas encostam na borda da tela, que
+          é exatamente onde uma fita fica num livro na mão.
         */}
         <nav
           aria-label="Módulos"
-          className="hidden lg:flex flex-col gap-2 pt-2 shrink-0 sticky top-6 self-start"
+          className="absolute z-20 left-[-14px] sm:left-[-26px] top-10 flex flex-col gap-2"
         >
           {livro.modulos.map((m, i) => {
             const ativo = i === atual.moduloIndice;
-            const primeiro = plano.findIndex((p) => p.moduloIndice === i);
             return (
-              <button key={m.titulo} onClick={() => irPara(primeiro)} title={m.titulo}
-                aria-current={ativo ? 'true' : undefined}
-                className="group relative flex items-center">
-                <span
-                  className="block rounded-r-sm transition-all duration-300"
-                  style={{
-                    width: ativo ? 22 : 12,
-                    height: 4,
-                    background: corDoModulo(i),
-                    opacity: ativo ? 1 : 0.4,
-                  }}
-                />
-                <span
-                  className="absolute left-7 whitespace-nowrap font-corpo text-[0.7rem] text-pergaminho/70 opacity-0 group-hover:opacity-100 transition pointer-events-none px-2 py-1 rounded-md"
-                  style={{ background: 'rgba(20,16,26,0.92)' }}
-                >
-                  {m.titulo}
-                </span>
-              </button>
+              <button
+                key={m.titulo}
+                onClick={() => setFitasAbertas((v) => !v)}
+                aria-label={`Módulos — ${m.titulo}`}
+                aria-expanded={fitasAbertas}
+                className="fita-do-modulo block rounded-l-[2px] transition-all duration-300"
+                style={{
+                  width: ativo ? 26 : 18,
+                  height: 7,
+                  background: corDoModulo(i),
+                  opacity: ativo ? 1 : 0.5,
+                  // A fita ativa "sai" um pouco mais do livro, como a que se
+                  // deixou marcando a página em que se parou.
+                  boxShadow: ativo ? `0 1px 6px ${corDoModulo(i)}66` : 'none',
+                }}
+              />
             );
           })}
         </nav>
 
-        <article className="flex-1 min-w-0 flex flex-col gap-5">
-          <div className="flex flex-col gap-1">
-            <span
-              className="font-corpo text-[0.62rem] tracking-[0.18em] uppercase"
-              style={{ color: cor }}
-            >
-              Capítulo {posicao + 1} de {plano.length} · {atual.capitulo.minutos} min
-            </span>
-            <h1 className="font-display italic text-2xl sm:text-[1.75rem] leading-snug text-pergaminho">
-              {atual.capitulo.titulo}
-            </h1>
-          </div>
-
-          {atual.capitulo.blocos.map((bloco, i) =>
-            bloco.tipo === 'pratica' ? (
-              /*
-                A prática é visualmente OUTRA COISA: filete na cor do módulo,
-                recuo e rótulo. Ela pede que a pessoa pare de ler e faça — e um
-                bloco que pede ação precisa parecer diferente do que informa,
-                senão os olhos passam por cima.
-              */
-              <aside
-                key={i}
-                className="flex flex-col gap-3 rounded-xl border-l-2 pl-5 pr-4 py-4"
-                style={{
-                  borderColor: cor,
-                  background: 'color-mix(in srgb, var(--pergaminho) 4%, transparent)',
-                }}
-              >
-                <span
-                  className="font-corpo text-[0.6rem] tracking-[0.18em] uppercase"
-                  style={{ color: cor }}
+        {/* ── as fitas jogadas por cima do papel ── */}
+        {fitasAbertas && (
+          <>
+            <div
+              className="fixed inset-0 z-30"
+              onClick={() => setFitasAbertas(false)}
+              style={{ background: 'rgba(12,10,16,0.35)' }}
+            />
+            <div className="absolute z-40 left-0 right-0 top-6 px-4 sm:px-10 flex flex-col gap-2">
+              {livro.modulos.map((m, mi) => (
+                <div
+                  key={m.titulo}
+                  className="rounded-r-md rounded-l-[2px] overflow-hidden"
+                  style={{
+                    // Cada fita cai com um atraso: elas se jogam sobre o papel
+                    // uma depois da outra, como quem abre um livro pelas fitas.
+                    animation: `fitaCai 380ms cubic-bezier(.2,.9,.3,1) ${mi * 55}ms both`,
+                    boxShadow: '0 8px 20px -8px rgba(0,0,0,0.7)',
+                  }}
                 >
-                  Prática
-                </span>
-                {bloco.paragrafos.map((p, j) => (
-                  <p key={j} className="font-corpo font-light text-[0.95rem] leading-[1.75] text-pergaminho/85">
-                    {p}
-                  </p>
-                ))}
-              </aside>
-            ) : (
-              <div key={i} className="flex flex-col gap-4">
-                {bloco.paragrafos.map((p, j) => (
-                  <p key={j} className="font-corpo font-light text-[1rem] leading-[1.85] text-pergaminho/80">
-                    {p}
-                  </p>
-                ))}
-              </div>
-            )
-          )}
+                  <div
+                    className="px-3.5 py-2 flex items-center gap-2.5"
+                    style={{ background: corDoModulo(mi) }}
+                  >
+                    <span className="font-corpo text-[0.74rem] text-[#F3EADA] leading-snug">
+                      {m.titulo}
+                    </span>
+                  </div>
+                  <ul
+                    className="flex flex-col"
+                    style={{ background: 'rgba(24,19,32,0.96)' }}
+                  >
+                    {m.capitulos.map((c, ci) => {
+                      const indice = plano.findIndex(
+                        (p) => p.moduloIndice === mi && p.capituloIndice === ci
+                      );
+                      const aqui = indice === posicao;
+                      return (
+                        <li key={c.titulo}>
+                          <button
+                            onClick={() => irPara(indice)}
+                            className="w-full text-left px-3.5 py-2 font-corpo font-light text-[0.78rem] leading-snug transition hover:bg-white/5"
+                            style={{
+                              color: aqui
+                                ? 'var(--vela)'
+                                : 'color-mix(in srgb, var(--pergaminho) 60%, transparent)',
+                            }}
+                          >
+                            {c.titulo}
+                            <span className="opacity-40"> · {c.minutos} min</span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
 
-          <div
-            className="flex items-center justify-between gap-3 pt-6 mt-2 border-t"
-            style={{ borderColor: 'color-mix(in srgb, var(--pergaminho) 10%, transparent)' }}
+        <FolhaPergaminho>
+          {/*
+            Tudo daqui para baixo é grimório: mesma tinta, mesma tipografia da
+            revelação. Nenhum botão vive aqui dentro.
+          */}
+          <span
+            className="font-corpo text-[0.6rem] tracking-[0.22em] uppercase"
+            style={{ color: cor }}
           >
-            <button
-              onClick={() => irPara(posicao - 1)}
-              disabled={posicao === 0}
-              className="inline-flex items-center gap-1.5 font-corpo text-[0.8rem] text-pergaminho/55 hover:text-vela transition disabled:opacity-25"
-            >
-              <ChevronLeft size={15} strokeWidth={1.5} /> Anterior
-            </button>
+            {atual.modulo.titulo}
+          </span>
 
-            {posicao === plano.length - 1 ? (
-              <Link
-                href="/conta/biblioteca"
-                className="inline-flex items-center gap-1.5 font-corpo text-[0.8rem] text-vela hover:brightness-110 transition"
-              >
-                Terminei este livro
-              </Link>
-            ) : (
-              <button
-                onClick={() => irPara(posicao + 1)}
-                className="inline-flex items-center gap-1.5 font-corpo text-[0.8rem] text-vela hover:brightness-110 transition"
-              >
-                Próximo <ChevronRight size={15} strokeWidth={1.5} />
-              </button>
+          <h1 className="font-display italic text-[1.6rem] sm:text-[2rem] leading-tight text-center text-escrita text-balance max-w-[24ch]">
+            {atual.capitulo.titulo}
+          </h1>
+
+          {/* O filete que separa o título do corpo, como num livro impresso. */}
+          <span
+            aria-hidden="true"
+            className="block h-px w-16"
+            style={{ background: `linear-gradient(90deg, transparent, ${cor}88, transparent)` }}
+          />
+
+          <div className="w-full flex flex-col gap-5 max-w-[46ch]">
+            {atual.capitulo.blocos.map((bloco, i) =>
+              bloco.tipo === 'pratica' ? (
+                /*
+                  A prática é a margem do livro: recuo, filete na cor do
+                  módulo e itálico. Ela pede que a pessoa PARE de ler e faça —
+                  e um bloco que pede ação precisa parecer diferente do que
+                  informa, senão os olhos passam por cima.
+                */
+                <aside
+                  key={i}
+                  className="relative flex flex-col gap-3 pl-5 py-1 my-1"
+                  style={{ borderLeft: `2px solid ${cor}` }}
+                >
+                  <span
+                    className="font-corpo text-[0.58rem] tracking-[0.22em] uppercase"
+                    style={{ color: cor }}
+                  >
+                    Prática
+                  </span>
+                  {bloco.paragrafos.map((p, j) => (
+                    <p
+                      key={j}
+                      className="font-corpo font-light text-[0.95rem] leading-[1.8] text-escrita-corpo italic"
+                    >
+                      {p}
+                    </p>
+                  ))}
+                </aside>
+              ) : (
+                <div key={i} className="flex flex-col gap-4">
+                  {bloco.paragrafos.map((p, j) => (
+                    <p
+                      key={j}
+                      className="font-corpo font-light text-[1.02rem] leading-[1.85] text-escrita-corpo"
+                    >
+                      {p}
+                    </p>
+                  ))}
+                </div>
+              )
             )}
           </div>
-        </article>
+
+          {/*
+            O número da página, no rodapé da folha. Não serve para nada — dá
+            para navegar sem ele. É o detalhe que faz a coisa parecer um livro
+            em vez de uma tela com texto.
+          */}
+          <span className="font-corpo text-[0.68rem] tabular-nums text-escrita-fraca/60 mt-3">
+            {posicao + 1} / {plano.length}
+          </span>
+        </FolhaPergaminho>
       </div>
 
-      {sumarioAberto && (
-        <>
-          <div
-            className="fixed inset-0 z-30"
-            style={{ background: 'rgba(12,10,16,0.75)' }}
-            onClick={() => setSumarioAberto(false)}
-          />
-          <div
-            className="fixed z-40 inset-x-4 top-16 bottom-16 sm:inset-x-auto sm:right-8 sm:w-[380px] rounded-2xl border overflow-y-auto p-5 flex flex-col gap-5"
-            style={{ borderColor: borda, background: 'var(--tinta, #14101A)' }}
-          >
-            <div className="flex items-center justify-between">
-              <h2 className="font-corpo text-[0.68rem] tracking-[0.16em] uppercase text-pergaminho/45">
-                Sumário
-              </h2>
-              <button
-                onClick={() => setSumarioAberto(false)}
-                aria-label="Fechar"
-                className="text-pergaminho/50 hover:text-vela transition"
-              >
-                <X size={16} strokeWidth={1.5} />
-              </button>
-            </div>
+      {/* ── de volta ao quarto: avançar e voltar ── */}
+      <div className="w-full max-w-2xl flex items-center justify-between gap-3 px-1">
+        <button
+          onClick={() => irPara(posicao - 1)}
+          disabled={posicao === 0}
+          className="inline-flex items-center gap-1.5 font-corpo text-[0.8rem] text-pergaminho/50 hover:text-vela transition disabled:opacity-20"
+        >
+          <ChevronLeft size={15} strokeWidth={1.5} /> Anterior
+        </button>
 
-            {livro.modulos.map((m, mi) => (
-              <div key={m.titulo} className="flex flex-col gap-2">
-                <div className="flex items-center gap-2">
-                  <span
-                    className="block w-4 h-[3px] rounded-full shrink-0"
-                    style={{ background: corDoModulo(mi) }}
-                  />
-                  <span className="font-corpo text-[0.78rem] text-pergaminho/70">{m.titulo}</span>
-                </div>
-                <ul className="flex flex-col gap-0.5 pl-6">
-                  {m.capitulos.map((c, ci) => {
-                    const indice = plano.findIndex(
-                      (p) => p.moduloIndice === mi && p.capituloIndice === ci
-                    );
-                    return (
-                      <li key={c.titulo}>
-                        <button
-                          onClick={() => irPara(indice)}
-                          className="w-full text-left font-corpo font-light text-[0.8rem] leading-snug py-1.5 transition"
-                          style={{
-                            color:
-                              indice === posicao
-                                ? 'var(--vela)'
-                                : 'color-mix(in srgb, var(--pergaminho) 55%, transparent)',
-                          }}
-                        >
-                          {c.titulo}
-                          <span className="text-pergaminho/25"> · {c.minutos} min</span>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
+        <span className="font-corpo text-[0.7rem] text-pergaminho/25 tabular-nums">
+          {atual.capitulo.minutos} min
+        </span>
+
+        {posicao === plano.length - 1 ? (
+          <Link
+            href="/conta/biblioteca"
+            className="inline-flex items-center gap-1.5 font-corpo text-[0.8rem] text-vela hover:brightness-110 transition"
+          >
+            Terminei este livro
+          </Link>
+        ) : (
+          <button
+            onClick={() => irPara(posicao + 1)}
+            className="inline-flex items-center gap-1.5 font-corpo text-[0.8rem] text-vela hover:brightness-110 transition"
+          >
+            Próximo <ChevronRight size={15} strokeWidth={1.5} />
+          </button>
+        )}
+      </div>
     </div>
   );
 }

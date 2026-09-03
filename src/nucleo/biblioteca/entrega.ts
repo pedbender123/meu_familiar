@@ -1,6 +1,8 @@
 import db from '../../lib/db';
 import { buscarEbook } from './catalogo';
-import { desbloquear } from './desbloqueios';
+import { desbloquear, ligarDesbloqueiosAConta } from './desbloqueios';
+import { garantirConta, criarTokenMagico } from '../../lib/autenticacao';
+import { enviarLivrosComprados } from '../../lib/email';
 
 /**
  * Libera os ebooks que a pessoa marcou no checkout.
@@ -27,8 +29,10 @@ import { desbloquear } from './desbloqueios';
  */
 export function entregarBumpsDoPedido(pedidoId: string): string[] {
   const pedido = db
-    .prepare('SELECT id, email, bumps_json FROM pedidos WHERE id = ?')
-    .get(pedidoId) as { id: string; email: string | null; bumps_json: string | null } | undefined;
+    .prepare('SELECT id, nome, email, bumps_json FROM pedidos WHERE id = ?')
+    .get(pedidoId) as
+    | { id: string; nome: string | null; email: string | null; bumps_json: string | null }
+    | undefined;
 
   if (!pedido?.email || !pedido.bumps_json) return [];
 
@@ -69,7 +73,67 @@ export function entregarBumpsDoPedido(pedidoId: string): string[] {
       `[biblioteca] pedido ${pedidoId}: ${entregues.length} ebook(s) liberado(s) — ` +
         entregues.join(', ')
     );
+    void avisarQueChegou(pedido.email, pedido.nome ?? '', entregues);
   }
 
   return entregues;
+}
+
+/**
+ * O e-mail com o caminho até os livros.
+ *
+ * ── Sem ele, a pessoa paga e não tem como chegar ──────────────────────────
+ *
+ * O ebook é adicional de checkout, e o que ela recebe não é arquivo: é acesso
+ * a uma leitura dentro do app. Sem este aviso ela veria "obrigado" na tela e
+ * precisaria descobrir sozinha que existe uma biblioteca — e adivinhar que
+ * precisa entrar na conta para achá-la.
+ *
+ * Isso não vira chamado de suporte. Vira estorno.
+ *
+ * ── Link mágico, e não uma tela de login ──────────────────────────────────
+ *
+ * Pedir senha a quem acabou de pagar é pôr uma porta entre a pessoa e o que
+ * ela comprou. O link já entra logado e cai direto na estante.
+ *
+ * ── Nunca derruba a entrega ───────────────────────────────────────────────
+ *
+ * Roda sem `await` e engole o próprio erro. O direito já foi gravado antes: se
+ * o e-mail falhar, a pessoa continua dona dos livros e os encontra no próximo
+ * login. Falhar ao avisar não pode desfazer o que foi entregue.
+ */
+async function avisarQueChegou(
+  email: string,
+  nome: string,
+  ids: string[]
+): Promise<void> {
+  try {
+    const livros = ids
+      .map((id) => buscarEbook(id))
+      .filter((e): e is NonNullable<typeof e> => !!e)
+      .map((e) => ({ titulo: e.titulo, capitulos: e.capitulos }));
+
+    if (livros.length === 0) return;
+
+    /*
+      A conta nasce aqui, se ainda não existia.
+
+      Quem marcou o bump veio do ritual e pode nunca ter feito login — o
+      direito ficou preso ao e-mail. Criar a conta agora e ligar os
+      desbloqueios a ela é o que faz o link do e-mail já abrir a estante
+      cheia, em vez de abrir uma estante vazia que só se enche depois.
+    */
+    const conta = garantirConta(email);
+    ligarDesbloqueiosAConta(email, conta.id);
+
+    const base = process.env.BASE_URL || 'http://localhost:3000';
+    const token = criarTokenMagico(email, 'conta');
+    const url =
+      `${base}/entrar/verificar?t=${encodeURIComponent(token)}` +
+      `&e=lg&destino=${encodeURIComponent('/conta/biblioteca')}`;
+
+    await enviarLivrosComprados({ nome: nome || email.split('@')[0], email, url, livros });
+  } catch (erro) {
+    console.error('[biblioteca] falha ao avisar sobre os livros:', erro);
+  }
 }
