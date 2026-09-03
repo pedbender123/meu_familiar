@@ -12,6 +12,51 @@ rotas próprias (`/gateway/card/subscription`), que não precisam de catálogo.
 
 ---
 
+## 03/09 — a plataforma virou o destino
+
+**No ar em `teste.bruxario.com.br`. Produção NÃO recebeu nada disto.**
+994 testes.
+
+- **Quem compra entra na plataforma.** `/entrar/direto/[id]` abre a sessão e
+  leva para `/conta/familiar/[id]` — a revelação inteira, agora dentro do app,
+  ao lado do Oráculo, do calendário e da estante. A prova de que o navegador é
+  o da compradora é um cookie assinado posto quando o pedido nasce
+  (`lib/porta-do-comprador.ts`): **o id do pedido É o link público**, e uma
+  porta que abrisse só com ele daria a conta de quem comprou para qualquer
+  pessoa que recebesse o link no WhatsApp. Sem o cookie, a porta cai na
+  revelação pública sem erro nenhum.
+- **A revelação virou componente** (`components/revelacao/CorpoDaRevelacao`),
+  usado pela página pública e pela tela de dentro. Duas cópias do mesmo
+  grimório em dois arquivos era garantir que um dia ficassem diferentes.
+- **O PDF espera sete dias** (`nucleo/carencia.ts`, o prazo de arrependimento
+  do CDC). Saiu do anexo do e-mail e do botão imediato. A regra vale na ROTA,
+  não só no botão: o endereço do arquivo é adivinhável a partir do id.
+- **O tocador de trilhas** (`plataforma/Tocador.tsx`) mora no layout da conta,
+  então a faixa atravessa a navegação. O capítulo do livro pede a dele pelo
+  `som:` do Markdown, e pedir não é mandar — a troca só acontece com o tocador
+  já tocando. Duas faixas de verdade hoje; `trilhasNoAr` só devolve o que está
+  em disco.
+- **Exemplar em PDF do ebook comprado**, também com sete dias. Assinante lê e
+  não baixa: a assinatura vende acesso enquanto durar.
+- **`**negrito**` do Markdown passou a ser desenhado** em vez de mostrar os
+  asteriscos. Os livros novos usam umas oitenta vezes cada.
+
+### Dois bugs que apareceram no caminho
+
+| | |
+| --- | --- |
+| **Todo mundo era assinante** | `assinaturasAtivasDaConta(...).length > 0` é verdade para qualquer conta: o plano `gratuito` nasce junto e não tem fim. A biblioteca abria a estante inteira "para quem assina" — os três livros vendidos no checkout estavam de graça para quem tivesse entrado uma vez. Agora é `assinaturaPagaAtiva` (preço > 0 **e** recorrente). |
+| **O anexo furava a carência** | Segurar o PDF por sete dias na tela não vale nada enquanto ele sai anexado no e-mail de entrega. O anexo saiu; a entrega é a plataforma. |
+
+### Aberto e decidido pelo dono
+
+- O cron `acesso-gratis` (a chave grátis 4h depois, só para quem **não**
+  comprou) **continua rodando**. Quem compra não depende mais dele — entra na
+  hora. Se a ideia era desligar o e-mail também para quem não comprou, é uma
+  linha no crontab.
+
+---
+
 ## PARADO AQUI — 01/09, 17h
 
 Tudo que está no ar está commitado e testado (903). **A simulação do
