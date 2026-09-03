@@ -48,7 +48,19 @@ export async function entregarChaveDaPlataforma(dados: {
     await enviarContaCriada({
       nome: dados.nome,
       email,
-      url: `${base}/entrar/verificar?t=${encodeURIComponent(token)}&e=lg`,
+      /**
+       * O link abre **no familiar**, e não na porta da casa.
+       *
+       * Ele caía em `/conta`, e de lá a pessoa tinha que descobrir sozinha
+       * onde estava a coisa que ela veio ver. Um clique a mais entre o e-mail
+       * e o produto é um clique onde metade das pessoas some — e é o pior
+       * lugar possível para perdê-las, porque é o primeiro contato delas com a
+       * plataforma inteira.
+       *
+       * O destino passa pela lista fixa de `/entrar/verificar`: nada que venha
+       * de URL vira redirecionamento sem estar declarado lá.
+       */
+      url: `${base}/entrar/verificar?t=${encodeURIComponent(token)}&e=lg&destino=${encodeURIComponent('/conta/familiar')}`,
       minutosDeValidade: VALIDADE_DO_LINK_MIN,
       contaNova: dados.contaNova,
       // O familiar vai no e-mail como NOTÍCIA, não como entrega: é o que faz

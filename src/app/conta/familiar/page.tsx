@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import db from '@/lib/db';
 import { sessaoAtual } from '@/lib/sessao-servidor';
 import { FAMILIARES, type FamiliarId, type LuaId } from '@/lib/familiares';
@@ -68,6 +69,23 @@ export default async function FamiliarDaConta() {
        ORDER BY (status = 'entregue') DESC, criado_em DESC`
     )
     .all(sessao.email) as Linha[];
+
+  /**
+   * Uma revelação só? Ela **é** a página.
+   *
+   * A estante existe para quem fez o ritual mais de uma vez, e essa pessoa é
+   * a minoria. Para todo o resto, esta tela era um cartão único com um botão
+   * "abrir" — um clique entre a pessoa e a coisa que ela comprou, no primeiro
+   * contato dela com a plataforma, que é onde menos se pode pedir paciência.
+   *
+   * O redirecionamento, e não renderizar aqui: assim a revelação tem um
+   * endereço só, que serve para voltar, para o histórico do navegador e para
+   * o link do e-mail. Duas telas mostrando a mesma coisa em endereços
+   * diferentes é como elas começam a divergir.
+   */
+  if (revelacoes.length === 1 && revelacoes[0].status === 'entregue') {
+    redirect(`/conta/familiar/${revelacoes[0].id}`);
+  }
 
   if (revelacoes.length === 0) {
     return (

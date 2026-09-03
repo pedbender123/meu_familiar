@@ -81,7 +81,7 @@ export async function GET(req: NextRequest) {
    * Validar "começa com barra" seria quase certo e deixaria passar `//evil`,
    * que o navegador lê como outro host.
    */
-  const DESTINOS_PERMITIDOS = new Set(['/conta/biblioteca']);
+  const DESTINOS_PERMITIDOS = new Set(['/conta/biblioteca', '/conta/familiar']);
   const pedido = req.nextUrl.searchParams.get('destino');
   const paraOnde =
     tipo === 'conta' && pedido && DESTINOS_PERMITIDOS.has(pedido)

@@ -63,8 +63,29 @@ describe('o destino do link mágico', () => {
    * `?destino=https://outro-site` virar redirecionamento aberto assinado pelo
    * nosso domínio — e ainda logando a vítima antes de mandá-la embora.
    */
+  /**
+   * A lista é fixa e curta de propósito: `destino` vem da URL, e aceitar
+   * qualquer valor faria `?destino=https://outro-site` virar um
+   * redirecionamento aberto assinado pelo nosso domínio — logando a vítima
+   * antes de mandá-la embora. Validar "começa com barra" deixaria passar
+   * `//evil`, que o navegador lê como outro host.
+   *
+   * O que este teste protege não é o tamanho da lista, é ela existir e ser
+   * consultada. Cada entrada nova precisa ser um caminho nosso, escrito aqui
+   * à mão.
+   */
   test('só caminho da lista fixa é aceito', () => {
-    assert.match(VERIFICAR, /DESTINOS_PERMITIDOS = new Set\(\['\/conta\/biblioteca'\]\)/);
+    const lista = VERIFICAR.match(/DESTINOS_PERMITIDOS = new Set\(\[([^\]]*)\]\)/);
+    assert.ok(lista, 'a lista fixa precisa existir');
+    const caminhos = lista[1].match(/'[^']+'/g) ?? [];
+    assert.ok(caminhos.length > 0, 'lista vazia não serve para nada');
+    for (const caminho of caminhos) {
+      assert.match(
+        caminho,
+        /^'\/conta\/[a-z-]+'$/,
+        `${caminho} não é um caminho interno da conta`
+      );
+    }
     assert.match(VERIFICAR, /DESTINOS_PERMITIDOS\.has\(pedido\)/);
   });
 
