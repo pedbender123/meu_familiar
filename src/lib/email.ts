@@ -713,12 +713,31 @@ export async function enviarOferta(params: {
 }
 
 /**
- * A confirmação de compra de quem ainda não terminou o ritual.
+ * O acesso ao teste, para quem pagou antes de fazê-lo.
  *
- * No funil novo a pessoa paga com TRÊS cenas respondidas; a leitura só nasce
- * quando as outras vinte e três fecharem. Este e-mail existe por um motivo
- * só: garantir que o link de continuar sobreviva à aba fechada. Ele é o
- * recibo e o caminho de volta na mesma mensagem.
+ * ── Por que este e-mail é a entrega, e não um recibo ──────────────────────
+ *
+ * Nos funis curtos (`atravessar`, `familiar`) a pessoa compra depois de
+ * responder meia dúzia de perguntas bonitas — a palma da mão, a roda de
+ * nascimento, o medidor do véu. Nada daquilo mede coisa alguma: aquele funil
+ * existe para vender, e ele vende bem justamente por não cobrar treze minutos
+ * de ninguém antes de saber se quer.
+ *
+ * O que decide o familiar são as 26 cenas, e elas ainda não aconteceram. Então
+ * o que a pessoa comprou não está pronto no instante do pagamento — e mandá-la
+ * direto para uma página de familiar seria mostrar um resultado que nenhuma
+ * resposta dela produziu.
+ *
+ * Este e-mail é o que fecha esse buraco: ele entrega **o teste**. É por isso
+ * que o assunto e o botão falam de fazer o teste, e não de "acessar sua
+ * conta" — não é a plataforma que está sendo entregue aqui, é a única coisa
+ * que falta para o produto existir.
+ *
+ * ── Ele não substitui a tela ──────────────────────────────────────────────
+ *
+ * Quem fica na aba depois de pagar é levado ao ritual pelo `/obrigado`, e
+ * segue direto. Este e-mail é para quem fechou a aba — e é o caminho de volta
+ * que sobrevive a isso. Os dois levam ao mesmo lugar.
  */
 export async function enviarCompraConfirmada(params: {
   nome: string;
@@ -731,31 +750,34 @@ export async function enviarCompraConfirmada(params: {
 
   await enviar({
     para: email,
-    assunto: `${nome}, seu pagamento chegou — ele está esperando`,
+    assunto: `${nome}, seu teste está liberado — faltam 26 perguntas`,
     html: moldura(`
       <p style="margin:0 0 16px;font-family:Georgia,serif;font-size:15px;line-height:1.7;color:#2E2438;">
         ${nome},
       </p>
       <p style="margin:0 0 16px;font-family:Georgia,serif;font-size:15px;line-height:1.7;color:#2E2438;">
-        Seu pagamento da <strong>${nomeDoProduto}</strong> foi confirmado. Do
-        outro lado do véu, alguém sentiu.
+        Seu pagamento da <strong>${nomeDoProduto}</strong> foi confirmado, e o
+        seu acesso ao teste está aberto.
       </p>
       <p style="margin:0 0 16px;font-family:Georgia,serif;font-size:15px;line-height:1.7;color:#2E2438;">
-        Faltam as cenas que dizem <em>qual</em> dos três é o seu. Leva uns
-        minutos, e dá para parar e voltar quando quiser — este link guarda o
-        seu lugar:
+        São <strong>26 cenas</strong> — nenhuma pergunta sobre signo, nenhuma
+        sobre data. É o que decide qual dos doze familiares caminha ao seu
+        lado, e é ele que escreve a sua leitura. <strong>Só depois de
+        respondê-las o seu relatório é escrito.</strong>
       </p>
-      <p style="margin:0 0 8px;">${botao(url, 'Continuar meu ritual')}</p>
+      <p style="margin:0 0 8px;">${botao(url, 'Fazer o meu teste')}</p>
       <p style="margin:20px 0 0;font-family:Arial,sans-serif;font-size:12px;line-height:1.6;color:#6B5F72;">
-        Guarde este e-mail: o link acima é o caminho de volta se você fechar a
-        página.
+        Leva alguns minutos e dá para parar e voltar quando quiser — este link
+        guarda o seu lugar. Guarde este e-mail: ele é o caminho de volta se
+        você fechar a página.
       </p>
     `),
     texto: [
       `${nome},`,
-      `Seu pagamento da ${nomeDoProduto} foi confirmado.`,
-      `Faltam as cenas que dizem qual dos três é o seu familiar. Continue por aqui:`,
-      url,
+      `Seu pagamento da ${nomeDoProduto} foi confirmado, e o seu acesso ao teste está aberto.`,
+      `São 26 cenas — é o que decide qual dos doze familiares caminha ao seu lado. Só depois de respondê-las o seu relatório é escrito.`,
+      `Fazer o meu teste: ${url}`,
+      `Dá para parar e voltar quando quiser: o link guarda o seu lugar.`,
     ].join('\n\n'),
   });
 }

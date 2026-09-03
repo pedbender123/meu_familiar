@@ -84,11 +84,23 @@ describe('a página de vendas', () => {
     );
   });
 
-  test('as outras portas de funil caem na página de vendas', () => {
+  /**
+   * O oposto do que este teste dizia hoje de manhã.
+   *
+   * `/atravessar` e `/familiar` chegaram a redirecionar para `/vendas`. Isso
+   * matava a única forma de testar um funil com tráfego isolado — que é
+   * exatamente o que eles existem para permitir. Endereço próprio é o
+   * mecanismo, não o problema; o que não pode é tráfego pago cair neles sem
+   * querer, e disso cuida não haver link nenhum apontando para lá.
+   */
+  test('as portas de funil continuam sendo páginas, não desvios', () => {
     const config = readFileSync('next.config.ts', 'utf8');
     for (const rota of ['/atravessar', '/familiar']) {
-      const trecho = config.slice(config.indexOf(`source: "${rota}"`));
-      assert.match(trecho.slice(0, 120), /destination: "\/vendas"/, rota);
+      assert.doesNotMatch(
+        config,
+        new RegExp(`source:\\s*["']${rota}["']`),
+        `${rota} é o link isolado de um funil — redirecionar mata o teste`
+      );
     }
   });
 });

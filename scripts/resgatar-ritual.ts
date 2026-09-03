@@ -89,7 +89,7 @@ function paragrafos(nome: string, feitas: number): string[] {
   if (feitas === 0) {
     return [
       `${nome}, o seu lugar está pago e guardado — mas ele ainda não sabe quem você é.`,
-      'As cenas continuam abertas exatamente onde você deixou. São escolhas rápidas, e no fim delas ele aparece com nome, retrato e a leitura escrita a partir do que você respondeu.',
+      'O seu teste continua aberto: são 26 cenas, escolhas rápidas, nenhuma pergunta sobre signo. É ele que decide qual dos doze caminha ao seu lado, e no fim dele o seu familiar aparece com nome, retrato e a leitura escrita a partir do que você respondeu.',
       'Não tem pressa e não tem prazo. É só voltar quando puder.',
     ];
   }
