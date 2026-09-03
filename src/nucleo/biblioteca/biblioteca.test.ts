@@ -28,12 +28,39 @@ import { precoComDesconto } from '../../lib/cupons';
 
 const EMAIL = 'quem@comprou.com';
 
+/**
+ * A trava que impede este arquivo de apagar os livros de verdade.
+ *
+ * ── Por que ela existe ────────────────────────────────────────────────────
+ *
+ * Já aconteceu. Quando o catálogo passou a apontar para `biblioteca/texto/`,
+ * esta fixture sobrescreveu e apagou os três livros publicados — os nomes que
+ * ela escreve são exatamente os nomes reais. Nenhum teste falhou: o `unlink`
+ * mora num `try/catch` que engole tudo.
+ *
+ * `npm test` roda com `BRUXARIO_DIR_BIBLIOTECA` numa pasta temporária. Rodar
+ * o arquivo direto (`npx tsx --test`) não tem essa variável — e é assim que o
+ * acidente aconteceu. Então o teste se recusa a rodar fora do sandbox.
+ */
+function exigirSandbox() {
+  if (!process.env.BRUXARIO_DIR_BIBLIOTECA) {
+    throw new Error(
+      'Este teste escreve em disco e apagaria os livros publicados.\n' +
+        'Rode com `npm test`, ou defina BRUXARIO_DIR_BIBLIOTECA para uma pasta descartável.'
+    );
+  }
+}
+
 function criarArquivosFalsos() {
+  exigirSandbox();
   fs.mkdirSync(PASTA_DA_BIBLIOTECA, { recursive: true });
-    for (const e of EBOOKS) fs.writeFileSync(caminhoDoTexto(e), '## Capítulo\n\nTexto de teste.');
+  for (const e of EBOOKS) {
+    fs.writeFileSync(caminhoDoTexto(e), '## Capítulo\n\nTexto de teste.');
+  }
 }
 
 function apagarArquivosFalsos() {
+  exigirSandbox();
   for (const e of EBOOKS) {
     try {
       fs.unlinkSync(caminhoDoTexto(e));

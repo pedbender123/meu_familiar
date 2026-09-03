@@ -52,7 +52,29 @@ export const CONTEUDO = path.join(RAIZ, 'conteudo');
  * código. Em `var/` cada livro novo viraria um upload manual esquecível, e
  * esquecer significa vender um PDF que não existe do outro lado.
  */
-export const BIBLIOTECA = path.join(RAIZ, 'biblioteca');
+/**
+ * `BRUXARIO_DIR_BIBLIOTECA` aponta a pasta para uma cópia isolada — é o que
+ * o `npm test` usa, pela mesma razão que `BRUXARIO_DIR_DADOS` existe.
+ *
+ * ── O acidente que criou esta variável ────────────────────────────────────
+ *
+ * A fixture de `biblioteca.test.ts` escreve livros falsos em disco e os apaga
+ * no fim. Enquanto o catálogo apontava para `pdfs/`, os arquivos reais tinham
+ * outros nomes e nunca colidiam. No dia em que o catálogo passou a apontar
+ * para `texto/*.md` — exatamente onde os livros moram, com exatamente os
+ * nomes do catálogo — a suíte de testes **apagou os três livros de verdade**.
+ *
+ * Nenhum teste falhou, nada avisou: a fixture faz `unlink` num `try/catch`
+ * que engole tudo. O sintoma apareceu no deploy, quando os arquivos não
+ * estavam lá.
+ *
+ * Teste que escreve em disco tem que escrever num disco que não é o do
+ * produto. Isso é estrutura, não disciplina — depender de lembrar é depender
+ * de nunca esquecer.
+ */
+export const BIBLIOTECA = process.env.BRUXARIO_DIR_BIBLIOTECA
+  ? path.resolve(process.env.BRUXARIO_DIR_BIBLIOTECA)
+  : path.join(RAIZ, 'biblioteca');
 /** O Markdown de cada livro — o produto. Ver `nucleo/biblioteca/formato.ts`. */
 export const BIBLIOTECA_TEXTO = path.join(BIBLIOTECA, 'texto');
 /** O PDF de origem, quando houve um. Pesquisa, não entrega. */
