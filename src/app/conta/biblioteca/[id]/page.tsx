@@ -2,7 +2,7 @@ import { notFound, redirect } from 'next/navigation';
 import { sessaoAtual } from '@/lib/sessao-servidor';
 import { buscarConta } from '@/lib/autenticacao';
 import { assinaturaPagaAtiva } from '@/nucleo/assinaturas';
-import { podeAbrir } from '@/nucleo/biblioteca/desbloqueios';
+import { downloadDoLivro, podeAbrir } from '@/nucleo/biblioteca/desbloqueios';
 import { lerEbook } from '@/nucleo/biblioteca/leitura';
 import { Leitor } from '@/components/biblioteca/Leitor';
 
@@ -44,5 +44,16 @@ export default async function LerLivro({ params }: { params: Promise<{ id: strin
     redirect('/conta/biblioteca');
   }
 
-  return <Leitor ebookId={lido.ebook.id} titulo={lido.ebook.titulo} livro={lido.livro} />;
+  return (
+    <Leitor
+      ebookId={lido.ebook.id}
+      titulo={lido.ebook.titulo}
+      livro={lido.livro}
+      /*
+        Quem lê pela assinatura recebe `comprado: false` e não vê arquivo
+        nenhum — a assinatura vende leitura, a compra vende o livro.
+      */
+      download={downloadDoLivro(sessao.email, id)}
+    />
+  );
 }

@@ -34,11 +34,11 @@ import { DESCRICAO_DOS_EIXOS, type Eixo } from './quiz/eixos';
  * alguns bytes em vez de um PNG.
  */
 
-const A5 = { largura: 419.53, altura: 595.28 };
-const MARGEM = 46;
-const LARGURA_TEXTO = A5.largura - MARGEM * 2;
+export const A5 = { largura: 419.53, altura: 595.28 };
+export const MARGEM = 46;
+export const LARGURA_TEXTO = A5.largura - MARGEM * 2;
 
-const COR = {
+export const COR = {
   tinta: rgb(0x17 / 255, 0x12 / 255, 0x25 / 255),
   folha: rgb(0xe7 / 255, 0xdc / 255, 0xc4 / 255),
   escrita: rgb(0x2e / 255, 0x24 / 255, 0x38 / 255),
@@ -52,7 +52,7 @@ const COR = {
   pergaminho: rgb(0xea / 255, 0xe0 / 255, 0xcc / 255),
 };
 
-interface Fontes {
+export interface Fontes {
   corpo: PDFFont;
   display: PDFFont;
   displayBold: PDFFont;
@@ -61,7 +61,14 @@ interface Fontes {
 
 /* ── medir e quebrar texto ─────────────────────────────────────────────── */
 
-function quebrar(
+/*
+  Daqui para baixo, o que é `export` é peça compartilhada com `pdf-livro.ts`,
+  que monta os ebooks com a mesma folha. Duas implementações da mesma folha de
+  pergaminho seriam duas estéticas que divergem na primeira vez que alguém
+  ajustar uma delas.
+*/
+
+export function quebrar(
   texto: string,
   fonte: PDFFont,
   tamanho: number,
@@ -84,7 +91,7 @@ function quebrar(
   return linhas;
 }
 
-function centralizar(
+export function centralizar(
   pagina: PDFPage,
   texto: string,
   y: number,
@@ -103,7 +110,7 @@ function centralizar(
 }
 
 /** Filete centrado: o separador que o site faz com um `<hr>` esmaecido. */
-function filete(pagina: PDFPage, y: number, meiaLargura = 34) {
+export function filete(pagina: PDFPage, y: number, meiaLargura = 34) {
   pagina.drawLine({
     start: { x: A5.largura / 2 - meiaLargura, y },
     end: { x: A5.largura / 2 + meiaLargura, y },
@@ -127,7 +134,7 @@ function filete(pagina: PDFPage, y: number, meiaLargura = 34) {
  * páginas. 600px esticado é indistinguível de resolução plena num fundo
  * texturizado, e pesa uma fração.
  */
-async function fundoDePergaminho(): Promise<Buffer> {
+export async function fundoDePergaminho(): Promise<Buffer> {
   const L = 600;
   const A = Math.round(L * (A5.altura / A5.largura));
 

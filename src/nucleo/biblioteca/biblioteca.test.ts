@@ -11,7 +11,13 @@ import {
   caminhoDoTexto,
   PASTA_DA_BIBLIOTECA,
 } from './catalogo';
-import { desbloquear, desbloqueiosDe, estanteDe, podeAbrir } from './desbloqueios';
+import {
+  desbloquear,
+  desbloqueiosDe,
+  downloadDoLivro,
+  estanteDe,
+  podeAbrir,
+} from './desbloqueios';
 import { entregarBumpsDoPedido } from './entrega';
 import { precoComDesconto } from '../../lib/cupons';
 
@@ -287,5 +293,67 @@ describe('quem pode abrir o arquivo', () => {
   test('livro sem arquivo não abre nem para assinante', () => {
     apagarArquivosFalsos();
     assert.equal(podeAbrir(EMAIL, 'magia-elemental', true), false);
+  });
+});
+
+/**
+ * Baixar é outra pergunta que ler.
+ *
+ * Ler é o que a assinatura vende; baixar é o que a compra dá. Misturar os dois
+ * faria o assinante sair com o acervo no bolso no dia em que cancelasse — que
+ * é exatamente o que a assinatura não vende.
+ */
+describe('quem pode BAIXAR o arquivo', () => {
+  const HOJE = new Date('2026-09-20T12:00:00.000Z');
+  const haDias = (n: number) => new Date(HOJE.getTime() - n * 86_400_000);
+
+  test('quem não tem o livro não baixa', () => {
+    assert.equal(downloadDoLivro(EMAIL, 'magia-elemental', HOJE).comprado, false);
+  });
+
+  test('quem comprou hoje espera sete dias', () => {
+    desbloquear({
+      email: EMAIL,
+      ebookId: 'magia-elemental',
+      origem: 'bump',
+      quando: HOJE,
+    });
+    const estado = downloadDoLivro(EMAIL, 'magia-elemental', HOJE);
+    assert.equal(estado.comprado, true);
+    assert.equal(estado.liberado, false);
+    assert.equal(estado.diasQueFaltam, 7);
+  });
+
+  test('passados os sete dias, abre', () => {
+    desbloquear({
+      email: EMAIL,
+      ebookId: 'magia-elemental',
+      origem: 'bump',
+      quando: haDias(8),
+    });
+    assert.equal(downloadDoLivro(EMAIL, 'magia-elemental', HOJE).liberado, true);
+  });
+
+  test('cortesia não é compra: nunca baixa', () => {
+    desbloquear({
+      email: EMAIL,
+      ebookId: 'magia-elemental',
+      origem: 'cortesia',
+      quando: haDias(400),
+    });
+    const estado = downloadDoLivro(EMAIL, 'magia-elemental', HOJE);
+    assert.equal(estado.comprado, false);
+    assert.equal(estado.liberado, false);
+  });
+
+  /**
+   * A assinatura nem cria linha de desbloqueio (ver `estanteDe`), então o
+   * assinante cai no mesmo caso de quem não tem o livro. Este teste existe
+   * para que alguém que um dia resolva gravar a assinatura como desbloqueio
+   * descubra aqui o que isso quebra.
+   */
+  test('assinante lê tudo e não baixa nada', () => {
+    assert.equal(podeAbrir(EMAIL, 'magia-elemental', true), true);
+    assert.equal(downloadDoLivro(EMAIL, 'magia-elemental', HOJE).liberado, false);
   });
 });

@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import db from '../../lib/db';
 import { EBOOKS, buscarEbook, ebookEntregavel, type Ebook } from './catalogo';
+import { estadoDoDownload } from '../carencia';
 
 /**
  * Quem pode abrir qual livro.
@@ -168,4 +169,56 @@ export function podeAbrir(
   if (!ebook || !ebookEntregavel(ebook)) return false;
   if (assinaturaAtiva) return true;
   return desbloqueiosDe(email).some((d) => d.ebook_id === ebookId);
+}
+
+/**
+ * O livro pode ser BAIXADO?
+ *
+ * ── Ler não é levar embora ────────────────────────────────────────────────
+ *
+ * `podeAbrir` responde sobre leitura, e a assinatura abre tudo. Aqui a
+ * pergunta é outra: o arquivo sai daqui e fica com a pessoa para sempre,
+ * independente do que ela faça depois. Isso é de quem **comprou o livro**.
+ *
+ * Assinante não baixa — ele lê enquanto assina, e é justamente esse "enquanto"
+ * que a assinatura vende. Cortesia também não: ninguém pagou por ela.
+ *
+ * ── E mesmo quem comprou espera sete dias ─────────────────────────────────
+ *
+ * O prazo de arrependimento do CDC. Ver `nucleo/carencia.ts` para o porquê —
+ * o resumo é que baixar no primeiro minuto e pedir estorno no segundo é uma
+ * porta que não precisa ficar aberta, e que a espera transforma o arquivo de
+ * saída em lembrança.
+ */
+export interface DownloadDoLivro {
+  liberado: boolean;
+  diasQueFaltam: number;
+  /** `false` quando o direito não é de compra (assinatura, cortesia, nada). */
+  comprado: boolean;
+}
+
+/** As origens que são compra de verdade — as que geram direito ao arquivo. */
+const ORIGENS_DE_COMPRA: OrigemDoDesbloqueio[] = ['bump', 'avulso'];
+
+export function downloadDoLivro(
+  email: string,
+  ebookId: string,
+  agora?: Date
+): DownloadDoLivro {
+  const fechado = { liberado: false, diasQueFaltam: 0, comprado: false };
+
+  const ebook = buscarEbook(ebookId);
+  if (!ebook || !ebookEntregavel(ebook)) return fechado;
+
+  const compra = desbloqueiosDe(email).find(
+    (d) => d.ebook_id === ebookId && ORIGENS_DE_COMPRA.includes(d.origem)
+  );
+  if (!compra) return fechado;
+
+  const estado = estadoDoDownload(compra.criado_em, agora);
+  return {
+    liberado: estado.liberado,
+    diasQueFaltam: estado.diasQueFaltam,
+    comprado: true,
+  };
 }

@@ -4,7 +4,11 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight, Volume2, VolumeX } from 'lucide-react';
 import { FolhaPergaminho } from '@/components/FolhaPergaminho';
-import { paginarCapitulo, type LivroLido } from '@/nucleo/biblioteca/formato';
+import {
+  paginarCapitulo,
+  partesDoParagrafo,
+  type LivroLido,
+} from '@/nucleo/biblioteca/formato';
 import {
   alternarTrilha,
   assinarTrilha,
@@ -51,10 +55,16 @@ export function Leitor({
   ebookId,
   titulo,
   livro,
+  download,
 }: {
   ebookId: string;
   titulo: string;
   livro: LivroLido;
+  /**
+   * O estado do arquivo para levar embora. Só existe para quem COMPROU o
+   * livro — assinante lê e não baixa. Ver `downloadDoLivro`.
+   */
+  download?: { liberado: boolean; diasQueFaltam: number; comprado: boolean };
 }) {
   /**
    * A linha reta da leitura: uma entrada por PÁGINA, não por capítulo.
@@ -432,7 +442,7 @@ export function Leitor({
                       key={j}
                       className="font-corpo font-light text-[0.95rem] leading-[1.8] text-escrita-corpo italic"
                     >
-                      {p}
+                      <ComEnfase texto={p} />
                     </p>
                   ))}
                 </aside>
@@ -443,7 +453,7 @@ export function Leitor({
                       key={j}
                       className="font-corpo font-light text-[1.02rem] leading-[1.85] text-escrita-corpo"
                     >
-                      {p}
+                      <ComEnfase texto={p} />
                     </p>
                   ))}
                 </div>
@@ -494,6 +504,78 @@ export function Leitor({
           </button>
         )}
       </div>
+
+      <Exemplar ebookId={ebookId} download={download} />
     </div>
+  );
+}
+
+/**
+ * O negrito do Markdown, desenhado como negrito.
+ *
+ * Os livros usam `**assim**` dezenas de vezes, e sem isto o leitor mostrava os
+ * asteriscos crus no meio da frase — o defeito mais barato de perceber que um
+ * produto pode ter. Ver `partesDoParagrafo`.
+ *
+ * `font-medium`, e não `font-bold`: a folha é Sora Light num corpo pequeno, e
+ * o negrito cheio sobre pergaminho vira borrão. O que se quer é a frase pesar
+ * um pouco mais, não gritar.
+ */
+function ComEnfase({ texto }: { texto: string }) {
+  return (
+    <>
+      {partesDoParagrafo(texto).map((parte, i) =>
+        parte.forte ? (
+          <strong key={i} className="font-medium text-escrita">
+            {parte.texto}
+          </strong>
+        ) : (
+          <span key={i}>{parte.texto}</span>
+        )
+      )}
+    </>
+  );
+}
+
+/**
+ * O exemplar em PDF — o que a pessoa leva embora.
+ *
+ * ── Só quem comprou, e só depois de sete dias ─────────────────────────────
+ *
+ * Quem lê pela assinatura não vê nada aqui: não há arquivo, e não é
+ * esquecimento — é o que a assinatura vende (acesso enquanto durar) contra o
+ * que a compra dá (o livro, para sempre). Ver `nucleo/carencia.ts` para o
+ * prazo, e `downloadDoLivro` para quem tem direito.
+ *
+ * ── Por que a espera é anunciada ──────────────────────────────────────────
+ *
+ * Um botão que aparece do nada uma semana depois não é notado por ninguém.
+ * Contar os dias promete uma coisa que vai chegar, e dá motivo para voltar.
+ */
+function Exemplar({
+  ebookId,
+  download,
+}: {
+  ebookId: string;
+  download?: { liberado: boolean; diasQueFaltam: number; comprado: boolean };
+}) {
+  if (!download?.comprado) return null;
+
+  if (!download.liberado) {
+    return (
+      <p className="font-corpo text-[0.7rem] text-pergaminho/30 text-center max-w-[34ch] leading-relaxed">
+        O seu exemplar em PDF, com o seu nome na capa, fica pronto para guardar{' '}
+        {download.diasQueFaltam === 1 ? 'amanhã' : `em ${download.diasQueFaltam} dias`}.
+      </p>
+    );
+  }
+
+  return (
+    <a
+      href={`/api/biblioteca/${ebookId}/pdf`}
+      className="font-corpo text-[0.78rem] px-5 py-2 rounded-full border border-pergaminho/15 text-pergaminho/45 hover:border-pergaminho/40 hover:text-pergaminho/80 transition-colors"
+    >
+      Guardar o exemplar em PDF
+    </a>
   );
 }

@@ -277,25 +277,86 @@ export function paginarCapitulo(
   };
 
   for (const bloco of capitulo.blocos) {
-    const doBloco = contarPalavras(bloco.paragrafos);
+    if (bloco.tipo === 'pratica') {
+      const doBloco = contarPalavras(bloco.paragrafos);
+      if (palavras > 0 && palavras + doBloco > palavrasPorPagina) fechar();
+      atual.push(bloco);
+      palavras += doBloco;
+      fechar();
+      continue;
+    }
 
-    /*
-      Cabe? Entra. Não cabe e a página já tem coisa? Vira página nova.
-
-      A checagem `atual.length > 0` é o que impede um bloco maior que a folha
-      inteira de gerar uma página vazia antes dele. Bloco gigante ocupa uma
-      página sozinho, e tudo bem — melhor uma folha longa que uma em branco.
-    */
-    if (palavras > 0 && palavras + doBloco > palavrasPorPagina) fechar();
-
-    atual.push(bloco);
-    palavras += doBloco;
-
-    // A prática encerra a folha: ela é o convite para parar e fazer.
-    if (bloco.tipo === 'pratica') fechar();
+    // Bloco de texto: distribui os parágrafos sem quebrar nenhum parágrafo ao meio
+    let paragrafosDaPagina: string[] = [];
+    for (const p of bloco.paragrafos) {
+      const doP = p.split(/\s+/).filter(Boolean).length;
+      if (palavras > 0 && palavras + doP > palavrasPorPagina) {
+        if (paragrafosDaPagina.length > 0) {
+          atual.push({ tipo: 'texto', paragrafos: paragrafosDaPagina });
+          paragrafosDaPagina = [];
+        }
+        fechar();
+      }
+      paragrafosDaPagina.push(p);
+      palavras += doP;
+    }
+    if (paragrafosDaPagina.length > 0) {
+      atual.push({ tipo: 'texto', paragrafos: paragrafosDaPagina });
+    }
   }
   fechar();
 
   // Capítulo sem texto nenhum ainda é uma página — em branco, mas navegável.
   return paginas.length > 0 ? paginas : [{ blocos: [], minutos: 0 }];
+}
+
+/* ── ênfase dentro do parágrafo ─────────────────────────────────────────── */
+
+export interface ParteDoTexto {
+  texto: string;
+  forte: boolean;
+}
+
+/**
+ * Quebra um parágrafo nos trechos em negrito do Markdown (`**assim**`).
+ *
+ * ── Por que isto apareceu tarde ───────────────────────────────────────────
+ *
+ * Os primeiros livros não usavam negrito, e o leitor imprimia o parágrafo
+ * cru. Quando os livros de verdade chegaram, eles vinham com oitenta trechos
+ * em negrito cada um — e o produto passou a mostrar `**Passo 1**` com os
+ * asteriscos na cara da pessoa, em tela e em PDF.
+ *
+ * ── Por que na hora de desenhar, e não na leitura do arquivo ──────────────
+ *
+ * O parágrafo continua sendo uma string no `LivroLido`: é ela que conta
+ * palavras, que a paginação mede e que a busca um dia vai olhar. Trocar isso
+ * por uma árvore de pedaços obrigaria todo mundo que só quer o texto a
+ * remontá-lo. Quem desenha chama esta função; o resto continua com a frase.
+ *
+ * ── Tolerante, como o resto do formato ────────────────────────────────────
+ *
+ * Asterisco solto (um `**` sem o par) não vira nada: fica como está. Um livro
+ * não pode deixar de abrir por causa de um asterisco esquecido no meio de
+ * vinte mil palavras.
+ */
+export function partesDoParagrafo(texto: string): ParteDoTexto[] {
+  const partes: ParteDoTexto[] = [];
+  const padrao = /\*\*([^*]+)\*\*/g;
+  let ultimo = 0;
+
+  for (const achado of texto.matchAll(padrao)) {
+    const inicio = achado.index ?? 0;
+    if (inicio > ultimo) {
+      partes.push({ texto: texto.slice(ultimo, inicio), forte: false });
+    }
+    partes.push({ texto: achado[1], forte: true });
+    ultimo = inicio + achado[0].length;
+  }
+
+  if (ultimo < texto.length) {
+    partes.push({ texto: texto.slice(ultimo), forte: false });
+  }
+
+  return partes.length ? partes : [{ texto, forte: false }];
 }

@@ -1,6 +1,6 @@
 import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { lerLivro, paginarCapitulo } from './formato';
+import { lerLivro, paginarCapitulo, partesDoParagrafo } from './formato';
 
 /**
  * O parser do livro precisa aguentar texto escrito por gente — e por modelo
@@ -191,5 +191,47 @@ describe('as páginas dentro do capítulo', () => {
     const paginas = paginarCapitulo(capituloCom(), 290);
     assert.equal(paginas.length, 1);
     assert.deepEqual(paginas[0].blocos, []);
+  });
+});
+
+describe('a ênfase dentro do parágrafo', () => {
+  test('separa o que está entre asteriscos duplos', () => {
+    const partes = partesDoParagrafo('Antes **o meio** depois');
+    assert.deepEqual(partes, [
+      { texto: 'Antes ', forte: false },
+      { texto: 'o meio', forte: true },
+      { texto: ' depois', forte: false },
+    ]);
+  });
+
+  test('o parágrafo inteiro em negrito é uma parte só', () => {
+    assert.deepEqual(partesDoParagrafo('**Passo 1: o assento**'), [
+      { texto: 'Passo 1: o assento', forte: true },
+    ]);
+  });
+
+  test('parágrafo sem negrito volta inteiro', () => {
+    assert.deepEqual(partesDoParagrafo('nada aqui'), [{ texto: 'nada aqui', forte: false }]);
+  });
+
+  test('vários trechos no mesmo parágrafo', () => {
+    const partes = partesDoParagrafo('**a** e **b**');
+    assert.equal(partes.filter((p) => p.forte).length, 2);
+    assert.equal(partes.map((p) => p.texto).join(''), 'a e b');
+  });
+
+  /** Asterisco esquecido não pode derrubar um livro de vinte mil palavras. */
+  test('asterisco solto fica como texto', () => {
+    assert.deepEqual(partesDoParagrafo('um ** solto'), [
+      { texto: 'um ** solto', forte: false },
+    ]);
+  });
+
+  test('o texto nunca se perde', () => {
+    const original = 'a **b** c **d** e';
+    assert.equal(
+      partesDoParagrafo(original).map((p) => p.texto).join(''),
+      'a b c d e'
+    );
   });
 });
