@@ -197,8 +197,21 @@ export function ofertaDepoisDaEntrega(): boolean {
   return !interruptorLigado(CHAVE_OFERTA_FECHADA);
 }
 
+/**
+ * Para onde a pessoa vai quando a entrega termina.
+ *
+ * Com a oferta ligada, a escada de três degraus continua vindo primeiro: é o
+ * único momento de atenção total do funil, e pular ele para mostrar o app
+ * seria trocar a venda pelo passeio.
+ *
+ * Sem ela, o destino deixou de ser a revelação pública e passou a ser a porta
+ * (`/entrar/direto/[id]`): a mesma revelação, só que **dentro** da plataforma
+ * e com a sessão aberta. A porta cai sozinha na página pública quando não
+ * consegue provar que o navegador é o da compradora, então trocar isto aqui
+ * não fecha caminho para ninguém. Ver `lib/porta-do-comprador.ts`.
+ */
 export function destinoDepoisDaEntrega(pedidoId: string): string {
-  return ofertaDepoisDaEntrega() ? `/oferta/${pedidoId}` : `/revelacao/${pedidoId}`;
+  return ofertaDepoisDaEntrega() ? `/oferta/${pedidoId}` : `/entrar/direto/${pedidoId}`;
 }
 
 /**

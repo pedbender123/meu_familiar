@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { selarRespostaDoPedido } from '@/lib/porta-do-comprador';
 import { v4 as uuidv4 } from 'uuid';
 import { calcularSignos, calcularFaseDaLua } from '@/lib/astro';
 import { criarPedido, rascunhoVirouPedido, atualizarPedido } from '@/lib/db';
@@ -168,5 +169,6 @@ export async function POST(req: NextRequest) {
   const visitante = req.cookies.get('bx_v')?.value;
   if (visitante) rascunhoVirouPedido(visitante);
 
-  return NextResponse.json({ id: pedidoId, grupo });
+  // Ver `porta-do-comprador.ts`.
+  return selarRespostaDoPedido(NextResponse.json({ id: pedidoId, grupo }), pedidoId);
 }

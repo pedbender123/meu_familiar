@@ -97,6 +97,13 @@ export const MARCAS_DE_EMAIL: Record<string, { rotulo: string; conta: boolean }>
   ca: { rotulo: 'Lembrete de carrinho', conta: true },
   rs: { rotulo: 'Lembrete de rascunho', conta: true },
   rm: { rotulo: 'Remarketing', conta: true },
+  /**
+   * Não veio de e-mail nenhum: é quem entrou na plataforma no mesmo gesto do
+   * pagamento (ver `/entrar/direto/[id]`). Fica nesta tabela porque usa o
+   * mesmo parâmetro `e=`, e `conta: false` porque a aquisição já foi contada
+   * na venda — marcá-la de novo aqui seria contar a mesma pessoa duas vezes.
+   */
+  cp: { rotulo: 'Entrada pela compra', conta: false },
 };
 
 /**

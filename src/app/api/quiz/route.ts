@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { selarRespostaDoPedido } from '@/lib/porta-do-comprador';
 import { v4 as uuidv4 } from 'uuid';
 import { calcularSignos, calcularFaseDaLua } from '@/lib/astro';
 import {
@@ -236,7 +237,12 @@ export async function POST(req: NextRequest) {
     });
     registrarEvento('pagamento_dispensado_por_cupom', pedidoId);
     processarPedido(pedidoId);
-    return NextResponse.json({ id: pedidoId, gratis: true });
+    // O selo da porta: é ele que faz esta pessoa entrar na plataforma
+    // depois de pagar, sem passar pelo e-mail. Ver `porta-do-comprador.ts`.
+    return selarRespostaDoPedido(
+      NextResponse.json({ id: pedidoId, gratis: true }),
+      pedidoId
+    );
   }
 
   /**
@@ -319,5 +325,7 @@ export async function POST(req: NextRequest) {
     console.error('[api/quiz] rastreio do lead falhou:', erro);
   }
 
-  return NextResponse.json({ id: pedidoId });
+  // Ver `porta-do-comprador.ts`: o selo desta aba é o que abre a
+  // plataforma no minuto seguinte ao pagamento.
+  return selarRespostaDoPedido(NextResponse.json({ id: pedidoId }), pedidoId);
 }

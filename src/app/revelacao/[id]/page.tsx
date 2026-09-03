@@ -1,30 +1,18 @@
 import Link from 'next/link';
 import { buscarPedido } from '@/lib/db';
-import { FAMILIARES, type FamiliarId, type LuaId } from '@/lib/familiares';
+import { FAMILIARES, type FamiliarId } from '@/lib/familiares';
 import type { Leitura } from '@/lib/leitura';
-import type { Signo } from '@/lib/astro';
-import { FolhaPergaminho } from '@/components/FolhaPergaminho';
-import { CartaFamiliar } from '@/components/CartaFamiliar';
-import { SigiloFamiliar } from '@/components/SigiloFamiliar';
-import { TextoEscrito, BlocoRevelado } from '@/components/TextoEscrito';
 import { PoeiraNaLuz } from '@/components/PoeiraNaLuz';
-import { Constelacao } from '@/components/Constelacao';
-import { BotaoCompartilhar } from '@/components/BotaoCompartilhar';
-import { OfertaDaCompleta } from '@/components/OfertaDaCompleta';
-import { podeMelhorar } from '@/nucleo/melhoria';
-import { MarcarNoStory } from '@/components/MarcarNoStory';
-import { marcacaoDoPedido } from '@/lib/marcacoes';
 import { RodapeLegal } from '@/components/RodapeLegal';
-import { AvisoDeExpiracao, AcessoExpirado } from '@/components/AvisoDeExpiracao';
+import { AcessoExpirado } from '@/components/AvisoDeExpiracao';
 import { linkPublicoExpirou, produtoDe } from '@/lib/produtos';
 import { sessaoAtual } from '@/lib/sessao-servidor';
 import { comentarioDoPedido } from '@/lib/db';
 import { PedidoDeOpiniao } from '@/components/PedidoDeOpiniao';
-import { RelatorioCompleto, type Perfil } from '@/components/RelatorioCompleto';
-import { TocaAudio } from '@/components/TocaAudio';
 import { buscarConta } from '@/lib/autenticacao';
 import { compararAcessoEmSombra } from '@/nucleo/sombra';
 import { MarcaCompra } from '@/components/MarcaCompra';
+import { CorpoDaRevelacao } from '@/components/revelacao/CorpoDaRevelacao';
 
 /**
  * Metadados por revelação: o card mostra o familiar DA PESSOA.
@@ -61,17 +49,6 @@ export async function generateMetadata({
     },
   };
 }
-
-/**
- * A fase da lua vira anotação manuscrita sob a carta. Antes ela era só fundo
- * de imagem — aqui ela diz alguma coisa.
- */
-const LEGENDA_LUA: Record<LuaId, string> = {
-  nova: 'sob a lua nova, quando nada ainda tem nome',
-  crescente: 'sob a lua crescente, com tudo ainda por acontecer',
-  cheia: 'sob a lua cheia, quando não há onde se esconder',
-  minguante: 'sob a lua minguante, na hora de deixar ir',
-};
 
 export default async function Revelacao({
   params,
@@ -115,16 +92,7 @@ export default async function Revelacao({
   }
 
   const leitura: Leitura = JSON.parse(pedido.leitura_json);
-  const familiar = FAMILIARES[pedido.familiar as FamiliarId];
   const produto = produtoDe(pedido.produto);
-
-  // Os gráficos só existem na Completa — é o que ela vende. Pedidos antigos
-  // não têm perfil salvo, então a ausência também esconde a seção em vez de
-  // quebrar a página.
-  const perfil: Perfil | null =
-    produto.graficos && pedido.perfil_json
-      ? (JSON.parse(pedido.perfil_json) as Perfil)
-      : null;
 
   // Fase 2 de docs/reestruturacao.md: compara em sombra o que produtos.ts
   // decidiu aqui contra o que o núcleo novo (acesso.ts) diria — nunca decide
@@ -167,168 +135,21 @@ export default async function Revelacao({
 
       {/*
         A composição segue a regra da estética: o que é grimório vai DENTRO da
-        folha; o que é interface fica fora dela, no quarto. Por isso o botão de
-        compartilhar e o oráculo vêm depois do </FolhaPergaminho> — botão sobre
-        pergaminho leria como anacronismo.
+        folha; o que é interface fica fora dela, no quarto.
+
+        O corpo é o MESMO objeto que a plataforma monta em
+        `/conta/familiar/[id]` — ver `CorpoDaRevelacao`. Esta página é a moldura
+        pública dele: a que tem prazo, a que circula, a que um estranho pode
+        abrir.
       */}
       <main className="quarto-de-vela relative z-10 flex-1 flex flex-col items-center px-5 pt-10 pb-16 gap-8 sm:gap-12 sm:pt-16">
-        <Vela />
-
-        {pedido.expira_em && (
-          <AvisoDeExpiracao
-            pedidoId={id}
-            expiraEm={pedido.expira_em}
-            ehADona={ehADona}
-          />
-        )}
-
-        <FolhaPergaminho>
-          <SigiloFamiliar sigilo={familiar.sigilo} tamanho={200} />
-
-          <span className="font-corpo text-[0.68rem] tracking-[0.24em] uppercase text-escrita-fraca">
-            O familiar de
-          </span>
-          <p className="font-ritual text-5xl sm:text-6xl leading-none text-escrita text-center text-balance">
-            {pedido.nome}
-          </p>
-
-          <h1 className="font-display italic font-semibold text-2xl sm:text-4xl leading-tight text-escrita text-center text-balance">
-            {familiar.nome}{' '}
-            <span className="text-ouro-velho">· {leitura.nome_secreto}</span>
-          </h1>
-
-          <CartaFamiliar
-            pedidoId={id}
-            alt={`${familiar.nome} — a carta do familiar de ${pedido.nome}`}
-            legenda={LEGENDA_LUA[pedido.lua as LuaId]}
-          />
-
-          <hr className="w-24 h-px border-0 bg-gradient-to-r from-transparent via-escrita/40 to-transparent" />
-
-          <TextoEscrito className="font-display italic text-lg sm:text-xl leading-relaxed text-center max-w-[34ch] text-escrita">
-            {leitura.saudacao}
-          </TextoEscrito>
-
-          {/*
-            Só existe pra quem comprou um produto com `narracaoAudio` (hoje,
-            só a Completa) — ver `processarPedido` em `processar.ts`.
-          */}
-          {pedido.audio_narracao === 1 && (
-            <TocaAudio
-              src={`/api/storage/${id}/narracao.mp3`}
-              rotulo="Ouvir a leitura narrada"
-            />
-          )}
-
-          {pedido.signo_sol && pedido.signo_lua && (
-            <Constelacao
-              signoSol={pedido.signo_sol as Signo}
-              signoLua={pedido.signo_lua as Signo}
-              variante="papel"
-            />
-          )}
-
-          <div className="leitura-grimorio flex flex-col gap-5 max-w-[62ch] self-stretch text-escrita-corpo leading-[1.75]">
-            {leitura.leitura.map((paragrafo, i) => (
-              <TextoEscrito key={i} className="font-corpo font-light">
-                {paragrafo}
-              </TextoEscrito>
-            ))}
-          </div>
-
-          <TextoEscrito className="font-display italic text-xl sm:text-2xl leading-snug text-center max-w-[30ch] mt-3 text-ouro-profundo text-balance">
-            {leitura.frase_de_invocacao}
-          </TextoEscrito>
-
-          {perfil && (
-            <RelatorioCompleto perfil={perfil} familiar={pedido.familiar as FamiliarId} />
-          )}
-        </FolhaPergaminho>
-
-        <BlocoRevelado className="flex justify-center">
-          <BotaoCompartilhar
-            pedidoId={id}
-            textoCompartilhar={`Descobri meu familiar de bruxa: ${familiar.nome} · ${leitura.nome_secreto}.`}
-          />
-        </BlocoRevelado>
-
-        {/*
-          O upgrade para a Completa, por R$ 4,90.
-
-          Só para a DONA: a página tem link público, e oferecer um upgrade a
-          quem recebeu o link de outra pessoa venderia a melhoria de um pedido
-          que não é dela. `podeMelhorar` cuida do resto — quem já tem a
-          Completa, quem já pagou, e os exemplos do mural ficam de fora.
-        */}
-        {ehADona && podeMelhorar(pedido) && (
-          <BlocoRevelado className="flex justify-center">
-            <OfertaDaCompleta pedidoId={id} />
-          </BlocoRevelado>
-        )}
-
-        {/*
-          A troca por compartilhamento fica logo abaixo dos botões de
-          compartilhar, e só para a dona logada — a página tem link público, e
-          um estranho registraria um @ no pedido de outra pessoa.
-        */}
-        {ehADona && sessao?.tipo === 'conta' && (
-          <BlocoRevelado className="flex justify-center">
-            <MarcarNoStory
-              pedidoId={id}
-              jaRegistrado={marcacaoDoPedido(id)?.arroba ?? null}
-              conferido={!!marcacaoDoPedido(id)?.recompensado}
-            />
-          </BlocoRevelado>
-        )}
-
-        {/*
-          ── O convite para quem chegou pelo link de outra pessoa ───────────
-
-          O botão de compartilhar manda a REVELAÇÃO, porque é o que a pessoa
-          quer mostrar ("olha o que deu pra mim"). Isso resolve metade do
-          problema e cria a outra: sem este bloco, quem recebe lê a história de
-          uma amiga, acha bonito, e não tem para onde ir — a página não pede
-          nada, e a curiosidade morre ali.
-
-          Era essa a preocupação por trás de o link ter apontado para a home
-          durante um tempo. A preocupação estava certa; a solução, não. O lugar
-          de convidar é aqui, depois de a pessoa ter lido a coisa que dá
-          vontade — não antes dela, numa página de vendas que o amigo nunca
-          pediu para ver.
-
-          Só para quem NÃO é a dona: ela já tem o dela, e oferecer o ritual a
-          quem acabou de recebê-lo é o tipo de detalhe que faz um produto
-          parecer que não sabe com quem está falando.
-        */}
-        {!ehADona && (
-          <BlocoRevelado className="w-full max-w-md flex flex-col items-center gap-4 text-center border-t border-pergaminho/10 pt-8 sm:pt-10">
-            <p className="font-display italic text-lg leading-snug text-pergaminho/80 max-w-[28ch]">
-              Cada pessoa tem o seu.
-            </p>
-            <p className="font-corpo font-light text-sm leading-relaxed text-pergaminho/55 max-w-[34ch]">
-              Vinte e seis cenas revelam qual dos doze caminha ao seu lado. O
-              signo tem peso zero.
-            </p>
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 bg-vela text-tinta font-corpo font-medium px-6 py-3 rounded-full hover:brightness-110 transition"
-            >
-              Descobrir o meu familiar
-            </Link>
-          </BlocoRevelado>
-        )}
-
-        {/*
-          O recado para o Oráculo saiu daqui e foi para a área da conta.
-          Aqui ele pedia texto livre a quem talvez nem tivesse conta, numa
-          página que também é vista por estranhos com o link. Na conta, é a
-          própria pessoa, identificada, num lugar que é dela.
-        */}
-        <section className="w-full max-w-md flex flex-col items-center gap-3 text-center border-t border-pergaminho/10 pt-8 sm:pt-10">
-          <p className="font-display italic text-lg leading-snug text-pergaminho/70 max-w-[30ch]">
-            &ldquo;{leitura.sussurro_final}&rdquo;
-          </p>
-        </section>
+        <CorpoDaRevelacao
+          pedido={pedido}
+          leitura={leitura}
+          ehADona={ehADona}
+          temSessaoDeConta={sessao?.tipo === 'conta'}
+          contexto="publico"
+        />
 
         <RodapeLegal />
       </main>
@@ -342,36 +163,5 @@ export default async function Revelacao({
         <PedidoDeOpiniao pedidoId={id} jaComentou={!!comentarioDoPedido(id)} />
       )}
     </>
-  );
-}
-
-/** A vela que ilumina o quarto — a fonte da luz que a folha reflete. */
-function Vela() {
-  return (
-    <div className="flex flex-col items-center gap-2">
-      <svg width="40" height="66" viewBox="0 0 40 66" aria-hidden="true">
-        <ellipse cx="20" cy="60" rx="4" ry="4.5" fill="var(--vela)" opacity="0.35" />
-        <rect
-          x="18"
-          y="42"
-          width="4"
-          height="18"
-          rx="2"
-          fill="var(--pergaminho)"
-          opacity="0.8"
-        />
-        <g className="chama-tremula" style={{ transformOrigin: '20px 42px' }}>
-          <path d="M20 6 C9 24, 6 34, 20 42 C34 34, 31 24, 20 6 Z" fill="var(--vela)" />
-          <path
-            d="M20 19 C14.5 29, 13.5 35, 20 39 C26.5 35, 25.5 29, 20 19 Z"
-            fill="#FFF3D6"
-            opacity="0.92"
-          />
-        </g>
-      </svg>
-      <span className="font-corpo text-[0.7rem] tracking-[0.22em] uppercase text-violeta">
-        Bruxário
-      </span>
-    </div>
   );
 }

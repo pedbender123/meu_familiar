@@ -16,7 +16,12 @@ import { readFileSync } from 'node:fs';
  */
 
 const BOTAO = readFileSync('src/components/BotaoCompartilhar.tsx', 'utf8');
-const PAGINA = readFileSync('src/app/revelacao/[id]/page.tsx', 'utf8');
+/**
+ * O corpo da revelação mudou de casa: ele é um componente agora, usado pela
+ * página pública e pela tela de dentro do app. O convite a quem chegou pelo
+ * link de outra pessoa mora lá, e é lá que este teste precisa olhar.
+ */
+const PAGINA = readFileSync('src/components/revelacao/CorpoDaRevelacao.tsx', 'utf8');
 
 describe('o que o botão de compartilhar copia', () => {
   test('o link aponta para a revelação, não para a home', () => {
@@ -56,8 +61,10 @@ describe('quem recebe o link tem para onde ir', () => {
    * apontado para a home — certa, e resolvida no lugar errado.
    */
   test('a revelação convida quem não é a dona', () => {
-    const bloco = PAGINA.slice(PAGINA.indexOf('{!ehADona && ('));
-    assert.ok(bloco.length > 0, 'existe um bloco só para visitante');
+    // Só na moldura pública: dentro do app não existe visitante para convidar.
+    const inicio = PAGINA.indexOf("{contexto === 'publico' && !ehADona && (");
+    assert.notEqual(inicio, -1, 'existe um bloco só para visitante');
+    const bloco = PAGINA.slice(inicio);
     assert.match(bloco.slice(0, 1200), /Descobrir o meu familiar/);
   });
 

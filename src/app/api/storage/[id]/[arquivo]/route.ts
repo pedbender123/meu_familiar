@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { buscarPedido } from '@/lib/db';
 import { pastaDoPedido, familiarFundidaPng } from '@/lib/caminhos';
+import { DIAS_DE_CARENCIA, podeBaixar } from '@/nucleo/carencia';
 
 const ARQUIVOS_PERMITIDOS: Record<string, string> = {
   'story.png': 'image/png',
@@ -59,6 +60,21 @@ export async function GET(
   const LIBERADOS_ANTES = new Set(['carta.webp', 'og.png', 'veu.webp', 'familiar.png']);
   if (pedido.status !== 'entregue' && !LIBERADOS_ANTES.has(arquivo)) {
     return NextResponse.json({ erro: 'não encontrado' }, { status: 404 });
+  }
+
+  /**
+   * O PDF só existe depois da carência — e a regra mora AQUI, não no botão.
+   *
+   * Esconder o link na tela e deixar a rota aberta não é esconder nada: o
+   * endereço é adivinhável a partir do id do pedido, que a própria pessoa vê
+   * na barra. Se a decisão de segurar o arquivo vale alguma coisa, ela vale
+   * no servidor. Ver `nucleo/carencia.ts` para o porquê dos sete dias.
+   */
+  if (arquivo === 'revelacao.pdf' && !podeBaixar(pedido.pago_em)) {
+    return NextResponse.json(
+      { erro: `o arquivo abre ${DIAS_DE_CARENCIA} dias depois da compra` },
+      { status: 403 }
+    );
   }
 
   /**

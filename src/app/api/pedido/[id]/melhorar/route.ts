@@ -38,7 +38,7 @@ export async function POST(
   }
 
   if (pedido.melhoria_paga_em || pedido.produto === 'completa') {
-    return NextResponse.json({ redirect: `/revelacao/${id}` });
+    return NextResponse.json({ redirect: `/entrar/direto/${id}` });
   }
   if (!podeMelhorar(pedido)) {
     return NextResponse.json({ erro: 'esta leitura não pode ser melhorada' }, { status: 400 });
@@ -50,7 +50,7 @@ export async function POST(
     const { entrega } = await confirmarMelhoria(id);
     await entrega;
     registrarEvento('melhoria_confirmada_fake', id);
-    return NextResponse.json({ status: 'approved', redirect: `/revelacao/${id}` });
+    return NextResponse.json({ status: 'approved', redirect: `/entrar/direto/${id}` });
   }
 
   let form: FormDataBrick;
@@ -86,7 +86,7 @@ export async function POST(
     registrarEvento(`melhoria_criada_${resultado.status}`, id);
 
     if (statusLiberaAcesso(resultado.status)) {
-      return NextResponse.json({ status: resultado.status, redirect: `/revelacao/${id}` });
+      return NextResponse.json({ status: resultado.status, redirect: `/entrar/direto/${id}` });
     }
 
     return NextResponse.json({

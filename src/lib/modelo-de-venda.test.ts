@@ -62,7 +62,7 @@ describe('desligado — o modelo de produção', () => {
 
   test('a trava de emergência devolve todo mundo para a revelação', () => {
     definirInterruptor({ chave: CHAVE_OFERTA_FECHADA, ligado: true, percentual: 100 });
-    assert.equal(destinoDepoisDaEntrega('abc'), '/revelacao/abc');
+    assert.equal(destinoDepoisDaEntrega('abc'), '/entrar/direto/abc');
     assert.equal(ofertaDepoisDaEntrega(), false);
   });
 

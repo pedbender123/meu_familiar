@@ -57,7 +57,8 @@ describe('a oferta chega nos dois canais', () => {
    * nem todo mundo abre o e-mail.
    */
   test('na revelação, guardada por `ehADona` e `podeMelhorar`', () => {
-    const fonte = readFileSync('src/app/revelacao/[id]/page.tsx', 'utf8');
+    // O corpo da revelação virou componente — ver `CorpoDaRevelacao`.
+    const fonte = readFileSync('src/components/revelacao/CorpoDaRevelacao.tsx', 'utf8');
     assert.ok(fonte.includes('OfertaDaCompleta'), 'a oferta precisa estar na página');
     assert.ok(
       /ehADona && podeMelhorar\(pedido\)/.test(fonte),

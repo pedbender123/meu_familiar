@@ -29,8 +29,9 @@ interface Linha {
  * ela que faz esta página valer a visita — e é a imagem que a pessoa quer
  * mostrar pra alguém.
  *
- * O relatório completo continua morando em `/revelacao/[id]`; esta tela é a
- * porta, não uma segunda cópia dele.
+ * A revelação inteira abre em `/conta/familiar/[id]`, aqui dentro. Esta tela é
+ * a estante: quem fez mais de um ritual tem mais de um familiar, e é aqui que
+ * eles ficam lado a lado.
  */
 export default async function FamiliarDaConta() {
   const sessao = await sessaoAtual();
@@ -122,32 +123,23 @@ export default async function FamiliarDaConta() {
 
             <div className="flex flex-wrap items-center justify-center gap-2.5">
               {linha.status === 'entregue' ? (
-                <>
-                  <Link
-                    href={`/revelacao/${linha.id}`}
-                    className="font-corpo text-sm px-6 py-2.5 rounded-full border border-vela/45 text-vela hover:bg-vela/10 transition-colors"
-                  >
-                    Abrir a revelação
-                  </Link>
+                /*
+                  Abre DENTRO da plataforma, não mais em `/revelacao/[id]`.
 
-                  {/*
-                    O PDF baixa AQUI, não pelo e-mail. É a troca que a mudança de
-                    agosto/2026 fez: o e-mail virou a chave, e o artefato mora
-                    dentro — do lado do Oráculo e do calendário, que é o que a
-                    pessoa precisa ver para querer o resto.
+                  O link público continua existindo e continua sendo o que
+                  circula — mas mandar a dona para fora do app para ler o que
+                  ela comprou é devolvê-la à página solta de onde ela veio, com
+                  o menu do produto inteiro do lado de lá da porta.
 
-                    `download` no anchor, e não `target=_blank`: o PDF é dela, e
-                    abrir num visualizador de aba nova esconde justamente o gesto
-                    de guardar.
-                  */}
-                  <a
-                    href={`/api/storage/${linha.id}/revelacao.pdf`}
-                    download={`bruxario-${familiar.nome.toLowerCase().replace(/\s+/g, '-')}.pdf`}
-                    className="font-corpo text-sm px-6 py-2.5 rounded-full border border-pergaminho/20 text-pergaminho/65 hover:border-pergaminho/45 hover:text-pergaminho transition-colors"
-                  >
-                    Baixar o PDF
-                  </a>
-                </>
+                  O PDF saiu daqui: ele agora mora na revelação, e só depois de
+                  sete dias. Ver `nucleo/carencia.ts`.
+                */
+                <Link
+                  href={`/conta/familiar/${linha.id}`}
+                  className="font-corpo text-sm px-6 py-2.5 rounded-full border border-vela/45 text-vela hover:bg-vela/10 transition-colors"
+                >
+                  Abrir a revelação
+                </Link>
               ) : (
                 <>
                   {/*

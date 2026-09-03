@@ -49,7 +49,7 @@ export async function POST(
   // Se a pessoa voltou pra essa tela com o pedido já adiantado, manda pro
   // lugar certo em vez de cobrar de novo.
   if (pedido.status === 'entregue') {
-    return NextResponse.json({ redirect: `/revelacao/${id}` });
+    return NextResponse.json({ redirect: `/entrar/direto/${id}` });
   }
   if (
     pedido.status === 'pago' ||

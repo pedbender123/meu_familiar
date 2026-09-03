@@ -1,7 +1,4 @@
-import fs from 'fs';
-import path from 'path';
 import { Resend } from 'resend';
-import { pastaDoPedido } from './caminhos';
 import { diasRestantes, produtoDe, precoFormatado, PRODUTOS } from './produtos';
 import { PRECO_DA_MELHORIA_CENTAVOS } from '../nucleo/melhoria';
 
@@ -145,15 +142,6 @@ function botao(url: string, texto: string): string {
   return `<a href="${url}" style="display:inline-block;background:${CORES.vela};color:${CORES.tinta};font-family:Arial,sans-serif;font-size:14px;font-weight:bold;text-decoration:none;padding:13px 26px;border-radius:999px;">${texto}</a>`;
 }
 
-/** Pedaço de nome de arquivo: sem acento, sem espaço, minúsculo. */
-function arquivo(texto: string): string {
-  return texto
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
-}
 
 /**
  * A entrega da revelação. Vai com o PDF anexado e, quando o acesso é
@@ -179,10 +167,11 @@ export async function enviarRevelacao(params: {
     dias === null
       ? ''
       : `<p style="margin:0 0 18px;font-family:Arial,sans-serif;font-size:13px;line-height:1.6;color:#6B4E1E;background:rgba(217,164,65,0.16);border-radius:6px;padding:12px 14px;">
-           <strong>Seu link fica aberto por ${produto.diasDeLinkPublico} dias</strong> —
-           até ${new Date(expiraEm!).toLocaleDateString('pt-BR')}. O PDF em anexo é
-           seu para sempre, guarde este e-mail. Se quiser que o link nunca expire,
-           dá para fazer isso por R$ ${precoFormatado(PRODUTOS.link_permanente)}.
+           <strong>Este link fica aberto por ${produto.diasDeLinkPublico} dias</strong> —
+           até ${new Date(expiraEm!).toLocaleDateString('pt-BR')}. É o link de
+           mostrar para as outras pessoas; o seu, dentro do Bruxário, não expira
+           nunca. Se quiser que o público também não expire, dá para fazer isso
+           por R$ ${precoFormatado(PRODUTOS.link_permanente)}.
          </p>`;
 
   /**
@@ -214,16 +203,18 @@ export async function enviarRevelacao(params: {
        </p>`
     : '';
 
-  const anexos: Anexo[] = [];
-  const caminhoPdf = path.join(pastaDoPedido(pedidoId), 'revelacao.pdf');
-  if (fs.existsSync(caminhoPdf)) {
-    anexos.push({
-      // O nome do arquivo é o que a pessoa vê na pasta de downloads daqui a
-      // dois anos. Leva o nome dela junto: `bruxario-helena-o-corvo.pdf`.
-      filename: `bruxario-${arquivo(nome)}-${arquivo(nomeFamiliar)}.pdf`,
-      content: fs.readFileSync(caminhoPdf),
-    });
-  }
+  /**
+   * ── O PDF saiu do anexo ───────────────────────────────────────────────
+   *
+   * Ele ia junto desde o começo, e era o caminho mais curto para quem comprava
+   * baixar, fechar a aba e nunca conhecer o resto do produto. A entrega não
+   * ficou menor por causa disso: a revelação inteira está no Bruxário da
+   * pessoa, para sempre, e o arquivo continua existindo — ele fica guardado
+   * lá dentro e abre para download depois de sete dias.
+   *
+   * Ver `nucleo/carencia.ts` para o porquê dos sete, e `/conta/familiar/[id]`
+   * para onde ele aparece.
+   */
 
   const html = moldura(`
     <p style="margin:0 0 6px;font-family:Arial,sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#6B5F72;">O familiar de</p>
@@ -235,9 +226,11 @@ export async function enviarRevelacao(params: {
     </p>
     <p style="margin:0 0 22px;">${botao(url, 'Ver minha revelação')}</p>
     <p style="margin:0;font-family:Arial,sans-serif;font-size:13px;line-height:1.6;color:#6B5F72;">
-      Em anexo vai a revelação inteira em PDF — a carta, a leitura, a sua
-      invocação${produto.graficos ? ' e os gráficos do seu perfil' : ''}.
-      Guarde ou imprima.
+      A revelação inteira — a carta, a leitura, a sua
+      invocação${produto.graficos ? ' e os gráficos do seu perfil' : ''} — fica
+      guardada no seu Bruxário, junto do Oráculo, do calendário e da
+      biblioteca. A cópia em PDF, para guardar no computador, abre lá dentro
+      daqui a uma semana.
     </p>
     ${blocoUpgrade}
   `);
@@ -246,8 +239,8 @@ export async function enviarRevelacao(params: {
     `${nome}, seu familiar é ${nomeFamiliar} · ${nomeSecreto}.`,
     dias === null
       ? ''
-      : `Seu link fica no ar até ${new Date(expiraEm!).toLocaleDateString('pt-BR')}. O PDF em anexo é seu para sempre.`,
-    `Em anexo vai a revelação inteira em PDF: a carta, a leitura, a sua invocação${produto.graficos ? ' e os gráficos do seu perfil' : ''}.`,
+      : `O link de mostrar para os outros fica no ar até ${new Date(expiraEm!).toLocaleDateString('pt-BR')}. O seu, dentro do Bruxário, não expira.`,
+    `A revelação inteira fica no seu Bruxário: a carta, a leitura, a sua invocação${produto.graficos ? ' e os gráficos do seu perfil' : ''}. A cópia em PDF abre lá daqui a uma semana.`,
     `Ver a revelação: ${url}`,
     ofereceUpgrade
       ? `Quer a leitura completa? Por mais R$ ${(PRECO_DA_MELHORIA_CENTAVOS / 100).toFixed(2).replace('.', ',')}: ${urlUpgrade}`
@@ -261,7 +254,6 @@ export async function enviarRevelacao(params: {
     assunto: `${nome}, seu familiar atravessou o véu`,
     html,
     texto,
-    anexos,
   });
 }
 
