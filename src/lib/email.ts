@@ -760,10 +760,10 @@ export async function enviarCompraConfirmada(params: {
         seu acesso ao teste está aberto.
       </p>
       <p style="margin:0 0 16px;font-family:Georgia,serif;font-size:15px;line-height:1.7;color:#2E2438;">
-        São <strong>26 cenas</strong> — nenhuma pergunta sobre signo, nenhuma
-        sobre data. É o que decide qual dos doze familiares caminha ao seu
-        lado, e é ele que escreve a sua leitura. <strong>Só depois de
-        respondê-las o seu relatório é escrito.</strong>
+        São <strong>26 cenas</strong>. É por elas que ele te reconhece — e é
+        do que você responder ali, junto do seu Sol e da sua Lua, que sai a
+        leitura escrita sobre você. <strong>Só depois delas o seu relatório
+        existe.</strong>
       </p>
       <p style="margin:0 0 8px;">${botao(url, 'Fazer o meu teste')}</p>
       <p style="margin:20px 0 0;font-family:Arial,sans-serif;font-size:12px;line-height:1.6;color:#6B5F72;">
@@ -775,7 +775,7 @@ export async function enviarCompraConfirmada(params: {
     texto: [
       `${nome},`,
       `Seu pagamento da ${nomeDoProduto} foi confirmado, e o seu acesso ao teste está aberto.`,
-      `São 26 cenas — é o que decide qual dos doze familiares caminha ao seu lado. Só depois de respondê-las o seu relatório é escrito.`,
+      `São 26 cenas. É por elas que ele te reconhece — e é do que você responder ali, junto do seu Sol e da sua Lua, que sai a leitura escrita sobre você. Só depois delas o seu relatório existe.`,
       `Fazer o meu teste: ${url}`,
       `Dá para parar e voltar quando quiser: o link guarda o seu lugar.`,
     ].join('\n\n'),

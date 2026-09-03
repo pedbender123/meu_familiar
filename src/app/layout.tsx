@@ -48,7 +48,8 @@ export const metadata: Metadata = {
     siteName: 'Bruxário',
     locale: 'pt_BR',
     title: 'Bruxário — O familiar de bruxa que te escolheu',
-    description: 'Cenas revelam qual dos doze caminha ao seu lado. O signo tem peso zero.',
+    description:
+      'Cenas revelam qual dos doze caminha ao seu lado, com o seu Sol e a sua Lua na leitura.',
     images: [{ url: '/og/inicio.png', width: 1200, height: 630 }],
   },
   twitter: {

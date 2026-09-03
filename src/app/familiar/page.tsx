@@ -4,7 +4,7 @@ import { RitualLongo } from './RitualLongo';
 
 export const metadata = {
   title: 'Descubra seu familiar — Bruxário',
-  description: 'Descubra qual dos 12 animais guarda a sua natureza. Não é signo.',
+  description: 'Descubra qual dos 12 animais guarda a sua natureza, com o seu Sol e a sua Lua na leitura.',
 };
 
 export const dynamic = 'force-dynamic';

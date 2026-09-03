@@ -198,8 +198,10 @@ export default function Privacidade() {
             <>
               <strong className="font-medium">Qual familiar te encontrou</strong>{' '}
               — é calculado a partir das suas escolhas, por um método que está
-              publicado na página inicial. Seu signo tem peso zero nessa conta.
-              Quando dois ficam empatados de verdade, quem escolhe é você.
+              publicado na página inicial. A sua data de nascimento vira o seu
+              Sol e a sua Lua, que entram no texto da leitura e no seu
+              calendário. Quando dois familiares ficam empatados de verdade,
+              quem escolhe é você.
             </>,
             <>
               <strong className="font-medium">O texto da leitura</strong> — é

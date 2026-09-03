@@ -235,7 +235,7 @@ export function ComoFunciona() {
       n: '2',
       titulo: 'Ele te encontra',
       texto:
-        'O resultado sai das suas escolhas. O seu signo tem peso zero na conta; ele volta depois, só como textura da leitura.',
+        'O resultado sai das suas escolhas — e o seu Sol e a sua Lua entram na leitura que ele escreve sobre você.',
     },
     {
       n: '3',

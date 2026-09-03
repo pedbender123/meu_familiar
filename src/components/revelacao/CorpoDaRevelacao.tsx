@@ -192,8 +192,8 @@ export function CorpoDaRevelacao({
             Cada pessoa tem o seu.
           </p>
           <p className="font-corpo font-light text-sm leading-relaxed text-pergaminho/55 max-w-[34ch]">
-            Vinte e seis cenas revelam qual dos doze caminha ao seu lado. O signo
-            tem peso zero.
+            Vinte e seis cenas revelam qual dos doze caminha ao seu lado — com o
+            seu Sol e a sua Lua na leitura que ele escreve sobre você.
           </p>
           <Link
             href="/"
