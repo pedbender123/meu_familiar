@@ -215,9 +215,8 @@ export async function PUT(req: NextRequest) {
     // venda fecha depois dele, o crédito é dele — é a ÚNICA coisa que
     // sobrescreve o primeiro toque. Ver `deveSubstituir` em rastreio.ts.
     ? `${base()}/seu-familiar/${envio.pedido_id}?e=rm`
-    // A raiz: `/vendas` saiu do ar (ver `next.config.ts`), e é a campanha
-    // que decide qual funil a pessoa encontra do outro lado.
-    : `${base()}?e=rm`;
+    // `/vendas`: a primeira cena das 26, sem a landing na frente.
+    : `${base()}/vendas?e=rm`;
 
   try {
     await enviarOferta({

@@ -30,17 +30,16 @@ export function LinkDoAnuncio({ base }: { base: string }) {
     só aparece depois de o anúncio já ter gasto dinheiro.
   */
   /*
-    A RAIZ, e não `/vendas`.
+    `/vendas`, e não a raiz.
 
-    O link do anúncio apontava para uma rota fixa, fora do registro de
-    `lib/funis.ts` — então a escolha de funil da campanha não valia nada para
-    quem entrava por ali: todo tráfego pago caía no funil de sete perguntas,
-    que nunca vendeu, enquanto o das 26 cenas (o único que vendeu) ficava
-    esperando. Na raiz, quem decide o que a pessoa vê é a campanha, que é
-    onde essa decisão sempre deveria ter morado.
+    A raiz sem `?c=` é a landing explicativa — e link de anúncio chega sem
+    marcador com mais frequência do que se imagina (encurtador que come a
+    query, alguém que copia só o domínio). `/vendas` é a primeira cena das 26
+    com marcador ou sem, então não existe caminho por onde tráfego pago caia
+    na landing por acidente.
   */
   const link =
-    `${base}` +
+    `${base}/vendas` +
     '?utm_source={{site_source_name}}' +
     '&utm_medium=paid' +
     '&utm_campaign={{campaign.id}}' +
