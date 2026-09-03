@@ -29,8 +29,18 @@ export function LinkDoAnuncio({ base }: { base: string }) {
     espaço junto e a URL chega quebrada no gerenciador — o tipo de erro que
     só aparece depois de o anúncio já ter gasto dinheiro.
   */
+  /*
+    A RAIZ, e não `/vendas`.
+
+    O link do anúncio apontava para uma rota fixa, fora do registro de
+    `lib/funis.ts` — então a escolha de funil da campanha não valia nada para
+    quem entrava por ali: todo tráfego pago caía no funil de sete perguntas,
+    que nunca vendeu, enquanto o das 26 cenas (o único que vendeu) ficava
+    esperando. Na raiz, quem decide o que a pessoa vê é a campanha, que é
+    onde essa decisão sempre deveria ter morado.
+  */
   const link =
-    `${base}/vendas` +
+    `${base}` +
     '?utm_source={{site_source_name}}' +
     '&utm_medium=paid' +
     '&utm_campaign={{campaign.id}}' +

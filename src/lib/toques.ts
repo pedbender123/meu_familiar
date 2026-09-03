@@ -340,8 +340,25 @@ export function comparacaoDeFunis(desde: string | null): {
     visitante: string | null;
   }[];
 
-  // Quem chegou em cada funil sai dos MARCOS, não dos pedidos: `ritual_aberto`
-  // é disparado na primeira tela, antes de qualquer campo preenchido.
+  /*
+    Quem chegou em cada funil, pelo caminho da primeira visita.
+
+    ── Atenção: isto mede menos do que media ─────────────────────────────
+
+    Os três caminhos abaixo eram endereços publicados. Hoje só `/familiar`
+    ainda é: `/vendas` saiu do ar (ver `next.config.ts`) e o tráfego pago
+    entra pela RAIZ, onde a campanha decide qual funil renderizar. Uma visita
+    a `/` não diz em que funil a pessoa caiu, e a tabela `visitas` não guarda
+    essa informação.
+
+    Efeito prático: a coluna de chegadas destes funis vai parando de crescer,
+    enquanto pedidos e vendas (que leem `pedidos.funil`) continuam certos. O
+    histórico anterior continua valendo, e é por isso que os caminhos ficam
+    aqui em vez de serem apagados.
+
+    Para medir chegada por funil daqui em diante seria preciso gravar o funil
+    na visita — decisão de produto, não conserto de consulta.
+  */
   const chegadas = db
     .prepare(
       `SELECT v.caminho AS caminho, COUNT(DISTINCT v.visitante) AS pessoas
