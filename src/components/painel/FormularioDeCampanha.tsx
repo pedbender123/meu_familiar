@@ -2,9 +2,8 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { EscolhaDeFunis } from './EscolhaDeFunis';
 import { EscolhaDeCheckout } from './EscolhaDeCheckout';
-import type { FunilId } from '@/lib/funis';
+import { FUNIL_PADRAO, type FunilId } from '@/lib/funis';
 import type { NomeDoGateway } from '@/nucleo/checkouts/nomes';
 import { agoraEmBrasilia } from '@/lib/periodo';
 
@@ -39,7 +38,12 @@ export function FormularioDeCampanha() {
    * nova nascer apontando para uma aposta não validada seria trocar o certo
    * pelo talvez sem ninguém ter decidido isso.
    */
-  const [funis, setFunis] = useState<FunilId[]>(['padrao']);
+  /*
+    Fixo nas 26 cenas. A campanha continua gravando a coluna `funis` — é o
+    formato que a rota espera e o histórico usa —, só não há mais o que
+    escolher. Ver `ESCOLHA_DE_FUNIL_LIGADA` em `lib/funis.ts`.
+  */
+  const funis: FunilId[] = [FUNIL_PADRAO];
   /** `null` = segue o padrão do servidor, como toda campanha antiga. */
   const [gateway, setGateway] = useState<NomeDoGateway | null>(null);
 
@@ -95,8 +99,14 @@ export function FormularioDeCampanha() {
         <Campo rotulo="Nome" valor={form.nome} onChange={set('nome')}
           placeholder="Story 07/08 — teste do bilhete" />
         <div className="sm:col-span-2">
-          <EscolhaDeFunis valor={funis} onChange={setFunis} />
+          {/*
+            O seletor de funis saiu da tela.
 
+            Toda campanha serve as 26 cenas — ver `ESCOLHA_DE_FUNIL_LIGADA` em
+            `lib/funis.ts`. Uma escolha que só tem uma resposta certa não é uma
+            escolha: é uma chance de alguém errar. O componente continua no
+            repositório para o dia em que o teste voltar.
+          */}
           <EscolhaDeCheckout valor={gateway} onChange={setGateway} />
         </div>
 

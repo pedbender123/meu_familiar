@@ -48,6 +48,29 @@ const nextConfig: NextConfig = {
         destination: "/",
         permanent: false,
       },
+
+      /**
+       * As outras duas portas de funil, pelo mesmo motivo.
+       *
+       * `/atravessar` era a continuação de `/vendas` (a segunda pergunta em
+       * diante) e ficou órfã junto com ela; `/familiar` é o ritual longo. As
+       * duas continuam existindo como código e como histórico — o que deixou
+       * de existir é o endereço, porque endereço publicado é por onde entra
+       * tráfego pago, e tráfego pago só tem um destino agora.
+       *
+       * A query vai junto: um anúncio antigo apontando para cá não perde
+       * `?c=` nem os UTMs no caminho.
+       */
+      {
+        source: "/atravessar",
+        destination: "/",
+        permanent: false,
+      },
+      {
+        source: "/familiar",
+        destination: "/",
+        permanent: false,
+      },
     ];
   },
 };
