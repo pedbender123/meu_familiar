@@ -35,6 +35,8 @@ async function principal() {
       pedidoId,
       emailDoPedido: 'teste@bruxario.com.br',
       descontoPercentual: 0,
+      // Cobrança de fumaça: sem ebook marcado.
+      bumpsCentavos: 0,
       cakto: {
         metodo: 'pix',
         nome: 'Teste Bruxario',

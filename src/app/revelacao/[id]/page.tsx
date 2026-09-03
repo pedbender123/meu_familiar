@@ -282,6 +282,43 @@ export default async function Revelacao({
         )}
 
         {/*
+          ── O convite para quem chegou pelo link de outra pessoa ───────────
+
+          O botão de compartilhar manda a REVELAÇÃO, porque é o que a pessoa
+          quer mostrar ("olha o que deu pra mim"). Isso resolve metade do
+          problema e cria a outra: sem este bloco, quem recebe lê a história de
+          uma amiga, acha bonito, e não tem para onde ir — a página não pede
+          nada, e a curiosidade morre ali.
+
+          Era essa a preocupação por trás de o link ter apontado para a home
+          durante um tempo. A preocupação estava certa; a solução, não. O lugar
+          de convidar é aqui, depois de a pessoa ter lido a coisa que dá
+          vontade — não antes dela, numa página de vendas que o amigo nunca
+          pediu para ver.
+
+          Só para quem NÃO é a dona: ela já tem o dela, e oferecer o ritual a
+          quem acabou de recebê-lo é o tipo de detalhe que faz um produto
+          parecer que não sabe com quem está falando.
+        */}
+        {!ehADona && (
+          <BlocoRevelado className="w-full max-w-md flex flex-col items-center gap-4 text-center border-t border-pergaminho/10 pt-8 sm:pt-10">
+            <p className="font-display italic text-lg leading-snug text-pergaminho/80 max-w-[28ch]">
+              Cada pessoa tem o seu.
+            </p>
+            <p className="font-corpo font-light text-sm leading-relaxed text-pergaminho/55 max-w-[34ch]">
+              Vinte e seis cenas revelam qual dos doze caminha ao seu lado. O
+              signo tem peso zero.
+            </p>
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 bg-vela text-tinta font-corpo font-medium px-6 py-3 rounded-full hover:brightness-110 transition"
+            >
+              Descobrir o meu familiar
+            </Link>
+          </BlocoRevelado>
+        )}
+
+        {/*
           O recado para o Oráculo saiu daqui e foi para a área da conta.
           Aqui ele pedia texto livre a quem talvez nem tivesse conta, numa
           página que também é vista por estranhos com o link. Na conta, é a

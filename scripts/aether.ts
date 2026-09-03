@@ -116,10 +116,15 @@ function acaoCampanhas(): string {
   const linhas = campanhas.map((c) => {
     const pedidos = db
       .prepare(
-        `SELECT produto, desconto_percentual, status
+        `SELECT produto, desconto_percentual, bumps_centavos, status
            FROM pedidos WHERE campanha_id = ? AND exemplo = 0`
       )
-      .all(c.id) as { produto: string; desconto_percentual: number | null; status: string }[];
+      .all(c.id) as {
+      produto: string;
+      desconto_percentual: number | null;
+      bumps_centavos: number | null;
+      status: string;
+    }[];
 
     const pagos = pedidos.filter((p) =>
       ['pago', 'gerando', 'entregue'].includes(p.status)
@@ -165,12 +170,13 @@ function acaoVendas({ janela, corte }: { janela: Janela; corte: string | null })
 
   const pedidos = db
     .prepare(
-      `SELECT produto, desconto_percentual, status, metodo_pagamento
+      `SELECT produto, desconto_percentual, bumps_centavos, status, metodo_pagamento
          FROM pedidos WHERE exemplo = 0 ${filtro}`
     )
     .all(...args) as {
     produto: string;
     desconto_percentual: number | null;
+    bumps_centavos: number | null;
     status: string;
     metodo_pagamento: string | null;
   }[];

@@ -63,24 +63,41 @@ export function BotaoCompartilhar({
   const [copiado, setCopiado] = useState(false);
 
   /**
-   * O endereço que a pessoa manda para os amigos, com a marca de indicação.
+   * O endereço que a pessoa manda para os amigos: **a revelação dela**, com a
+   * marca de indicação.
    *
-   * ── Por que o link compartilhado aponta para a HOME e não para a revelação
+   * ── Isto já apontou para a home, e voltou ───────────────────────────────
    *
-   * Antes ele mandava `/revelacao/<id>` — a revelação DELA. Quem recebia caía
-   * numa leitura que não era sua, sem nada a fazer ali além de ler o resultado
-   * de outra pessoa. Agora vai para a porta da frente com `?s=<código>`, que é
-   * onde o amigo pode fazer o próprio.
+   * O link chegou a ser `/?s=<código>`, com o raciocínio de que quem recebe a
+   * revelação de outra pessoa não tem nada a fazer ali além de ler o resultado
+   * alheio — melhor mandar para a porta da frente, onde ele faz o próprio.
    *
-   * O código são os 8 primeiros caracteres do id do pedido. Não abre nada: ele
-   * só credita a indicação a quem compartilhou, para o painel poder mostrar
-   * "esta venda veio pelo link da Marina".
+   * O raciocínio ignorava por que alguém compartilha. Ninguém manda "olha esse
+   * site"; manda **"olha o que deu pra mim"**. A revelação é a coisa que a
+   * pessoa quer mostrar, e mandar a home no lugar dela entrega ao amigo um
+   * anúncio em vez da história — o link some no meio da conversa, e quem
+   * compartilhou percebe: o que ele copia da barra de endereço funciona, e o
+   * botão de compartilhar não.
+   *
+   * Também é o link com preview: `/revelacao/[id]` gera Open Graph com o nome
+   * secreto e a arte do familiar (ver `generateMetadata`), enquanto a home
+   * mostra o card genérico do site. No WhatsApp isso é a diferença entre uma
+   * imagem que dá vontade de tocar e uma linha azul.
+   *
+   * ── O `?s=` continua indo junto ─────────────────────────────────────────
+   *
+   * São os 8 primeiros caracteres do id, e é o que credita a indicação a quem
+   * compartilhou — o `Farejador` lê `?s=` em qualquer página, então ele
+   * funciona aqui igual funcionava na home. O que muda é só onde o amigo cai.
+   *
+   * A conversão continua existindo, e num lugar melhor: a revelação já mostra
+   * a quem não é dono o convite para fazer o próprio ritual.
    */
   function enderecoPermanente() {
     if (urlPerfil) return urlPerfil;
     const codigo = pedidoId.replace(/-/g, '').slice(0, 8).toLowerCase();
     return typeof window !== 'undefined'
-      ? `${window.location.origin}/?s=${codigo}`
+      ? `${window.location.origin}/revelacao/${pedidoId}?s=${codigo}`
       : '';
   }
 
