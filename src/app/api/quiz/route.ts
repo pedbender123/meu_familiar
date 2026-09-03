@@ -11,7 +11,7 @@ import {
 import { validarEmail, validarNome } from '@/lib/validacao';
 import { calcularExpiracao, ehProdutoValido, PRODUTO_PADRAO, produtoDe } from '@/lib/produtos';
 import { precoComDesconto, validarCupom } from '@/lib/cupons';
-import { atribuicaoDoPedido } from '@/lib/rastreio';
+import { atribuicaoDoPedido , utmJsonDoCorpo } from '@/lib/rastreio';
 import { processarPedido, descreverPerfil } from '@/lib/processar';
 import { excedeuLimite } from '@/lib/rate-limit';
 import { ITENS } from '@/lib/quiz/itens';
@@ -154,15 +154,7 @@ export async function POST(req: NextRequest) {
    *
    * Só as cinco chaves de UTM, só string, 120 caracteres cada.
    */
-  const utmJson = (() => {
-    if (!utm || typeof utm !== 'object') return null;
-    const limpo: Record<string, string> = {};
-    for (const chave of ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content']) {
-      const valor = (utm as Record<string, unknown>)[chave];
-      if (typeof valor === 'string' && valor.trim()) limpo[chave] = valor.trim().slice(0, 120);
-    }
-    return Object.keys(limpo).length ? JSON.stringify(limpo) : null;
-  })();
+  const utmJson = utmJsonDoCorpo(utm);
 
   const pedidoId = uuidv4();
   criarPedido({

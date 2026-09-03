@@ -5,7 +5,7 @@ import { calcularSignos, calcularFaseDaLua } from '@/lib/astro';
 import { criarPedido, rascunhoVirouPedido, atualizarPedido } from '@/lib/db';
 import { validarEmail, validarNome } from '@/lib/validacao';
 import { PRODUTO_PADRAO, produtoDe } from '@/lib/produtos';
-import { atribuicaoDoPedido } from '@/lib/rastreio';
+import { atribuicaoDoPedido , utmJsonDoCorpo } from '@/lib/rastreio';
 import { ehFunil, FUNIL_PADRAO } from '@/lib/funis';
 import { excedeuLimite } from '@/lib/rate-limit';
 import { GRUPOS, ehGrupo } from '@/lib/quiz/grupos';
@@ -54,7 +54,8 @@ export async function POST(req: NextRequest) {
   }
 
   const corpo = await req.json().catch(() => ({}));
-  const { isca, perfilLongo, grupo: grupoPedido, nome, email, dataNascimento, funil } = corpo ?? {};
+  const { isca, perfilLongo, grupo: grupoPedido, nome, email, dataNascimento, funil, utm } =
+    corpo ?? {};
 
   /**
    * Dois funis chegam aqui, e eles trazem coisas diferentes.
@@ -149,6 +150,16 @@ export async function POST(req: NextRequest) {
     // Ver `atribuicaoDoPedido`: primeiro toque vence, e-mail transacional não
     // rouba crédito, remarketing é a única exceção que sobrescreve.
     ...atribuicaoDoPedido(req.cookies),
+    /**
+     * Os UTMs crus, que faltavam nesta rota.
+     *
+     * `atribuicaoDoPedido` resolve de qual CAMPANHA a pessoa veio; ele não
+     * sabe de qual anúncio. Sem esta linha, todo pedido nascido em
+     * `/familiar` e `/atravessar` chegava à Utmify sem `utm_content` e sem
+     * `utm_term` — sem o criativo e sem o conjunto, que é o que a agência usa
+     * para decidir o que escalar. O `/api/quiz` já gravava; esta rota, não.
+     */
+    utm_json: utmJsonDoCorpo(utm),
     visitante: req.cookies.get('bx_v')?.value ?? null,
     perfil_json: JSON.stringify(temIsca ? { isca: { grupo } } : { perfilLongo }),
   });

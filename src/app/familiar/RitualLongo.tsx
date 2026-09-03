@@ -1,4 +1,5 @@
 'use client';
+import { utmsDaSessao } from '@/components/checkout/utms';
 
 import { useEffect, useRef, useState } from 'react';
 import { PoeiraNaLuz } from '@/components/PoeiraNaLuz';
@@ -174,6 +175,9 @@ export function RitualLongo({
           email: aceitou ? dados.email : '',
           genero,
           funil: 'familiar',
+          // Os UTMs da chegada, para a venda aparecer na Utmify com o anúncio
+          // que a trouxe. Ver `utmJsonDoCorpo` em `lib/rastreio.ts`.
+          utm: utmsDaSessao(),
         }),
       });
       const d = await r.json();

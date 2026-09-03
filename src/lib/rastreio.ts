@@ -460,3 +460,49 @@ export function atribuicaoDoPedido(cookies: {
     indicado_por: null,
   };
 }
+
+/**
+ * Os UTMs que o navegador mandou, prontos para a coluna `utm_json`.
+ *
+ * ── Por que isto virou uma função ─────────────────────────────────────────
+ *
+ * Porque estava escrito dentro de `/api/quiz` e **não existia** em
+ * `/api/mini`, que é a rota dos outros dois funis. O efeito era silencioso e
+ * caro: pedido nascido no funil longo ou no curto ia para a Utmify sem
+ * `utm_content` e sem `utm_term` — ou seja, sem o anúncio e sem o conjunto.
+ * A agência via a venda e não via qual criativo a trouxe, que é a única coisa
+ * que ela usa para decidir o que escalar.
+ *
+ * Havia rede de segurança (`rastreioDaCampanha` reconstrói o `utm_campaign` a
+ * partir de outra venda da mesma campanha), mas ela só cobre a campanha, e só
+ * depois de a primeira venda com UTM ter existido. Numa campanha nova ela cai
+ * no NOME da campanha em vez do id da Meta — que é exatamente o que faz o
+ * painel deles mostrar duas identidades para a mesma coisa.
+ *
+ * ── Cortado em 120 caracteres ─────────────────────────────────────────────
+ *
+ * O `utm_campaign` da Meta chega como `nome|id` e o nome é digitado por gente
+ * — já vieram valores de duzentos caracteres. Guardar inteiro não ajuda
+ * ninguém e engorda toda linha da tabela.
+ */
+export const CHAVES_DE_UTM = [
+  'utm_source',
+  'utm_medium',
+  'utm_campaign',
+  'utm_term',
+  'utm_content',
+] as const;
+
+export function utmJsonDoCorpo(utm: unknown): string | null {
+  if (!utm || typeof utm !== 'object') return null;
+
+  const limpo: Record<string, string> = {};
+  for (const chave of CHAVES_DE_UTM) {
+    const valor = (utm as Record<string, unknown>)[chave];
+    if (typeof valor === 'string' && valor.trim()) {
+      limpo[chave] = valor.trim().slice(0, 120);
+    }
+  }
+
+  return Object.keys(limpo).length ? JSON.stringify(limpo) : null;
+}

@@ -1,4 +1,5 @@
 'use client';
+import { utmsDaSessao } from '@/components/checkout/utms';
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { marcar } from '@/lib/marcar';
@@ -161,6 +162,9 @@ export function FunilDeVendas({
           isca: respostas,
           grupo,
           funil: 'atravessar',
+          // Os UTMs da chegada, para a venda aparecer na Utmify com o anúncio
+          // que a trouxe. Ver `utmJsonDoCorpo` em `lib/rastreio.ts`.
+          utm: utmsDaSessao(),
           nome: dados.nome,
           dataNascimento: nascimento,
           email: aceitou ? dados.email : '',
