@@ -253,7 +253,23 @@ export function Leitor({
               onClick={() => setFitasAbertas(false)}
               style={{ background: 'rgba(12,10,16,0.35)' }}
             />
-            <div className="absolute z-40 left-0 right-0 top-6 px-4 sm:px-10 flex flex-col gap-2">
+            {/*
+              ── O painel nasce ONDE a fita está ──────────────────────────
+
+              Ele era `absolute` no topo do papel: quem estava lendo a folha
+              três clicava na fita e não via nada acontecer — o painel tinha
+              aberto centenas de pixels acima, fora da tela. A pessoa
+              concluía que o clique não funcionou.
+
+              `fixed`, ancorado à esquerda e centrado na vertical, ele abre
+              colado nas fitas, que é de onde ele saiu. `max-h` com rolagem
+              própria porque um livro de cinco módulos com seis capítulos cada
+              não cabe em tela de celular — e o painel rolando por dentro é
+              melhor que o painel empurrando a página.
+            */}
+            <div
+              className="fixed z-40 left-3 sm:left-5 top-1/2 -translate-y-1/2 w-[min(78vw,330px)] max-h-[80vh] overflow-y-auto flex flex-col gap-2 pr-1"
+            >
               {livro.modulos.map((m, mi) => (
                 <div
                   key={m.titulo}
