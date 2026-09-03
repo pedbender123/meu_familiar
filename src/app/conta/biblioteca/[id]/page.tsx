@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import { sessaoAtual } from '@/lib/sessao-servidor';
 import { buscarConta } from '@/lib/autenticacao';
-import { assinaturasAtivasDaConta } from '@/nucleo/assinaturas';
+import { assinaturaPagaAtiva } from '@/nucleo/assinaturas';
 import { podeAbrir } from '@/nucleo/biblioteca/desbloqueios';
 import { lerEbook } from '@/nucleo/biblioteca/leitura';
 import { Leitor } from '@/components/biblioteca/Leitor';
@@ -36,7 +36,9 @@ export default async function LerLivro({ params }: { params: Promise<{ id: strin
   if (!lido) notFound();
 
   const conta = buscarConta(sessao.email);
-  const assina = conta ? assinaturasAtivasDaConta(conta.id).length > 0 : false;
+  // Paga, não só ativa: o plano gratuito nasce com a conta e faria a
+  // estante inteira abrir para quem nunca comprou nada. Ver `assinaturaPagaAtiva`.
+  const assina = conta ? assinaturaPagaAtiva(conta.id) : false;
 
   if (!podeAbrir(sessao.email, id, assina)) {
     redirect('/conta/biblioteca');

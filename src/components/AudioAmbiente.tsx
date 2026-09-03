@@ -81,6 +81,17 @@ export function AudioAmbiente() {
    */
   if (caminho?.startsWith('/painel')) return null;
 
+  /**
+   * Dentro da conta quem manda no som é a pessoa.
+   *
+   * A plataforma tem tocador próprio (`plataforma/Tocador.tsx`), com lista de
+   * faixas e volume. Deixar o ambiente rodando junto seria chuva por cima de
+   * chuva — literalmente, já que a primeira faixa do catálogo é este mesmo
+   * arquivo — e dois controles de som na mesma tela, cada um ignorando o
+   * outro.
+   */
+  if (caminho?.startsWith('/conta')) return null;
+
   return (
     <>
       <audio ref={chuva} src="/audio/chuva.mp3" loop preload="auto" />

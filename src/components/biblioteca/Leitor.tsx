@@ -1,10 +1,17 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight, Volume2, VolumeX } from 'lucide-react';
 import { FolhaPergaminho } from '@/components/FolhaPergaminho';
 import { paginarCapitulo, type LivroLido } from '@/nucleo/biblioteca/formato';
+import {
+  alternarTrilha,
+  assinarTrilha,
+  estadoDaTrilha,
+  estadoDaTrilhaNoServidor,
+  pedirTrilha,
+} from '@/lib/trilha';
 
 /**
  * O modo de leitura — um livro apoiado na mesa, não uma página de site.
@@ -82,7 +89,20 @@ export function Leitor({
 
   const [posicao, setPosicao] = useState(0);
   const [fitasAbertas, setFitasAbertas] = useState(false);
-  const [somLigado, setSomLigado] = useState(false);
+
+  /**
+   * O som do capítulo é o tocador da plataforma, não um player daqui.
+   *
+   * O `som:` do Markdown nomeia uma faixa do catálogo (`nucleo/trilhas`), e o
+   * tocador que fica no canto da tela é quem toca — o mesmo que continua
+   * tocando quando a pessoa sai do livro. Um segundo elemento de áudio aqui
+   * dentro daria duas músicas ao mesmo tempo e dois botões que se ignoram.
+   */
+  const trilha = useSyncExternalStore(
+    assinarTrilha,
+    estadoDaTrilha,
+    estadoDaTrilhaNoServidor
+  );
 
   const chave = `bx_leitura_${ebookId}`;
 
@@ -112,6 +132,16 @@ export function Leitor({
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [posicao]);
 
+  /**
+   * O capítulo PEDE a trilha dele; quem decide é a pessoa.
+   *
+   * `pedirTrilha` só troca a faixa se o tocador já estiver tocando — virar a
+   * página não pode religar um som que ela desligou. Ver `lib/trilha.ts`.
+   */
+  useEffect(() => {
+    pedirTrilha(plano[posicao]?.capitulo.som);
+  }, [plano, posicao]);
+
   // Fechar com Esc: a fita aberta cobre o texto, e cobrir texto sem saída pelo
   // teclado é o tipo de coisa que prende quem lê no computador.
   useEffect(() => {
@@ -125,6 +155,7 @@ export function Leitor({
   if (!atual) return null;
 
   const cor = corDoModulo(atual.moduloIndice);
+  const tocandoEsteCapitulo = trilha.tocando && trilha.id === atual.capitulo.som;
 
   function irPara(i: number) {
     setPosicao(Math.max(0, Math.min(plano.length - 1, i)));
@@ -153,10 +184,16 @@ export function Leitor({
           </p>
         </div>
 
+        {/*
+          O botão liga a trilha DESTE capítulo no tocador da plataforma. Ele
+          fica aceso enquanto a faixa pedida for a que está tocando — se a
+          pessoa trocar de faixa no tocador, ele apaga, porque aí o som já não
+          é o do capítulo.
+        */}
         <button
-          onClick={() => setSomLigado((v) => !v)}
+          onClick={() => atual.capitulo.som && alternarTrilha(atual.capitulo.som)}
           disabled={!atual.capitulo.som}
-          aria-label={somLigado ? 'Desligar a trilha' : 'Ligar a trilha'}
+          aria-label={tocandoEsteCapitulo ? 'Desligar a trilha' : 'Ligar a trilha'}
           title={
             atual.capitulo.som
               ? `Trilha: ${atual.capitulo.som}`
@@ -164,15 +201,15 @@ export function Leitor({
           }
           className="shrink-0 w-9 h-9 rounded-full border flex items-center justify-center transition disabled:opacity-20"
           style={{
-            borderColor: somLigado
+            borderColor: tocandoEsteCapitulo
               ? 'rgba(217,164,65,0.5)'
               : 'color-mix(in srgb, var(--pergaminho) 15%, transparent)',
-            color: somLigado
+            color: tocandoEsteCapitulo
               ? 'var(--vela)'
               : 'color-mix(in srgb, var(--pergaminho) 50%, transparent)',
           }}
         >
-          {somLigado ? <Volume2 size={15} strokeWidth={1.5} /> : <VolumeX size={15} strokeWidth={1.5} />}
+          {tocandoEsteCapitulo ? <Volume2 size={15} strokeWidth={1.5} /> : <VolumeX size={15} strokeWidth={1.5} />}
         </button>
       </header>
 

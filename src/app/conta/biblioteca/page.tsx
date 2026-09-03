@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { Lock } from 'lucide-react';
 import { sessaoAtual } from '@/lib/sessao-servidor';
 import { buscarConta } from '@/lib/autenticacao';
-import { assinaturasAtivasDaConta } from '@/nucleo/assinaturas';
+import { assinaturaPagaAtiva } from '@/nucleo/assinaturas';
 import { estanteDe } from '@/nucleo/biblioteca/desbloqueios';
 import { lerEbook } from '@/nucleo/biblioteca/leitura';
 
@@ -39,7 +39,9 @@ export default async function Biblioteca() {
   if (!sessao || sessao.tipo !== 'conta') redirect('/entrar');
 
   const conta = buscarConta(sessao.email);
-  const assina = conta ? assinaturasAtivasDaConta(conta.id).length > 0 : false;
+  // Paga, não só ativa: o plano gratuito nasce com a conta e faria a
+  // estante inteira abrir para quem nunca comprou nada. Ver `assinaturaPagaAtiva`.
+  const assina = conta ? assinaturaPagaAtiva(conta.id) : false;
   const estante = estanteDe(sessao.email, assina);
 
   return (

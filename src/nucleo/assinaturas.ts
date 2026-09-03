@@ -116,6 +116,47 @@ export function assinaturasAtivasDaConta(contaId: string, agora = new Date()): A
     .all(contaId, agora.toISOString()) as Assinatura[];
 }
 
+/**
+ * Assinatura **paga** e ativa agora.
+ *
+ * ── Por que isto não é `assinaturasAtivasDaConta(...).length > 0` ─────────
+ *
+ * Porque todo mundo tem assinatura ativa. O plano `gratuito` é criado junto
+ * com a conta (ver `acesso-plataforma.ts`), não tem fim, e é ele que liga a
+ * tiragem do dia — então a contagem de assinaturas ativas nunca é zero para
+ * ninguém que já entrou uma vez.
+ *
+ * Enquanto a única pergunta era "esta pessoa tem acesso à plataforma?", isso
+ * dava certo. No dia em que a biblioteca passou a abrir a estante inteira
+ * "para quem assina", virou outra coisa: os três livros vendidos no checkout
+ * ficaram abertos para qualquer pessoa com conta — inclusive quem entrou de
+ * graça sem comprar nada.
+ *
+ * A pergunta certa é sobre PREÇO e RECORRÊNCIA: um plano que custa dinheiro e
+ * se repete. `preco_centavos > 0` e não `id <> 'gratuito'` porque o dia em que
+ * existir um segundo plano sem custo a regra continua valendo sozinha; e
+ * `recorrente = 1` porque as avulsas (`avulsa_simples`, `avulsa_completa`)
+ * também custam dinheiro e também viram linha de assinatura — mas elas são uma
+ * compra única de acesso, e o acervo da biblioteca nunca foi prometido nelas.
+ *
+ * "Assinante" aqui quer dizer exatamente o que a página de planos vende.
+ */
+export function assinaturaPagaAtiva(contaId: string, agora = new Date()): boolean {
+  const linha = db
+    .prepare(
+      `SELECT 1 FROM assinaturas a
+         JOIN planos p ON p.id = a.plano_id
+        WHERE a.conta_id = ?
+          AND a.status = 'ativa'
+          AND (a.fim IS NULL OR a.fim > ?)
+          AND p.preco_centavos > 0
+          AND p.recorrente = 1
+        LIMIT 1`
+    )
+    .get(contaId, agora.toISOString());
+  return !!linha;
+}
+
 export function todasAsAssinaturasDaConta(contaId: string): Assinatura[] {
   return db
     .prepare('SELECT * FROM assinaturas WHERE conta_id = ? ORDER BY criado_em DESC')

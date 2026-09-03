@@ -6,6 +6,7 @@ import {
   criarAssinatura,
   buscarAssinaturaDoPedido,
   assinaturasAtivasDaConta,
+  assinaturaPagaAtiva,
   todasAsAssinaturasDaConta,
 } from './assinaturas';
 
@@ -97,4 +98,54 @@ test('buscarAssinaturaDoPedido acha pelo pedido, undefined se não existir', () 
 
   criarAssinatura({ contaId, planoId: 'revelacao', pedidoId });
   assert.equal(buscarAssinaturaDoPedido(pedidoId)?.conta_id, contaId);
+});
+
+/**
+ * ── A conta que "assinava" sem nunca ter pago ─────────────────────────────
+ *
+ * O plano `gratuito` nasce junto com a conta e não tem fim. Enquanto o código
+ * perguntava "tem assinatura ativa?", a resposta era sim para todo mundo — e
+ * a biblioteca, que abre a estante inteira para quem assina, estava dando os
+ * três livros vendidos no checkout para qualquer pessoa que tivesse entrado
+ * uma vez.
+ */
+describe('assinaturaPagaAtiva', () => {
+  test('o plano gratuito não faz de ninguém assinante', () => {
+    const contaId = randomUUID();
+    criarAssinatura({ contaId, planoId: 'gratuito' });
+
+    assert.equal(
+      assinaturasAtivasDaConta(contaId).length,
+      1,
+      'ele É uma assinatura ativa — é justamente esse o problema'
+    );
+    assert.equal(assinaturaPagaAtiva(contaId), false);
+  });
+
+  test('um plano que custa dinheiro faz', () => {
+    const contaId = randomUUID();
+    criarAssinatura({ contaId, planoId: 'revelacao_mensal' });
+    assert.equal(assinaturaPagaAtiva(contaId), true);
+  });
+
+  test('vencida não vale, mesmo com o status parado em ativa', () => {
+    const contaId = randomUUID();
+    const ontem = new Date(Date.now() - 86_400_000).toISOString();
+    criarAssinatura({ contaId, planoId: 'revelacao_mensal', fim: ontem });
+    assert.equal(assinaturaPagaAtiva(contaId), false);
+  });
+
+  /**
+   * A avulsa custa dinheiro e vira linha de assinatura — mas é compra única de
+   * acesso, não plano. O acervo da biblioteca não foi vendido nela.
+   */
+  test('a avulsa paga não é assinatura', () => {
+    const contaId = randomUUID();
+    criarAssinatura({ contaId, planoId: 'avulsa_completa' });
+    assert.equal(assinaturaPagaAtiva(contaId), false);
+  });
+
+  test('sem assinatura nenhuma, não', () => {
+    assert.equal(assinaturaPagaAtiva(randomUUID()), false);
+  });
 });

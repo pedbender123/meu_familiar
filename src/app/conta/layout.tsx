@@ -8,6 +8,9 @@ import {
   NavegacaoDaPlataforma,
   type ItemDeNavegacao,
 } from '@/plataforma/NavegacaoDaPlataforma';
+import { Tocador } from '@/plataforma/Tocador';
+import { trilhasNoAr } from '@/nucleo/trilhas/servidor';
+import { assinaturaPagaAtiva } from '@/nucleo/assinaturas';
 
 export const metadata = {
   title: 'Seu Bruxário',
@@ -96,6 +99,23 @@ export default async function LayoutDaConta({
           {children}
         </main>
       </div>
+
+      {/*
+        O tocador mora no LAYOUT, e não em cada página.
+
+        É o que faz a trilha atravessar a navegação: escolheu chuva na
+        revelação, continua chovendo no Oráculo e dentro do livro. Se ele
+        vivesse na página, cada clique no menu recomeçaria o áudio do zero —
+        que é a diferença entre uma plataforma com som e um site que toca
+        música na sua cara.
+
+        A lista vem do disco (`trilhasNoAr`): faixa anunciada e sem arquivo é
+        promessa quebrada no clique. Ver `nucleo/trilhas/catalogo.ts`.
+      */}
+      <Tocador
+        trilhas={trilhasNoAr()}
+        assinaturaAtiva={conta ? assinaturaPagaAtiva(conta.id) : false}
+      />
     </>
   );
 }
